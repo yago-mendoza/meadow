@@ -1248,7 +1248,9 @@ function paintShapes(ctx, shapes, base = DW_W) {
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
       if (!inside(s, x + 0.5, y + 0.5)) continue;
       const rim = !inside(s, x - 0.5, y + 0.5) || !inside(s, x + 1.5, y + 0.5) || !inside(s, x + 0.5, y - 0.5) || !inside(s, x + 0.5, y + 1.5);
-      ctx.fillStyle = rim ? edge : s.c; ctx.fillRect(x, y, 1, 1);
+      if (s.hollow) { const rim2 = rim || !inside(s, x - 1.5, y + 0.5) || !inside(s, x + 2.5, y + 0.5) || !inside(s, x + 0.5, y - 1.5) || !inside(s, x + 0.5, y + 2.5); if (!rim2) continue; ctx.fillStyle = s.c; }
+      else ctx.fillStyle = rim ? edge : s.c;
+      ctx.fillRect(x, y, 1, 1);
     }
   }
 }
@@ -1261,7 +1263,7 @@ function drawThumb(d) {
 const thumbs = (id) => drawsAt(id).map((d) => `<img class="dw-th" data-draw="${d.id}" src="${drawThumb(d)}" alt="" title="Dibujo · clic para abrirlo">`).join('');
 
 // the sheet
-let dwOpen = null, dwColor = DW_COLORS.top[4], dwShape = 'rect', dwSnapped = false;
+let dwOpen = null, dwColor = DW_COLORS.top[4], dwShape = 'rect', dwSnapped = false, dwHollow = false;
 const dwNow = () => (S.drawings || []).find((d) => d.id === dwOpen);
 const shapeIco = (t) => `<svg viewBox="0 0 20 20" width="18" height="18">${{ rect: '<rect x="3" y="5" width="14" height="10"/>', ellipse: '<circle cx="10" cy="10" r="7"/>', tri: '<path d="M10 3 L17 16 L3 16 Z"/>', diamond: '<path d="M10 2 L18 10 L10 18 L2 10 Z"/>', line: '<path d="M3 17 L17 3" stroke-width="2.4" fill="none"/>' }[t]}</svg>`;
 function openDrawing(d) {
@@ -1271,9 +1273,9 @@ function openDrawing(d) {
   box.querySelector('.dw-top').innerHTML = DW_COLORS.top.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
   box.querySelector('.dw-left').innerHTML = DW_COLORS.left.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
   box.querySelector('.dw-right').innerHTML = DW_COLORS.right.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
-  box.querySelector('.dw-shapes').innerHTML = DW_SHAPES.map(([t, name]) => `<b data-shape="${t}" title="${name}">${shapeIco(t)}</b>`).join('');
+  box.querySelector('.dw-shapes').innerHTML = DW_SHAPES.map(([t, name]) => `<b data-shape="${t}" title="${name}">${shapeIco(t)}</b>`).join('') + '<span class="dw-sep"></span><b data-fill="1" title="Rellena"><i class="dw-fill"></i></b><b data-fill="0" title="Solo el borde"><i class="dw-hollow"></i></b>';
   box.querySelector('.dw-where').textContent = nestPath(d.at) || '';
-  box.hidden = false; dwPaint(); dwPickColor(dwColor); dwPickShape(dwShape);
+  box.hidden = false; dwPaint(); dwPickColor(dwColor); dwPickShape(dwShape); dwPickFill(dwHollow);
   box.querySelector('.dw-in').animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
 }
 function closeDrawing() {
@@ -1287,7 +1289,8 @@ function dwPaint(preview) {
   paintShapes($('#dw-c').getContext('2d'), preview ? [...d.shapes.map((s) => ({ ...s })), preview] : d.shapes, d.base || 192);
 }
 function dwPickColor(c) { dwColor = c; for (const el of document.querySelectorAll('#draw [data-col]')) el.classList.toggle('on', el.dataset.col === c); dwBrush(); for (const el of document.querySelectorAll('#draw [data-shape]')) el.style.color = c; }
-function dwBrush() { const b = $('#draw .dw-cur'); b.innerHTML = shapeIco(dwShape); b.style.color = dwColor; }
+function dwBrush() { const b = $('#draw .dw-cur'); b.innerHTML = shapeIco(dwShape); b.style.color = dwColor; b.classList.toggle('hollow', dwHollow); }
+function dwPickFill(h) { dwHollow = h; for (const el of document.querySelectorAll('#draw [data-fill]')) el.classList.toggle('on', (el.dataset.fill === '0') === h); dwBrush(); }
 function dwPickShape(t) { dwShape = t; for (const el of document.querySelectorAll('#draw [data-shape]')) el.classList.toggle('on', el.dataset.shape === t); dwBrush(); }
 function dwEdit(fn) { if (!dwSnapped) { snap(); dwSnapped = true; } fn(); const d = dwNow(); d.v = (d.v || 0) + 1; save(); dwPaint(); }
 // colours and figures are taken by passing over them, no click
@@ -1296,8 +1299,15 @@ $('#draw').addEventListener('pointerover', (e) => {
   const sw = e.target.closest('[data-col]'), sh = e.target.closest('[data-shape]'); clearTimeout(dwHoverT);
   if (sw) dwHoverT = setTimeout(() => dwPickColor(sw.dataset.col), 90);
   if (sh) dwHoverT = setTimeout(() => dwPickShape(sh.dataset.shape), 90);
+  const fl = e.target.closest('[data-fill]'); if (fl) dwHoverT = setTimeout(() => dwPickFill(fl.dataset.fill === '0'), 90);
 });
 // a figure is put on the sheet by dragging its box (a line: from where you press to where you let go)
+$('#dw-c').addEventListener('pointermove', (e) => {
+  const r = e.currentTarget.getBoundingClientRect(), px = $('#draw .dw-px'), cw = r.width / DW_W;
+  const gx = Math.floor((e.clientX - r.left) / cw), gy = Math.floor((e.clientY - r.top) / cw);
+  Object.assign(px.style, { left: gx * cw + 'px', top: gy * cw + 'px', width: cw + 'px', height: cw + 'px', background: dwColor }); px.hidden = false;
+});
+$('#dw-c').addEventListener('pointerleave', () => { $('#draw .dw-px').hidden = true; });
 $('#dw-c').addEventListener('pointerdown', (e) => {
   const d = dwNow(); if (!d) return;
   const c = e.currentTarget, r = c.getBoundingClientRect(), k = (d.base || 192) / DW_W;   // figures are kept in the drawing's own units
@@ -1306,7 +1316,7 @@ $('#dw-c').addEventListener('pointerdown', (e) => {
   const fig = (p1) => {
     if (dwShape === 'line') return { t: 'line', x1: p0[0] * k, y1: p0[1] * k, x2: p1[0] * k, y2: p1[1] * k, c: dwColor };
     const x = Math.min(p0[0], p1[0]), y = Math.min(p0[1], p1[1]);
-    return { t: dwShape, x: x * k, y: y * k, w: Math.abs(p1[0] - p0[0]) * k, h: Math.abs(p1[1] - p0[1]) * k, c: dwColor };
+    return { t: dwShape, hollow: dwHollow || undefined, x: x * k, y: y * k, w: Math.abs(p1[0] - p0[0]) * k, h: Math.abs(p1[1] - p0[1]) * k, c: dwColor };
   };
   let last = p0;
   const mv = (ev) => { last = at(ev); dwPaint(fig(last)); };
