@@ -8,7 +8,7 @@ A zoomable grid (pastel, dotted) of documents, post-its, ideas, tasks, frames an
   `@codemirror/view` is pinned to 6.43.15: 6.44.1 logs every DOM event to the console.
 
 ## The plane
-- Left bar: Documento, Post-it, Idea, Tarea, Marco, Letrero. Click: at the centre (a document opens); drag: where you drop it.
+- Toolbar (top): Documento, Post-it, Idea, Tarea, Marco, Etiqueta. Click: at the centre (a document opens); drag: where you drop it.
 - **Click** a thing: the view centres and zooms on it, and «Volver a donde estabas» takes you back. **Double click** a document opens it.
   Click a document's or a frame's title to rename it.
 - Drag the empty grid to move around (also middle/right button or Space + drag); the wheel zooms around the pointer.
@@ -19,9 +19,10 @@ A zoomable grid (pastel, dotted) of documents, post-its, ideas, tasks, frames an
 - Hover something partly covered: it comes forward (with what lies on it) while the pointer is over it. «Al frente» / «Al fondo» keep it there.
 - **Tasks dropped just under a document** dock to it: stacked, as wide as the page, moving and scaling with it.
 - **Frames**: dropped near loose things they wrap them; «＋» on the tab makes a frame inside; square corners.
-- **Signs**: a wooden plank standing out from the nearest edge of what you drop it on, with a scribble; a click reads it.
-- **Trays** (bottom left): tucked away as a pill; they come out by themselves while a document is dragged. One open at a time,
-  up to four, each with its colour (click its dot), rename (double click), «⤢» puts all its documents on the plane.
+- **Tags** («etiquetas»): a paper tag tied with a string to the nearest edge of what you drop it on, with a scribble; a click reads it.
+- **Drawers** («cajones», bottom left): tucked away as a little chest of drawers; they come out when a dragged document reaches
+  their corner, and go back when it leaves. One open at a time, up to four, each with its colour (click its dot), rename (double
+  click), «⤢» puts all its documents on the plane. «Recoger» only shows when you opened them yourself.
 - **Panel** (right): tasks (pending / done / all) and ideas, grouped by the frame they are in; history with «Restaurar»,
   «Volver a como estaba» for documents, and «Ir» / «Abrir» for pieces that still exist.
 - Ctrl+V on the plane: a copied idea or task appears there; any other text becomes a post-it.

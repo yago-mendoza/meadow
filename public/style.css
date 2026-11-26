@@ -388,20 +388,14 @@ body.dragging .prs { visibility: hidden; }
 .item.tarea.docked { width: 200px; max-width: 200px; min-width: 0; border-radius: 8px; padding: 7px 10px; font-size: 13px; }
 .item.tarea.docked .uses { display: none; }
 
-/* signs: a wooden plank standing out from behind an edge, perpendicular to it, with a little board and a scribble */
-.sign { position: absolute; z-index: -1; display: flex; align-items: center; cursor: pointer; pointer-events: auto; }
-.sign .plank { flex: none; border-radius: 3px; background: linear-gradient(#f5e2bf, #e8cb98); box-shadow: 0 1px 2px rgba(150, 105, 45, .2); }
-.sign .board { flex: none; display: block; filter: drop-shadow(0 2px 3px rgba(150, 105, 45, .22)); transform-origin: 50% 50%;
-  transition: transform .25s cubic-bezier(.34, 1.56, .64, 1); }
-.sign:hover .board { transform: rotate(-5deg) scale(1.12); }
-.sign.e-right { left: 100%; top: var(--t); transform: translateY(-50%); flex-direction: row; }
-.sign.e-left { right: 100%; top: var(--t); transform: translateY(-50%); flex-direction: row-reverse; }
-.sign.e-top { bottom: 100%; left: var(--t); transform: translateX(-50%); flex-direction: column-reverse; }
-.sign.e-bottom { top: 100%; left: var(--t); transform: translateX(-50%); flex-direction: column; }
-.sign.e-right .plank, .sign.e-left .plank { width: 13px; height: 5px; }
-.sign.e-top .plank, .sign.e-bottom .plank { width: 5px; height: 12px; }
-.sign.preview { opacity: .75; pointer-events: none; animation: none; }
-.sign.preview .board { transform: rotate(-3deg); }
+/* signs: a paper tag tied to an edge with a string, standing out perpendicular to it; no animation */
+.sign { position: absolute; z-index: -1; width: 64px; height: 36px; cursor: pointer; pointer-events: auto; transform-origin: 0 50%; }
+.sign .tag { display: block; filter: drop-shadow(0 1.5px 2px rgba(90, 60, 30, .18)); }
+.sign.e-right { left: 100%; top: var(--t); transform: translateY(-50%) rotate(7deg); }
+.sign.e-left { left: 0; top: var(--t); transform: translateY(-50%) rotate(173deg); }
+.sign.e-bottom { left: var(--t); top: 100%; transform: translateY(-50%) rotate(97deg); }
+.sign.e-top { left: var(--t); top: 0; transform: translateY(-50%) rotate(-83deg); }
+.sign.preview { opacity: .7; pointer-events: none; }
 .frame .sign { z-index: 1; }
 body.dragging .sign:not(.preview) { pointer-events: none; }
 
@@ -509,3 +503,36 @@ details.grp summary i { font: 600 10.5px Consolas, monospace; font-style: normal
 #backpill.on { transform: translate(-50%, 0); }
 #backpill:hover { background: var(--accent); }
 #backpill kbd { margin-left: 8px; padding: 1px 7px; border-radius: 6px; background: rgba(255, 255, 255, .18); font: 600 11px "Segoe UI", sans-serif; }
+
+/* «Recoger» only when you opened the drawers yourself; while a drag brings them out, no tools */
+#stash.tucked.dragopen .t-tools { display: none; }
+
+/* collapsed: a small chest of drawers, one front per drawer (bottom first), each with a handle and its count */
+.t-pill { padding: 6px 10px 6px 6px; gap: 8px; border-radius: 10px; background: linear-gradient(#fbf7f2, #f1e9df); box-shadow: 0 1px 2px rgba(90, 60, 30, .12), 0 6px 14px rgba(90, 60, 30, .12); color: #6e5a4a; }
+.cab { display: flex; flex-direction: column-reverse; gap: 3px; padding: 3px; border-radius: 6px; background: #e7dccd; box-shadow: inset 0 0 0 1px rgba(110, 80, 50, .12); }
+.drw { position: relative; display: flex; align-items: center; justify-content: center; width: 58px; height: 15px; border-radius: 3px;
+  background: linear-gradient(color-mix(in srgb, var(--t) 70%, #fff), var(--t)); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .08), 0 1px 1px rgba(90, 60, 30, .15); }
+.drw .hdl { width: 16px; height: 3px; border-radius: 2px; background: rgba(90, 60, 30, .45); box-shadow: 0 1px 0 rgba(255, 255, 255, .5); }
+.drw b { position: absolute; right: 4px; font: 700 9px Consolas, monospace; color: rgba(70, 45, 25, .7); }
+.cab-l { font-size: 12px; font-weight: 650; }
+.t-pill:hover .drw:first-child { transform: translateX(3px); transition: transform .2s; }
+
+/* shown: each closed drawer is a front with a handle; the open one is pulled out */
+.tray header { position: relative; }
+.tray header .hdl { position: absolute; left: 50%; top: 50%; width: 26px; height: 4px; margin: -2px 0 0 -13px; border-radius: 2px;
+  background: color-mix(in srgb, var(--t) 55%, #5a3c24); opacity: .45; pointer-events: none; }
+.tray.open header .hdl { opacity: .25; }
+
+/* the toolbar: horizontal, at the top, small */
+#side { top: 12px; left: 50%; bottom: auto; width: auto; transform: translateX(-50%); flex-direction: row; align-items: center; gap: 2px;
+  padding: 5px 8px; border-radius: 14px; }
+#side .brand { flex-direction: row; gap: 5px; margin: 0 8px 0 4px; font-size: 12px; }
+#side .brand span { font-size: 15px; }
+#types { display: flex; gap: 1px; }
+#side .tool { flex-direction: row; gap: 6px; padding: 4px 9px 4px 5px; border-radius: 10px; font-size: 11.5px; }
+#side .tool .ico { width: 24px; height: 24px; border-radius: 8px; font-size: 13px; }
+#side .tool:hover { transform: translateY(1px); }
+#selbar { top: 64px; }
+
+#selbar { transform: translate(-50%, -160px); }
+#selbar.on { transform: translate(-50%, 0); }

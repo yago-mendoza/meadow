@@ -43,7 +43,8 @@ async function load() {
   else S.view = { x: Math.round(innerWidth / 2 - 100), y: Math.round(innerHeight / 2 - 140), z: 1 };
   for (const k of ['postits', 'frames', 'ideas', 'tasks', 'history', 'signs']) S[k] ||= [];
   S.seq ||= { idea: 0, tarea: 0 };
-  if (!S.trays?.length) S.trays = [{ id: 'b1', name: 'Bandeja', color: TRAY_COLORS[0], open: true }];
+  if (!S.trays?.length) S.trays = [{ id: 'b1', name: 'Cajón', color: TRAY_COLORS[0], open: true }];
+  for (const t of S.trays) t.name = t.name.replace(/^Bandeja\b/, 'Cajón');
   for (const d of S.docs) if (d.place === 'stash' && !S.trays.some((t) => t.id === d.tray)) d.tray = S.trays[0].id;
   render();
 }
@@ -141,9 +142,9 @@ $('#z-fit').onclick = () => {
   if (!boxes.length) return;
   const x0 = Math.min(...boxes.map((b) => b[0])), y0 = Math.min(...boxes.map((b) => b[1]));
   const x1 = Math.max(...boxes.map((b) => b[0] + b[2])), y1 = Math.max(...boxes.map((b) => b[1] + b[3]));
-  const aw = innerWidth - 470, ah = innerHeight - 220;
+  const aw = innerWidth - 400, ah = innerHeight - 160;
   const z = Math.min(2, aw / (x1 - x0 + 80), ah / (y1 - y0 + 80));
-  S.view = { z, x: 120 + (aw - (x1 - x0) * z) / 2 - x0 * z, y: 20 + (ah - (y1 - y0) * z) / 2 - y0 * z };
+  S.view = { z, x: 30 + (aw - (x1 - x0) * z) / 2 - x0 * z, y: 80 + (ah - (y1 - y0) * z) / 2 - y0 * z };
   applyView(); saveView();
 };
 
@@ -180,25 +181,24 @@ function itemHTML(it) {
 }
 // ---- signs: a tab standing out of an edge of a document, post-it, idea, task or frame; a click reads it -------------
 const signsOf = (id) => (S.signs || []).filter((g) => g.host === id);
-// A little light-wood board, drawn: soft grain, four tiny nails, and a scribble that means nothing (always the same for one sign).
+// A tag tied to the edge with a string: a paper tag with a hole and a scribble that means nothing (the same for one tag).
 function scribble(seed) {
   let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   const rnd = () => ((h = (h * 1103515245 + 12345) >>> 0) / 4294967296);
   let d = '';
   for (let row = 0; row < 2; row++) {
-    const y = 10.5 + row * 6.5; let x = 9; d += `M${x.toFixed(1)} ${y}`;
-    const end = 31 - row * 6 - rnd() * 3;
-    while (x < end) { const nx = Math.min(end, x + 2.2 + rnd() * 2.6); d += ` Q${((x + nx) / 2).toFixed(1)} ${(y - 1.8 - rnd() * 2.2).toFixed(1)} ${nx.toFixed(1)} ${(y + (rnd() - .5) * 1.4).toFixed(1)}`; x = nx; }
+    const y = 15 + row * 7; let x = 29; d += `M${x} ${y}`;
+    const end = 54 - row * 7 - rnd() * 4;
+    while (x < end) { const nx = Math.min(end, x + 2.2 + rnd() * 2.4); d += ` Q${((x + nx) / 2).toFixed(1)} ${(y - 1.6 - rnd() * 2).toFixed(1)} ${nx.toFixed(1)} ${(y + (rnd() - .5) * 1.2).toFixed(1)}`; x = nx; }
   }
-  return `<svg class="board" viewBox="0 0 40 26" width="40" height="26" aria-hidden="true">
-    <defs><linearGradient id="mw-wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbedd3"/><stop offset="1" stop-color="#efd6a8"/></linearGradient></defs>
-    <rect x=".6" y=".6" width="38.8" height="24.8" rx="5" fill="url(#mw-wood)" stroke="#e2c592" stroke-width=".9"/>
-    <path d="M3 6.5 Q14 5.2 22 6.8 T37 6 M3 19.5 Q12 21 21 19.4 T37 20.2 M5 13 Q9 12.4 12 13.2" stroke="#e8cfa0" stroke-width=".7" fill="none"/>
-    <g fill="#d3b07a"><circle cx="4" cy="4" r=".85"/><circle cx="36" cy="4" r=".85"/><circle cx="4" cy="22" r=".85"/><circle cx="36" cy="22" r=".85"/></g>
-    <path d="${d}" fill="none" stroke="#a07a4c" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return d;
 }
-const signHTML = (g, extra = '') => `<div class="sign e-${g.edge}${extra}" data-sign="${g.id}" style="--t:${(g.t * 100).toFixed(1)}%" title="Clic para leer">
-  <i class="plank"></i>${scribble(g.id)}</div>`;
+const tagSVG = (g) => `<svg class="tag" viewBox="0 0 64 36" width="64" height="36" aria-hidden="true">
+  <path d="M0 18 C6 18 8 13 13 15 S17 19 21 18" fill="none" stroke="#b7a68f" stroke-width="1.1" stroke-linecap="round"/>
+  <path d="M16 18 L25 5.5 L60 5.5 Q62 5.5 62 7.5 L62 28.5 Q62 30.5 60 30.5 L25 30.5 Z" fill="${g.color || '#f6ead6'}" stroke="rgba(110,80,50,.28)" stroke-width=".8" stroke-linejoin="round"/>
+  <circle cx="22.5" cy="18" r="2.3" fill="#fff" stroke="rgba(110,80,50,.3)" stroke-width=".7"/>
+  <path d="${scribble(g.id)}" fill="none" stroke="rgba(80,55,35,.55)" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const signHTML = (g, extra = '') => `<div class="sign e-${g.edge}${extra}" data-sign="${g.id}" style="--t:${(g.t * 100).toFixed(1)}%" title="Clic para leer">${tagSVG(g)}</div>`;
 function signsHTML(id) { return signsOf(id).map((g) => signHTML(g)).join(''); }
 // Where a sign dropped at the pointer would stand: the edge of the thing under it nearest to the pointer.
 function signSpot(e) {
@@ -268,25 +268,32 @@ let traysShown = localStorage.getItem('meadow.trays') === 'shown';
 function showTrays(on) { traysShown = on; localStorage.setItem('meadow.trays', on ? 'shown' : 'tucked'); stash.classList.toggle('tucked', !on); }
 // while a document is dragged the trays come out by themselves, and go back when it is dropped
 const dragTrays = (on) => stash.classList.toggle('dragopen', on);
+function nearTrays(e) {
+  if (stash.classList.contains('dragopen')) {
+    const r = stash.getBoundingClientRect();
+    return e.clientX < r.right + 90 && e.clientY > r.top - 90;          // stay out while the pointer is around them
+  }
+  return e.clientX < 330 && e.clientY > innerHeight - 170;                 // come out when it reaches their corner
+}
 const trayOf = (d) => S.trays.find((t) => t.id === d.tray) || S.trays[0];
 const openTray = () => S.trays.find((t) => t.open) || S.trays[0];
 function renderStash() {
   const html = S.trays.map((t) => {
     const ds = S.docs.map((d, i) => [d, i + 1]).filter(([d]) => d.place === 'stash' && trayOf(d) === t);
     return `<div class="tray${t.open ? ' open' : ''}" data-tray="${t.id}" style="--t:${t.color};--i:${S.trays.indexOf(t)};--n:${S.trays.length}">
-      <header><i class="t-dot" title="Cambiar el color"></i><b class="t-name" title="Doble clic para renombrar">${esc(t.name)}</b><span class="t-n">${ds.length || ''}</span>
+      <header><i class="hdl"></i><i class="t-dot" title="Cambiar el color"></i><b class="t-name" title="Doble clic para renombrar">${esc(t.name)}</b><span class="t-n">${ds.length || ''}</span>
         ${ds.length ? '<button class="t-out" title="Sacar todos sus documentos al plano">⤢</button>' : ''}
-        ${S.trays.length > 1 ? '<button class="t-x" title="Quitar la bandeja (sus documentos pasan a otra)">×</button>' : ''}</header>
-      <div class="t-body"><div class="t-clip"><div class="t-list">${ds.map(([d, n]) => `<div class="chip" data-id="${d.id}" title="Clic para abrir · arrástralo al plano o a otra bandeja">
+        ${S.trays.length > 1 ? '<button class="t-x" title="Quitar el cajón (sus documentos pasan a otro)">×</button>' : ''}</header>
+      <div class="t-body"><div class="t-clip"><div class="t-list">${ds.map(([d, n]) => `<div class="chip" data-id="${d.id}" title="Clic para abrir · arrástralo al plano o a otro cajón">
         <span>📄</span><b>${esc(d.name)}</b><button class="x" title="Borrar">×</button></div>`).join('')
         || '<div class="t-empty">Suelta aquí documentos para dejarlos en espera</div>'}</div></div></div></div>`;
   }).join('');
   const total = S.docs.filter((d) => d.place === 'stash').length;
-  const pill = `<button class="t-pill" title="Mostrar las bandejas">📥 Bandejas ${S.trays.map((t) => {
+  const pill = `<button class="t-pill" title="Abrir los cajones"><span class="cab">${S.trays.map((t) => {
     const n = S.docs.filter((d) => d.place === 'stash' && trayOf(d) === t).length;
-    return `<span class="t-pdot" style="--t:${t.color}">${n || ''}</span>`; }).join('')}</button>`;
-  const tools = `<div class="t-tools" style="--i:${S.trays.length};--n:${S.trays.length}">${S.trays.length < MAX_TRAYS ? '<button class="t-add" title="Nueva bandeja">＋</button>' : ''}
-    <button class="t-hide" title="Recoger las bandejas (Esc)">▾ Recoger</button></div>`;
+    return `<span class="drw" style="--t:${t.color}"><i class="hdl"></i><b>${n || ''}</b></span>`; }).join('')}</span><span class="cab-l">Cajones</span></button>`;
+  const tools = `<div class="t-tools" style="--i:${S.trays.length};--n:${S.trays.length}">${S.trays.length < MAX_TRAYS ? '<button class="t-add" title="Nuevo cajón">＋</button>' : ''}
+    <button class="t-hide" title="Cerrar los cajones (Esc)">▾ Recoger</button></div>`;
   stash.innerHTML = `<div class="t-pillwrap"><div>${pill}</div></div><div class="t-stack"><div class="t-stack-in">${html}${tools}</div></div>`;
   stash.classList.toggle('tucked', !traysShown);
   stash.dataset.total = total;
@@ -466,7 +473,7 @@ function openSign(g, editing = false) {
   const host = find(g.host)?.o;
   const where = host ? (host.name || host.title || host.text || '').split('\n')[0].slice(0, 40) : '';
   const box = $('#reader');
-  box.querySelector('.rd-where').textContent = where ? `Letrero en «${where}»` : 'Letrero';
+  box.querySelector('.rd-where').textContent = where ? `Etiqueta en «${where}»` : 'Etiqueta';
   box.querySelector('.rd-panel').style.setProperty('--sc', g.color);
   const text = box.querySelector('.rd-text'), area = box.querySelector('.rd-edit');
   const show = (ed) => {
@@ -480,7 +487,7 @@ function openSign(g, editing = false) {
     if (e.target === box.querySelector('.rd-back') || a === 'close') close();
     else if (a === 'edit') show(true);
     else if (a === 'save') { snap(); g.text = area.value.replace(/\s+$/, ''); save(); renderItems(); paintSel(); show(false); }
-    else if (a === 'del') { snap(); S.signs = S.signs.filter((x) => x !== g); save(); renderItems(); paintSel(); close(); toast('Letrero quitado', [['Deshacer', doUndo]]); }
+    else if (a === 'del') { snap(); S.signs = S.signs.filter((x) => x !== g); save(); renderItems(); paintSel(); close(); toast('Etiqueta quitada', [['Deshacer', doUndo]]); }
   };
   area.onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) box.querySelector('[data-rd="save"]').click(); if (e.key === 'Escape') { e.stopPropagation(); if (!g.text && !area.value) { S.signs = S.signs.filter((x) => x !== g); save(); renderItems(); } close(); } };
   const close = () => { box.classList.remove('open', 'editing'); };
@@ -651,7 +658,8 @@ addEventListener('pointermove', (e) => {
   if (act.k === 'pan') { S.view.x = act.vx + e.clientX - act.sx; S.view.y = act.vy + e.clientY - act.sy; applyView(); }
   else if (act.k === 'move') {
     if (!act.moved && Math.hypot(e.clientX - act.sx, e.clientY - act.sy) < 3) return;
-    if (!act.moved) { act.moved = true; snap(); document.body.classList.add('dragging'); if (act.moving.some((m) => m.k === 'd')) dragTrays(true); }
+    if (!act.moved) { act.moved = true; snap(); document.body.classList.add('dragging'); }
+    if (act.moving.some((m) => m.k === 'd')) dragTrays(nearTrays(e));
     const dx = (e.clientX - act.sx) / z, dy = (e.clientY - act.sy) / z;
     for (const m of act.moving) { m.o.x = Math.round(m.x0 + dx); m.o.y = Math.round(m.y0 + dy); m.el.style.left = m.o.x + 'px'; m.el.style.top = m.o.y + 'px'; }
     hotTray(e, act.moving.some((m) => m.k === 'd'));
@@ -800,7 +808,7 @@ function animateView(to, ms = 380) {
 }
 function visibleArea() {
   const panelOpen = !$('#panel').classList.contains('closed');
-  return { l: 120, r: innerWidth - (panelOpen ? 340 : 24), t: 20, b: innerHeight - 20 };
+  return { l: 24, r: innerWidth - (panelOpen ? 340 : 24), t: 70, b: innerHeight - 20 };
 }
 function focusOn(id) {
   const f = find(id), el = elOf(id); if (!f || !el) return;
@@ -862,13 +870,14 @@ const ghost = $('#ghost');
 function startGhost(e, info) { gh = { ...info, sx: e.clientX, sy: e.clientY, moved: false }; }
 function moveGhost(e) {
   if (!gh.moved && Math.hypot(e.clientX - gh.sx, e.clientY - gh.sy) < 4) return;
-  if (!gh.moved) { gh.moved = true; ghost.innerHTML = gh.label; ghost.style.display = 'flex'; document.body.classList.add('dragging'); if (gh.kind === 'doc' || gh.kind === 'chip') dragTrays(true); }
+  if (!gh.moved) { gh.moved = true; ghost.innerHTML = gh.label; ghost.style.display = 'flex'; document.body.classList.add('dragging'); }
+  if (gh.kind === 'doc' || gh.kind === 'chip') dragTrays(nearTrays(e));
   ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px';
   if (gh.kind === 'sign') {
     world.querySelector('.sign.preview')?.remove();
     const sp = signSpot(e);
     ghost.style.display = sp ? 'none' : 'flex';
-    if (sp) sp.hostEl.insertAdjacentHTML('beforeend', signHTML({ id: 'preview', edge: sp.edge, t: sp.t }, ' preview'));
+    if (sp) sp.hostEl.insertAdjacentHTML('beforeend', signHTML({ id: 'preview', edge: sp.edge, t: sp.t, color: SIGN_COLORS[S.signs.length % SIGN_COLORS.length] }, ' preview'));
     return;
   }
   hotTray(e, gh.kind === 'doc' || gh.kind === 'chip');
@@ -890,7 +899,7 @@ function dropGhost(e) {
     }
     return;
   }
-  if (g.kind === 'sign') { if (g.moved) dropSign(e); else toast('Arrastra el letrero hasta el borde de un documento, post-it o marco'); return; }
+  if (g.kind === 'sign') { if (g.moved) dropSign(e); else toast('Arrastra la etiqueta hasta el borde de un documento, post-it o marco'); return; }
   if (!g.moved) return create(g.kind, centerWorld(), false);
   const tray = trayAt;
   if (tray) { if (g.kind === 'doc') create('doc', { x: 0, y: 0 }, tray); return; }
@@ -903,7 +912,7 @@ const TOOLS = [
   ['idea', '💡', 'Idea', '#cdeedd', 'Una idea que puedes pegar en el plano y dentro de documentos'],
   ['tarea', '☑️', 'Tarea', '#cfe5fb', 'Una tarea que puedes pegar en el plano y dentro de documentos'],
   ['frame', '⬚', 'Marco', '#e3d9f7', 'Un marco para agrupar lo que hay suelto'],
-  ['sign', '🏷️', 'Letrero', '#ffd9c2', 'Suéltalo sobre un borde de un documento, post-it o marco; se lee con un clic'],
+  ['sign', '🏷️', 'Etiqueta', '#ffd9c2', 'Átala al borde de un documento, post-it, idea, tarea o marco; se lee con un clic'],
 ];
 $('#types').innerHTML = TOOLS.map(([k, ico, name, c, tip]) => `<div class="tool" data-kind="${k}" style="--c:${c}" title="${tip} · clic o arrastra al plano">
   <span class="ico">${ico}</span><span>${name}</span></div>`).join('');
@@ -935,7 +944,7 @@ stash.addEventListener('click', (e) => {
   const x = e.target.closest('.chip .x'); if (x) return removeIds([x.closest('.chip').dataset.id]);
   if (e.target.closest('.t-add')) {
     snap(); const used = new Set(S.trays.map((t) => t.color));
-    const t = { id: 'b' + uid(), name: `Bandeja ${S.trays.length + 1}`, color: TRAY_COLORS.find((c) => !used.has(c)) || TRAY_COLORS[0], open: true };
+    const t = { id: 'b' + uid(), name: `Cajón ${S.trays.length + 1}`, color: TRAY_COLORS.find((c) => !used.has(c)) || TRAY_COLORS[0], open: true };
     for (const o of S.trays) o.open = false;
     S.trays.push(t); save(); renderStash();
     const nm = stash.querySelector(`[data-tray="${t.id}"] .t-name`); if (nm) editInline(nm, (v) => { if (v) { t.name = v; save(); renderStash(); } });
@@ -999,7 +1008,7 @@ function groupOf(it) {
   if (it.onCanvas) return at(it) || 'En el plano, sin marco';
   const d = docsUsing(it).find((x) => x.place === 'canvas');
   if (d) return at(d) || 'En documentos sueltos';
-  return docsUsing(it).length ? 'En documentos de las bandejas' : 'En ningún sitio';
+  return docsUsing(it).length ? 'En documentos de los cajones' : 'En ningún sitio';
 }
 function groupedRows(list) {
   const groups = new Map();
@@ -1151,9 +1160,9 @@ const edApi = {
   editItem(kind, n, el) { const it = getItem(kind, n); if (it) popEdit(el, it.text, (v) => setItemText(it, v)); },
   createDoc(name, text = '', o = {}) {
     const d = newDoc({ name, text, place: 'stash' }); putInTray([d], openTray().id);
-    log('crear', `Documento «${name}» (en la bandeja)`, { ref: d.id });
+    log('crear', `Documento «${name}» (en un cajón)`, { ref: d.id });
     save(); renderStash(); renderPanel();
-    if (o.announce) toast(`«${name}» creado en la bandeja`, [['Abrir', () => openEditor(d.id)], ['Luego', null]], 6000);
+    if (o.announce) toast(`«${name}» creado en «${openTray().name}»`, [['Abrir', () => openEditor(d.id)], ['Luego', null]], 6000);
     return N(d);
   },
   openDoc(n) { const d = S.docs[n - 1]; d ? openEditor(d.id) : toast('Ese documento ya no existe'); },
