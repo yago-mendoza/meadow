@@ -1022,3 +1022,9 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 .doc.near .rh1, .doc.near .rh2, .doc.near .rh3 { font-size: 1em !important; }
 .doc.near .rh2 { background: color-mix(in srgb, var(--accent) 10%, #fff); border-radius: 4px; }
 .doc.near .rh3 { background: color-mix(in srgb, var(--accent) 5%, #fff); border-radius: 4px; }
+/* Leer | Editar over the page, the page itself left as it is (no blur, no veil) */
+.doc:hover .dhov { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: transparent !important; }
+/* «#» titles: no band, slightly indented, always some air below, and above unless they open the page */
+.cm-line.cm-h1, .ied .cm-line.cm-h1 { background: none; padding-left: .7em !important; padding-top: .8em !important; padding-bottom: .45em !important; }
+.cm-line.cm-h1.cm-hfirst, .ied .cm-line.cm-h1.cm-hfirst { padding-top: 0 !important; }
+.doc.near .rh1 { padding: .6em 0 .35em .7em; }

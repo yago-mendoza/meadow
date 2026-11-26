@@ -1329,7 +1329,7 @@ function collectMoving(alone) {
   const add = (id) => { const f = find(id), el = elOf(id); if (f && el && !out.has(id)) out.set(id, { k: f.k, o: f.o, el, x0: f.o.x, y0: f.o.y }); };
   for (const id of sel) add(id);
   if (alone) return [...out.values()];
-  const inside = (p, q) => p !== q && p.x >= q.x && p.y >= q.y && p.x + p.w <= q.x + q.w && p.y + p.h <= q.y + q.h;
+  const inside = (p, q) => p !== q && p.w * p.h < q.w * q.h && p.x >= q.x && p.y >= q.y && p.x + p.w <= q.x + q.w && p.y + p.h <= q.y + q.h;   // strictly smaller: two equal frames never hold each other
   for (const id of sel) {
     const f = find(id); if (!f || f.k !== 'f') continue;
     const fr = f.o;
@@ -1698,7 +1698,7 @@ function liveFit(a) {
 // pushes it away (with everything it holds) just enough, along the shortest way out; the pushed one may push others ----
 const PUSH_GAP = 24, TAB_H = 34;
 const fbox = (f) => ({ x0: f.x, y0: f.y - TAB_H, x1: f.x + f.w, y1: f.y + f.h });
-const inside = (a, b) => a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;   // a within b
+const inside = (a, b) => a !== b && a.w * a.h < b.w * b.h && a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;   // a within b (strictly smaller)
 function shiftFrame(f, dx, dy) {
   const keep = new Set(sel); sel.clear(); sel.add(f.id);
   const group = collectMoving(false); sel.clear(); for (const id of keep) sel.add(id);
