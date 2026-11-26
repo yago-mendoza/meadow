@@ -356,7 +356,13 @@ function renderAreas(peek) {
 let arHov = -1;
 const paintHov = () => document.querySelectorAll('#areas .ar-col').forEach((c, i) => c.classList.toggle('hov', i === arHov));
 let arShut = -1;   // a column folded by a click stays folded until the pointer goes to another one
-$('#areas').addEventListener('pointermove', (e) => { const c = e.target.closest('.ar-col'); let i = c ? [...c.parentNode.children].indexOf(c) : -1; if (!c) return; if (c.classList.contains('last')) i = -1; else if (i !== arShut) arShut = -1; if (i === arShut && i !== -1) return; if (i !== arHov) { arHov = i; paintHov(); } });
+$('#areas').addEventListener('pointermove', (e) => {
+  const c = e.target.closest('.ar-col'); if (!c) return;
+  const i = c.classList.contains('last') ? -1 : [...c.parentNode.children].indexOf(c);
+  if (arShut !== -1 && i === arShut) return;   // the column just folded by a click stays folded while the pointer is still on it…
+  arShut = -1;                                  // …and any other column, the open one included, frees it
+  if (i !== arHov) { arHov = i; paintHov(); }
+});
 $('#areas').addEventListener('pointerleave', () => { arHov = -1; arShut = -1; paintHov(); });
 function renderTop() {
   const p = pathOf(S.focus);
