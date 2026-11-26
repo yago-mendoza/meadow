@@ -334,3 +334,7 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 /* the master title's band starts where every band starts (the words stay a little in; the air above/below is a clear border) */
 .cm-line.cm-h1, .ied .cm-line.cm-h1 { padding: 0 0 0 .7em !important; border-top: .8em solid transparent; border-bottom: .45em solid transparent; background-clip: padding-box !important; }
 .cm-line.cm-h1.cm-hfirst { border-top: 0; }
+
+/* «|»: its gap to the words is always there, typed space or not */
+.cm-intro-bar { padding-right: .7em; }
+.cm-intro-sp { display: inline-block; width: 0; overflow: hidden; vertical-align: top; }

@@ -125,7 +125,7 @@ function decorateLine(line, out) {
 const INDENTS = [1, 2, 3, 4].map((k) => Decoration.line({ class: 'cm-ind' + k }));
 // «| text» under a title: its intro, a box in the title's colour, a little paler, set apart from the rest
 const INTRO_RE = /^\|\s?/;
-const introBar = Decoration.mark({ class: 'cm-intro-bar' });
+const introBar = Decoration.mark({ class: 'cm-intro-bar' }), introSp = Decoration.mark({ class: 'cm-intro-sp' });
 function indentLevels(doc) {
   const ind = new Uint8Array(doc.lines + 1), hd = new Uint8Array(doc.lines + 1); let lv = 0, h = 0;
   for (let n = 1; n <= doc.lines; n++) {
@@ -147,7 +147,8 @@ function buildDecos(view) {
       if (im) {
         const n = line.number, isI = (k) => k >= 1 && k <= doc.lines && INTRO_RE.test(doc.line(k).text);
         out.push(Decoration.line({ class: 'cm-intro cm-intro-h' + Math.min(3, ind.hd[n] || 0) + (isI(n - 1) ? '' : ' cm-intro-first') + (isI(n + 1) ? '' : ' cm-intro-last') }).range(line.from));
-        out.push(introBar.range(line.from, line.from + im[0].length));
+        out.push(introBar.range(line.from, line.from + 1));                       // the bar keeps its own gap before the words,
+        if (im[0].length > 1) out.push(introSp.range(line.from + 1, line.from + im[0].length));   // so a typed space adds nothing
       } pos = line.to + 1; }
   }
   return Decoration.set(out, true);
