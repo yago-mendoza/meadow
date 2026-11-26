@@ -549,3 +549,36 @@ body.drag-hang #stage .ft { outline-offset: 1px; }
 .tk-def { margin-left: 10px; flex: 1; font: 12px "Segoe UI", sans-serif; color: #a08b6e; }
 .loose-its { flex: 0 0 100%; display: flex; gap: 6px; padding: 2px 2px 0; }
 .loose-its .its { gap: 6px; } .loose-its .it { width: 26px; height: 26px; font-size: 13px; }
+
+/* the task card, v2: five states, the plan with versions, comments by Yo (blue) or Agente (orange) */
+.tk-st button { padding: 5px 9px; }
+.tk-h.st-plan { --sc: #ece6fa; --sf: #6a54a8; }
+.tk-who.w-yo.on { background: #3d7bd9; color: #fff; } .tk-who.w-ag.on { background: #e08a2e; color: #fff; }
+.tk-plan-h { display: flex; align-items: center; gap: 10px; }
+.tk-ver { margin-left: auto; display: flex; align-items: center; gap: 4px; text-transform: none; letter-spacing: 0; font: 600 11.5px "Segoe UI", sans-serif; color: #8a7d8e; }
+.tk-ver > button[data-pv] { width: 24px; height: 24px; border-radius: 7px; font-size: 15px; color: #6a5e6c; background: #f5f1f6; }
+.tk-ver > button[data-pv]:hover:not([disabled]) { background: #ece4ef; color: var(--accent); }
+.tk-ver > button[disabled] { opacity: .3; cursor: default; }
+.tk-newver { margin-left: 6px; padding: 3px 9px; border-radius: 8px; font: 600 11.5px "Segoe UI", sans-serif; color: var(--accent); background: #f3ecf6; }
+.tk-newver:hover { background: #eadff0; }
+.tk-area.old { background: #f6f4f7; color: #6a5e6c; border-style: dashed; }
+.tk-log { margin: 0 0 8px; gap: 8px; }
+.tk-none { margin: 0; padding: 10px 2px; font: italic 13.5px Georgia, serif; color: #b3a7b8; }
+.tk-e { display: block; padding: 8px 12px 9px; border: 0; border-radius: 10px; border-left: 3px solid; background: #f7f9fd; }
+.tk-e.by-yo { border-left-color: #3d7bd9; background: #f3f7fd; } .tk-e.by-ag { border-left-color: #e08a2e; background: #fdf6ee; }
+.tk-e-h { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.tk-e-h b { font: 700 12px "Segoe UI", sans-serif; } .by-yo .tk-e-h b { color: #2f66b8; } .by-ag .tk-e-h b { color: #b86a17; }
+.tk-e-h time { width: auto; font: 11.5px "Segoe UI", sans-serif; color: #a397a5; }
+.tk-e-h button { margin-left: auto; }
+.tk-say { display: flex; gap: 8px; align-items: flex-start; }
+.tk-by { display: flex; flex-direction: column; gap: 3px; flex: none; }
+.tk-by button { padding: 4px 10px; border-radius: 8px; font: 600 11.5px "Segoe UI", sans-serif; color: #8a7d8e; background: #f5f1f6; }
+.tk-by button.w-yo.on { background: #3d7bd9; color: #fff; } .tk-by button.w-ag.on { background: #e08a2e; color: #fff; }
+.tk-say .tk-log-in { flex: 1; min-height: 52px; }
+.it.tarea.agent { box-shadow: 0 0 0 2px #f0a656, 0 1px 3px rgba(60, 40, 70, .15); }
+.it.tarea.st-plan { background: #ece6fa; } .it.tarea.st-plan::before { border-color: #8c74cf; }
+.cm-chip.st-plan .cm-chip-ico { border-color: #8c74cf; background: #ece6fa; }
+#ipeek.st-plan { --ip-h: #ece6fa; }
+.lwho { background: #fdf0e1; color: #b86a17; }
+.lst.s-plan { background: #ece6fa; color: #6a54a8; }
+.lrow.st-plan .lchk { border-color: #8c74cf; background: #ece6fa; }
