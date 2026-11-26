@@ -275,3 +275,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 #top .brand:hover { background: #efe9f0; }
 /* popups and notices above the start screen too */
 #pick { z-index: 320; } #toasts { z-index: 330; } #ipeek { z-index: 310; }
+
+.ar .ar-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none; }
+.ar .ar-x { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font: 600 12px "Segoe UI", sans-serif; color: inherit; opacity: 0; margin-left: 2px; }
+.ar:hover .ar-x { opacity: .7; } .ar .ar-x:hover { opacity: 1; background: #fbe0dc; color: #b8443f; }
+.ar i { margin-left: 0; }

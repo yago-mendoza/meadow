@@ -63,7 +63,7 @@ async function load() {
 }
 function ensureAreas() {
   const root = nd(S.root);
-  if (root.kids.every((k) => nd(k)?.kind === 'area') && root.kids.length) return;
+  if (root.kids.length && root.kids.every((k) => nd(k)?.kind === 'area')) return;
   const frames = root.kids.filter((k) => nd(k)?.kind !== 'area'), areas = root.kids.filter((k) => nd(k)?.kind === 'area');
   if (!areas.length) { const g = mk('area', 'General'); g.kids.push(...frames); root.kids = [g.id]; S.area = g.id; } else { nd(areas[0]).kids.push(...frames); root.kids = areas; }
   save();
@@ -251,6 +251,7 @@ function placeUnderHead(g, tabId, line) {
 }
 function tidy() {
   reindex();
+  if (S.nodes[S.root] && !nd(S.root).kids.length) { const g = mk('area', 'General'); nd(S.root).kids.push(g.id); reindex(); }
   for (const n of Object.values(S.nodes)) if (n.kind === 'frame' || n.kind === 'doc') ensureTab(n);
   for (const it of [...S.ideas, ...S.tasks]) if (it.at && !nd(it.at)) it.at = null;
   if (!nd(S.area) || nd(S.area).kind !== 'area' || !PAR.has(S.area)) S.area = nd(S.root).kids.find((k) => nd(k)?.kind === 'area') || null;
@@ -302,7 +303,7 @@ function renderStage() {
 let skipFlip = false;
 function renderAreas() {
   const root = nd(S.root);
-  $('#areas').innerHTML = root.kids.map((k) => { const a = nd(k); return `<button class="ar${k === S.area ? ' on' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo">${esc(a.title)}<i>${a.kids.length || ''}</i></button>`; }).join('')
+  $('#areas').innerHTML = root.kids.map((k) => { const a = nd(k); return `<button class="ar${k === S.area ? ' on' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><span class="ar-t">${esc(a.title)}</span><i>${a.kids.length || ''}</i><b class="ar-x" title="Borrar el apartado o guardarlo en el cajón">×</b></button>`; }).join('')
     + '<button class="ar-add" title="Nuevo apartado">＋ Apartado</button>';
 }
 function renderTop() {
@@ -348,7 +349,7 @@ function renderMap() {
 }
 function renderDrawer() {
   $('#dr-n').textContent = S.drawer.length || '';
-  const icon = { frame: '⬚', ftab: '▭', doc: '📄', dtab: '📄', project: '⬚' };
+  const icon = { area: '▤', frame: '⬚', ftab: '▭', doc: '📄', dtab: '📄', project: '⬚' };
   $('#dr-list').innerHTML = S.drawer.length ? S.drawer.map((id) => { const n = nd(id); return n ? `<div class="dr-chip" data-drag="${id}" data-id="${id}"><span>${icon[n.kind]}</span>${esc(n.title)}<button class="dr-x" title="Borrar para siempre">×</button></div>` : ''; }).join('')
     : '<p class="dr-none">Arrastra aquí lo que quieras apartar del árbol.</p>';
   if (S.drawer.length) $('#dr-list').insertAdjacentHTML('beforeend', '<button class="dr-empty">Vaciar el cajón</button>');
@@ -561,6 +562,7 @@ addEventListener('click', (e) => {
   const tool = t.closest('#tools .tool'); if (tool) { snap(); return makeAt(tool.dataset.drag.slice(4), null); }
   const go = t.closest('[data-go]'); if (go) return focusTo(go.dataset.go);
   if (t.closest('.new-frame')) { snap(); return makeAt('frame', { kind: 'place', pid: S.area || S.root }); }
+  const arx = t.closest('.ar-x'); if (arx) return askDelete(arx.closest('.ar').dataset.area, arx);
   const ar = t.closest('.ar'); if (ar) return focusTo(ar.dataset.area);
   if (t.closest('.ar-add')) { snap(); const a = mk('area', 'Apartado nuevo'); nd(S.root).kids.push(a.id); S.area = a.id; S.focus = a.id; save(); renderAll(); const el = $(`.ar[data-area="${a.id}"]`); if (el) editInline(el.firstChild.nodeType === 3 ? wrapText(el) : el, (v) => { if (v) { a.title = v; save(); } renderAll(); }); return; }
   const fin = t.closest('.fr-in'); if (fin) return focusTo(fin.closest('.fr').dataset.id);
@@ -595,7 +597,7 @@ const wrapText = (el) => { const s = document.createElement('span'); s.textConte
 addEventListener('dblclick', (e) => {
   const t = e.target;
   const ttl = t.closest('.fr-title, .dc-title'); if (ttl) { const id = ttl.closest('[data-id]').dataset.id; return editInline(ttl, (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
-  const arx = t.closest('.ar'); if (arx) { const id = arx.dataset.area; return editInline(wrapText(arx), (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
+  const arn = t.closest('.ar'); if (arn) { const id = arn.dataset.area; return editInline(arn.querySelector('.ar-t'), (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
   const ft = t.closest('.ft'); if (ft) { const id = ft.dataset.tab; return editInline(wrapText(ft), (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
   const cr = t.closest('.cr[data-go="' + S.root + '"]'); if (cr) return editInline(cr, (v) => { if (v) { snap(); nd(S.root).title = v; save(); } renderAll(); });
   const it = t.closest('.it'); if (it) { const x = [...S.ideas, ...S.tasks].find((y) => y.id === it.dataset.it); return popEdit(it, x.text, (v) => setItemText(x, v)); }
