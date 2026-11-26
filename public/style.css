@@ -807,3 +807,7 @@ button.cr:hover { background: #fff; color: var(--accent); box-shadow: var(--shad
   transition: clip-path .32s cubic-bezier(.22, 1, .36, 1), opacity .12s ease; }
 #ipeek.on { clip-path: inset(0 0 0 0 round 12px); opacity: 1; }
 .ip-k { display: block; font: 700 10.5px "Segoe UI", sans-serif; letter-spacing: .04em; text-transform: uppercase; color: #9a8d98; margin-bottom: 3px; }
+/* a frame's colours appear above its tab, not beside it (with a bridge so the hover holds on the way up) */
+.ftabs .pal { left: 0 !important; top: auto !important; bottom: calc(100% + 8px); transform: translateY(4px) !important; }
+.frame:hover .ftabs .pal, .frame.sel .ftabs .pal { transform: none !important; }
+.ftabs .pal::after { left: 0; right: 0; top: 100%; bottom: auto; width: auto; height: 12px; }

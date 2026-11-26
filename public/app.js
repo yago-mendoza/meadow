@@ -456,7 +456,7 @@ function anchorAt(f, hel, side, i, n, sc) {
   }
 }
 function layoutPins() {
-  for (const t of [...S.ideas, ...S.tasks]) if (t.pin && !t.riding && !find(t.pin.host)) delete t.pin;
+  for (const t of [...S.ideas, ...S.tasks]) { if (t.pin && !t.riding && !find(t.pin.host)) delete t.pin; if (t.pin?.side === 'tl' && find(t.pin.host)?.k === 'f') t.pin.side = 'l'; }
   const hosts = new Set([...S.ideas, ...S.tasks].filter((t) => t.pin && t.onCanvas && !t.riding).map((t) => t.pin.host));
   for (const id of hosts) {
     const f = find(id), hel = elOf(id); if (!f || !hel) continue;
@@ -499,6 +499,7 @@ function pinTarget(it, e) {
   let side;
   if (edge === 'l' || edge === 'r') { const c = corner(fy); side = c === null ? edge : (c ? 'b' : 't') + edge; }
   else { const c = corner(fx); side = c === null ? edge : edge + (c ? 'r' : 'l'); }
+  if (host.dataset.k === 'f' && side === 'tl') side = 'l';              // a frame's top-left corner is its tab
   return { host: host.dataset.id, side, at: side === 't' || side === 'b' ? cx : cy };
 }
 // The dotted slot: where a circle being dragged would land if dropped now (a dock slot under a page, or an anchor).
