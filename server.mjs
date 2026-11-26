@@ -46,7 +46,7 @@ const server = http.createServer((req, res) => {
       req.on('end', () => {
         if (String(url.searchParams.get('rev')) !== String(cur.rev || 0)) return send(res, 409, { rev: cur.rev });
         let state; try { state = JSON.parse(body); } catch { return send(res, 400, { error: 'json' }); }
-        if (!state || !Array.isArray(state.docs)) return send(res, 400, { error: 'shape' });
+        if (!state || !(Array.isArray(state.docs) || (state.v === 2 && state.nodes && typeof state.nodes === 'object'))) return send(res, 400, { error: 'shape' });   // the old board, or the tree (v 2)
         send(res, 200, { rev: write(state) });
       });
       return;

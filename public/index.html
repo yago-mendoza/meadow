@@ -6,52 +6,32 @@
 <title>Meadow</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="tree.css">
 </head>
 <body>
-<div id="vp">
-  <canvas id="grid"></canvas>
-  <div id="world"><div id="frames"></div><div id="items"></div></div>
-  <div id="empty">Arrastra algo de la barra de arriba al plano, o haz clic en ello</div>
-  <div id="selrect"></div>
-</div>
+<header id="top">
+  <div class="brand">🌿</div>
+  <nav id="crumbs"></nav>
+  <div class="grow"></div>
+  <div id="tools"></div>
+  <button id="list-btn" class="ib" title="Tareas e ideas">☰</button>
+</header>
 
-<aside id="side">
-  <div class="brand"><span>🌿</span>Meadow</div>
-  <div id="types"></div>
-</aside>
+<main id="stage"></main>
 
-<section id="stash"></section>
-
-<div id="selbar"><span id="selbar-n"></span><span class="sb-sep"></span>
-  <button id="sb-left" class="sb-i" title="Alinear a la izquierda"><svg viewBox="0 0 16 16" width="15" height="15"><path d="M2 1.5v13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="4" y="3" width="9" height="3.5" rx="1" fill="currentColor"/><rect x="4" y="9.5" width="6" height="3.5" rx="1" fill="currentColor"/></svg></button>
-  <button id="sb-top" class="sb-i" title="Alinear arriba"><svg viewBox="0 0 16 16" width="15" height="15"><path d="M1.5 2h13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="3" y="4" width="3.5" height="9" rx="1" fill="currentColor"/><rect x="9.5" y="4" width="3.5" height="6" rx="1" fill="currentColor"/></svg></button>
-  <button id="sb-h" class="sb-i" title="Repartir en horizontal"><svg viewBox="0 0 16 16" width="15" height="15"><rect x="1" y="4" width="3" height="8" rx="1" fill="currentColor"/><rect x="6.5" y="4" width="3" height="8" rx="1" fill="currentColor"/><rect x="12" y="4" width="3" height="8" rx="1" fill="currentColor"/></svg></button>
-  <button id="sb-v" class="sb-i" title="Repartir en vertical"><svg viewBox="0 0 16 16" width="15" height="15"><rect x="4" y="1" width="8" height="3" rx="1" fill="currentColor"/><rect x="4" y="6.5" width="8" height="3" rx="1" fill="currentColor"/><rect x="4" y="12" width="8" height="3" rx="1" fill="currentColor"/></svg></button>
-  <span class="sb-sep"></span><button id="selbar-copy">⧉ Copiar todo</button><button id="selbar-del">🗑 Borrar</button></div>
-
-<aside id="panel">
-  <button id="panel-tab" title="Mostrar u ocultar el panel">☰</button>
-  <div class="pin">
-    <nav><button data-tab="tareas">Tareas <i id="pt-n"></i></button><button data-tab="ideas">Ideas</button><button data-tab="mapa">Mapa</button><button data-tab="hist">Historial</button></nav>
-    <div id="panel-body"></div>
-  </div>
-</aside>
-
-<div id="zoom">
-  <button id="z-fit" title="Encuadrar todo">⤢</button>
-  <button id="z-val" title="Volver a 100 %">100 %</button>
-</div>
+<div id="map"><div id="map-in"></div><button id="map-size" class="ib" title="Más grande / más pequeño">⤢</button></div>
+<div id="drawer" data-drop="drawer"><div class="dr-pull" title="El cajón: lo que sacas del árbol">🗄 <span>Cajón</span> <i id="dr-n"></i></div><div id="dr-list"></div></div>
+<aside id="list" class="closed"><nav><button data-l="tareas" class="on">Tareas</button><button data-l="ideas">Ideas</button></nav><div id="list-body"></div></aside>
 
 <div id="ed">
   <div class="ed-back"></div>
   <div class="ed-panel">
     <header>
-      <button id="ed-prev" class="ib" title="Volver al anterior">←</button>
-      <span id="ed-ico"></span>
+      <span id="ed-ico">📄</span>
       <input id="ed-name" spellcheck="false">
       <div class="grow"></div>
       <div id="ed-lv">
-        <button class="ib h" data-l="1" title="Dividir por títulos # (o clic en el # de un título)">#</button>
+        <button class="ib h" data-l="1" title="Dividir por títulos #">#</button>
         <button class="ib h" data-l="2" title="Dividir por títulos ##">##</button>
         <button class="ib h" data-l="3" title="Dividir por títulos ###">###</button>
       </div>
@@ -60,33 +40,17 @@
     </header>
     <div class="ed-main">
       <nav id="ed-toc"><div class="toc-h">Índice</div><div id="toc-list"></div></nav>
-      <div class="ed-col"><div id="ed-tabs" hidden></div><div id="ed-crumbs"></div><div id="ed-body"></div></div>
+      <div class="ed-col"><div id="ed-crumbs"></div><div id="ed-tabs"></div><div id="ed-body"></div></div>
     </div>
     <footer id="ed-foot"></footer>
   </div>
 </div>
 
-<div id="reader">
-  <div class="rd-back"></div>
-  <div class="rd-panel">
-    <header><span class="rd-where"></span><div class="rd-colors" hidden></div><div class="grow"></div>
-      <button class="pill" data-rd="done" hidden>✔ Hecha</button><button class="pill rd-view-only" data-rd="edit">Editar</button><button class="pill rd-edit-only" data-rd="save">Guardar</button>
-      <button class="ib" data-rd="del" title="Quitar el ribete">🗑</button><button class="ib" data-rd="close" title="Cerrar (Esc)">×</button></header>
-    <div class="rd-text"></div>
-    <textarea class="rd-edit" placeholder="Escribe una nota para el ribete… (Ctrl+Enter guarda)"></textarea>
-  </div>
-</div>
-<button id="backpill">↩ Volver a donde estabas <kbd>Enter</kbd></button>
-<div id="crumb-peek"></div>
-<div id="viewer"></div>
-<div id="dlist"></div>
-<div id="pinhint"></div>
-<div id="editpill"><button id="ep-back">↩ Volver al plano <kbd>Esc</kbd></button><span class="ep-pages"><button id="ep-prev" title="Página anterior">‹</button><span id="ep-page"></span><button id="ep-next" title="Página siguiente">›</button></span><button id="ep-edit">✎ Editar <b></b></button></div>
+<div id="drop-bar"></div>
+<div id="ghost"></div>
 <div id="ipeek"></div>
-<div id="fan"></div>
 <div id="pick"></div>
 <div id="toasts"></div>
-<div id="ghost"></div>
 <script type="module" src="app.js"></script>
 </body>
 </html>

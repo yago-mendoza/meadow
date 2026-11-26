@@ -121,11 +121,23 @@ function decorateLine(line, out) {
   }
 }
 
+// The text under a deep title sits as far in as its title (### one step, #### two…); an empty line steps back one level.
+const INDENTS = [1, 2, 3, 4].map((k) => Decoration.line({ class: 'cm-ind' + k }));
+function indentLevels(doc) {
+  const ind = new Uint8Array(doc.lines + 1); let lv = 0;
+  for (let n = 1; n <= doc.lines; n++) {
+    const t = doc.line(n).text, m = t.match(/^(#{1,6})s/);
+    if (m) lv = Math.max(0, m[1].length - 2);
+    else if (!t.trim()) lv = Math.max(0, lv - 1);
+    else ind[n] = Math.min(4, lv);
+  }
+  return ind;
+}
 function buildDecos(view) {
-  const out = [], doc = view.state.doc;
+  const out = [], doc = view.state.doc, ind = indentLevels(doc);
   for (const { from, to } of view.visibleRanges) {
     let pos = from;
-    while (pos <= to) { const line = doc.lineAt(pos); decorateLine(line, out); pos = line.to + 1; }
+    while (pos <= to) { const line = doc.lineAt(pos); decorateLine(line, out); if (ind[line.number]) out.push(INDENTS[ind[line.number] - 1].range(line.from)); pos = line.to + 1; }
   }
   return Decoration.set(out, true);
 }

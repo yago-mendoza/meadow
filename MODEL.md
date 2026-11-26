@@ -1,65 +1,40 @@
 # El modelo de Meadow
 
-Qué hay en el plano, cómo se ordena y cómo responde a cada gesto. Cuando algo nuevo entra, se le da su género aquí
-primero; si un gesto hace en un género algo distinto que en otro, tiene que estar escrito el porqué.
+Todo es anidamiento. Hay una sola cosa, el **nodo**: tiene un título y vive dentro de otro. Lo que es lo dice dónde
+está, siguiendo una escalera:
 
-## 1. Géneros (de mayor a menor)
+```
+Proyecto (GGUF.OS)
+ └ Marco
+    └ Pestaña de marco          (un marco tiene siempre al menos una)
+       └ Marco … | Documento     (marcos dentro de marcos, los que haga falta; al final, documentos)
+          └ Pestaña de documento (un documento tiene siempre al menos una)
+             └ # Título › ## › ### › … › líneas   (dentro del texto)
+```
 
-| Género | Piezas | Qué es |
-|---|---|---|
-| **Contenedor** | Marco | Agrupa lo que tiene dentro. Puede anidarse en otro marco. Tiene lengüeta (título) y descripción. |
-| **Hoja** | Documento, Libreta | Texto largo que se abre. Lleva cosas encima, enganchadas debajo y clavadas en sus bordes. |
-| **Pieza suelta** | Post-it, Texto | Se lee sin abrir; se escribe encima. |
-| **Ficha** | Idea, Tarea | Un objeto único: el mismo en el plano y dentro de cualquier documento. Suelta, es un circulito. |
-| **Adorno** | Ribete | Marca un borde de otra cosa; no existe sin ella. |
-| **Color** | Forma | Rectángulo, redondeado, círculo, triángulo o rombo, de un color. No contiene nada; se mide por sus bordes. |
+## Convertir es arrastrar
 
-Rango (para «quién lleva a quién»): contenedor 4 · hoja 3 · pieza suelta y ficha 2. El adorno no tiene rango: vive en
-su anfitrión.
+Soltar algo en otro peldaño lo convierte, y todo lo que lleva dentro baja o sube los mismos peldaños:
 
-Libreta: un documento con sus propias pestañas dentro (páginas). En el plano es una hoja con lomo y sus pestañas asomando;
-al entrar, cada pestaña es un texto. Copiarla copia todas sus páginas.
+- Un `#`/`##` soltado en las pestañas de un marco → **pestaña de marco**; sus subtítulos → **documentos**; su texto va
+  dentro (el texto propio del título, en un documento con su nombre).
+- Un documento soltado dentro de otro → **pestaña** de ese documento; soltado en un título del mapa → **subtítulo**.
+- Un marco soltado en un texto → títulos; sus pestañas → subtítulos; y así hacia abajo.
+- Nada escrito se pierde: el texto que no tiene página donde vivir se guarda en un documento.
 
-## 2. Relaciones: solo dos
+Qué hijo admite cada uno: proyecto → marco · marco → pestaña · pestaña de marco → marco o documento · documento →
+pestaña · pestaña de documento → títulos en el texto.
 
-Yago, 26.11: «relación de interior o de borde, no hay más».
+## Pantalla
 
-- **Interior.** Cada cosa pertenece a lo más pequeño, de género igual o mayor, cuyo rectángulo contiene su centro (si
-  empatan, lo de arriba). Un marco contiene además los marcos que caben enteros en él. *Un marco nunca es más pequeño que
-  lo que contiene, y nunca se solapa con un marco que no esté dentro de él: si lo pisa, lo empuja.*
-- **Borde.** Ideas y tareas viven solo aquí, nunca dentro de nada: en uno de los 8 atractores de un documento, post-it o
-  marco (4 esquinas y el centro de cada lado, con la línea del borde pasando por su centro), o enganchadas debajo de un
-  documento (en columna, del ancho de la hoja, 3 líneas; más de 5, el tipo mayoritario se pliega en un circulito con
-  número). Soltadas dentro de algo, van a su atractor más cercano. En un marco, solo en su lado izquierdo (apiladas desde arriba) o en la franja de la descripción, a la derecha: esas son de la pestaña abierta y se van con ella. Soltar un circulito sobre otro los apila (un número; al pasar el ratón se despliegan). Los ribetes también son de borde. Lo de borde hereda el
-  tamaño y la altura de su anfitrión: no se escala ni va al frente o al fondo por su cuenta.
+- **El escenario**: el nodo en el que estás (el proyecto, o un marco por dentro). Sus marcos con sus pestañas y lo que
+  tiene la abierta. Entrar (⤢) hace crecer el marco desde su sitio; Esc o las migas, salir.
+- **El documento** se abre al hacer clic: sus pestañas arriba, el índice a la izquierda (sus títulos se pueden
+  arrastrar a otro sitio para convertirlos), la escritura de siempre.
+- **El mapa** (abajo a la izquierda): todo el árbol como rectángulos anidados, con nombres; rueda para acercar, clic
+  para ir, y se puede arrastrar desde y hacia él. Arriba de un rectángulo (su nombre) = como pestaña; dentro = dentro.
+- **Un cajón**: lo que se aparta del árbol, para volver a soltarlo donde sea.
+- **Ideas y tareas**: se cuelgan de cualquier nodo (arrastrándolas encima) o se escriben en una línea del texto.
 
-Con las dos pasa lo mismo: **lo de dentro y lo del borde viajan con su anfitrión** al moverlo, escalarlo o guardarlo en
-un cajón, y **lo pequeño nunca mueve ni cambia lo grande**.
-
-## 3. Gramática de gestos
-
-| Gesto | Contenedor | Hoja | Pieza suelta | Ficha | Adorno |
-|---|---|---|---|---|---|
-| **Clic** | 1.º: él y todo lo de dentro · 2.º: solo él | 1.º: acerca + ella y lo que lleva · 2.º: solo ella | acerca | lee (popup) | lee (popup) |
-| **Clic en su título** | renombra | renombra | — | — | — |
-| **Doble clic** | — | abre | escribe | escribe sobre su color | — |
-| **Arrastrar** | mueve todo lo que contiene | mueve lo que lleva; despacio hace sitio en su marco, rápido sale | mueve lo que lleva dentro | se suelta, se clava o se engancha según dónde caiga (hueco punteado) | cambia de borde o de anfitrión |
-| **Alt + arrastrar** | solo él | solo ella | solo ella | solo ella | — |
-| **Esquina** | estira (Shift: escala lo de dentro) | escala con lo que lleva | escala | escala (no si está clavada o enganchada) | — |
-| **Supr** | borra lo seleccionado | | | | |
-| **Ctrl+Z** | deshace cualquier operación | | | | |
-
-Acercarse a un documento lo convierte en el documento vivo: se lee y se escribe en la propia hoja, por páginas (la
-rueda pasa página; Ctrl+rueda acerca); abajo, «Volver al plano» (Esc) y «Pantalla completa». Un marco puede tener
-pestañas, como un archivador: cada una con su contenido, independientes. Borrar una pestaña se lleva lo suyo (avisa);
-el marco vive mientras le quede alguna. Una lengüeta más ancha que su marco lo ensancha.
-Un marco soltado con el centro sobre otro mayor entra en él: se coloca al lado de lo que ya hay y el de fuera (y los que
-lo contienen) se ensanchan. Agrandar un marco por encima del que lo contiene agranda también a ese. Borrar un marco avisa: todo, solo sus ideas y tareas, o solo el marco.
-
-En el vacío: arrastrar mueve la vista; Ctrl+arrastrar selecciona; la rueda acerca. Enter vuelve a donde estabas.
-
-## 4. Movimiento
-
-Todo cambio de sitio o de forma pasa por `public/motion.js`: unas pocas curvas (`snap` para lo que encaja, `smooth`
-para crecer y aparecer, `out` para irse) y una sola forma de animar (de su sitio y tamaño viejos al nuevo). Nada se
-anima por su cuenta. Lo que se abre se cierra con la misma animación, al revés.
+Los datos: `data/meadow.json` (`v: 2`, `nodes`, `drawer`, `ideas`, `tasks`). La copia de antes del árbol:
+`data/meadow-antes-del-arbol-2026-11-26.json`.
