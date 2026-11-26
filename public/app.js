@@ -333,7 +333,7 @@ function renderList() {
   const l = listTab === 'tareas' ? [...S.tasks].sort((a, b) => a.done - b.done) : S.ideas;
   $('#list-body').innerHTML = rows(l) || `<p class="none">${listTab === 'tareas' ? 'Sin tareas. Arrastra «Tarea» a cualquier sitio.' : 'Sin ideas todavía.'}</p>`;
 }
-function renderAll() { tidy(); renderTop(); renderStage(); renderMap(); renderDrawer(); renderList(); if (cur) renderEdHead(); }
+function renderAll() { tidy(); renderTop(); renderStage(); renderMap(); renderDrawer(); renderList(); renderDock(); if (cur) renderEdHead(); }
 
 // ---- zooming in and out of frames (the frame grows from where it was / shrinks back to its place) -------------------
 function glideFrom(el, r0, ms = 420) {
@@ -648,6 +648,7 @@ function openDoc(id, tabId, fromEl) {
   const d = nd(id); if (!d) return;
   ensureTab(d);
   cur = id; curTab = tabId && d.kids.includes(tabId) ? tabId : activeTab(d); d.active = curTab;
+  if (mins.some((m) => m.id === id)) { mins = mins.filter((m) => m.id !== id); renderDock(); }
   if (!ed) ed = createEditor($('#ed-body'), edApi);
   $ed.classList.add('open');
   ed.setDoc(nd(curTab).text || '');
@@ -698,6 +699,32 @@ $('#ed-crumbs').addEventListener('click', (e) => { const b = e.target.closest('[
 $('#ed-name').addEventListener('input', (e) => { const d = nd(cur); if (d && e.target.value.trim()) { d.title = e.target.value.trim(); save(); clearTimeout(renderEdHead.t); renderEdHead.t = setTimeout(() => { renderMap(); renderStage(); }, 300); } });
 $('#ed-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ed.focus(); } });
 $('#ed-close').onclick = closeDoc;
+let mins = JSON.parse(localStorage.getItem('meadow.mins') || '[]');
+function renderDock() {
+  mins = mins.filter((m) => nd(m.id)); localStorage.setItem('meadow.mins', JSON.stringify(mins));
+  $('#dock').innerHTML = mins.map((m) => `<div class="dk" data-doc="${m.id}" title="Volver a «${esc(nd(m.id).title)}»"><span>📄</span>${esc(nd(m.id).title)}<button class="dk-x" title="Quitar de aquí">×</button></div>`).join('');
+}
+function minimize() {
+  if (!cur) return;
+  const id = cur, tab = curTab;
+  mins = mins.filter((m) => m.id !== id); mins.push({ id, tab });
+  renderDock();
+  const chip = $(`#dock .dk[data-doc="${id}"]`), panel = $('.ed-panel');
+  const done = () => { closeDoc(); };
+  if (chip) {
+    const a = panel.getBoundingClientRect(), b = chip.getBoundingClientRect();
+    panel.animate([{ transformOrigin: '0 0', transform: 'none', opacity: 1 },
+      { transformOrigin: '0 0', transform: `translate(${b.left - a.left}px,${b.top - a.top}px) scale(${b.width / a.width},${b.height / a.height})`, opacity: .3 }], { duration: 300, easing: EASE.out }).finished.then(done, done);
+    chip.animate([{ opacity: 0 }, { opacity: 0 }, { opacity: 1 }], { duration: 360 });
+  } else done();
+}
+$('#ed-min').onclick = minimize;
+$('#dock').addEventListener('click', (e) => {
+  const x = e.target.closest('.dk-x'), k = e.target.closest('.dk'); if (!k) return;
+  const id = k.dataset.doc, m = mins.find((q) => q.id === id);
+  mins = mins.filter((q) => q.id !== id); renderDock();
+  if (!x) openDoc(id, m?.tab, k);
+});
 $('.ed-back').onclick = closeDoc;
 for (const b of document.querySelectorAll('#ed-lv [data-l]')) b.onclick = () => ed?.setLevel(+b.dataset.l === level ? 0 : +b.dataset.l);
 $('#ed-foldall').onclick = () => { const folded = ed?.toggleFoldHeads(); $('#ed-foldall').classList.toggle('on', !!folded); };
