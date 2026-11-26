@@ -2113,8 +2113,9 @@ function mapHTML() {
   const { kids, roots, trays } = mapTree();
   const want = (k) => !mapKinds.size || mapKinds.has(k);
   const label = (n) => n.k === 'f' ? (n.o.title || 'Marco sin título') : n.k === 'd' ? n.o.name : (n.o.text || '').split('\n')[0] || (n.k === 'p' ? 'Post-it' : n.k === 'x' ? 'Texto' : '…');
-  const icon = (n) => n.k === 't' ? (n.o.done ? '☑' : '☐') : KINDS.find((q) => q[0] === n.k)[2];
-  const order = (a, b) => 'fdpxit'.indexOf(a.k) - 'fdpxit'.indexOf(b.k) || (a.o.y || 0) - (b.o.y || 0) || (a.o.x || 0) - (b.o.x || 0);
+  const TOOLK = { f: 'frame', d: 'doc', p: 'postit', i: 'idea', t: 'tarea', x: 'text' };
+  const icon = (n) => { const t = TOOLS.find((q) => q[0] === TOOLK[n.k]); return `<span class="mk mk-${n.k}${n.k === 't' && n.o.done ? ' done' : ''}" style="--c:${t[3]}">${n.k === 't' ? (n.o.done ? '✔' : '') : t[1]}</span>`; };
+  const order = (a, b) => 'itdpxf'.indexOf(a.k) - 'itdpxf'.indexOf(b.k) || (a.o.y || 0) - (b.o.y || 0) || (a.o.x || 0) - (b.o.x || 0);
   const childrenOf = (n) => {
     const own = [...(kids.get(n.o.id) || [])];
     const tabs = n.k === 'f' && tabsOf(n.o).length > 1 ? tabsOf(n.o).map((t) => ({ tab: t, f: n.o, list: kids.get(n.o.id + '|' + t.id) || [] })) : [];
@@ -2122,22 +2123,23 @@ function mapHTML() {
   };
   const draw = (n, depth) => {
     const { own, tabs } = childrenOf(n);
-    const inner = [...tabs.map((t) => drawTab(t, depth + 1)), ...own.map((c) => draw(c, depth + 1))].filter(Boolean).join('');
+    const circ = own.filter((c) => c.k === 'i' || c.k === 't'), rest = own.filter((c) => c.k !== 'i' && c.k !== 't');
+    const inner = [...circ.map((c) => draw(c, depth + 1)), ...tabs.map((t) => drawTab(t, depth + 1)), ...rest.map((c) => draw(c, depth + 1))].filter(Boolean).join('');
     const mine = want(n.k);
     if (!mine && !inner) return '';
-    return `<div class="mp-n${mine ? '' : ' ctx'}" style="--d:${depth}"><button class="mp-row" data-loc2="${n.o.id}"><span class="mp-i">${icon(n)}</span><span class="mp-l">${esc(label(n))}</span>${n.rel ? `<span class="mp-rel">${n.rel}</span>` : ''}</button>${inner}</div>`;
+    return `<div class="mp-n${mine ? '' : ' ctx'}" style="--d:${depth}"><button class="mp-row" data-loc2="${n.o.id}">${icon(n)}<span class="mp-l">${esc(label(n))}</span>${n.rel ? `<span class="mp-rel">${n.rel}</span>` : ''}</button>${inner}</div>`;
   };
   const drawTab = (t, depth) => {
     const inner = t.list.sort(order).map((c) => draw(c, depth + 1)).filter(Boolean).join('');
     if (!inner && mapKinds.size) return '';
-    return `<div class="mp-n tab" style="--d:${depth}"><button class="mp-row" data-tabgo="${t.f.id}|${t.tab.id}"><span class="mp-i">▭</span><span class="mp-l">Pestaña «${esc(t.tab.title || 'sin título')}»</span>${t.tab.id === activeTab(t.f) ? '<span class="mp-rel">abierta</span>' : ''}</button>${inner || '<div class="mp-empty" style="--d:' + (depth + 1) + '">vacía</div>'}</div>`;
+    return `<div class="mp-n tab" style="--d:${depth}"><button class="mp-row" data-tabgo="${t.f.id}|${t.tab.id}"><span class="mk mk-tab"></span><span class="mp-l">Pestaña «${esc(t.tab.title || 'sin título')}»</span>${t.tab.id === activeTab(t.f) ? '<span class="mp-rel">abierta</span>' : ''}</button>${inner || '<div class="mp-empty" style="--d:' + (depth + 1) + '">vacía</div>'}</div>`;
   };
   const plane = roots.sort(order).map((n) => draw(n, 0)).filter(Boolean).join('');
-  const drawers = [...trays.values()].map(({ tray, list }) => { const inner = list.sort(order).map((c) => draw(c, 1)).filter(Boolean).join(''); return inner ? `<div class="mp-n ctx" style="--d:0"><div class="mp-row"><span class="mp-i">🗄</span><span class="mp-l">${esc(tray.name || 'Cajón')}</span></div>${inner}</div>` : ''; }).join('');
+  const drawers = [...trays.values()].map(({ tray, list }) => { const inner = list.sort(order).map((c) => draw(c, 1)).filter(Boolean).join(''); return inner ? `<div class="mp-n ctx" style="--d:0"><div class="mp-row"><span class="mk mk-tray">🗄</span><span class="mp-l">${esc(tray.name || 'Cajón')}</span></div>${inner}</div>` : ''; }).join('');
   const names = mapKinds.size ? KINDS.filter((q) => mapKinds.has(q[0])).map((q) => q[1].toLowerCase()) : [];
   const viewing = names.length ? 'Solo ' + (names.length > 1 ? names.slice(0, -1).join(', ') + ' y ' + names.at(-1) : names[0]) : 'Todo';
   return `<div class="mp-head"><b>Viendo:</b> ${viewing}</div>
-    <div class="filt mp-filt"><button data-mk="" class="${mapKinds.size ? '' : 'on'}">Todo</button>${KINDS.map(([k, l, ic]) => `<button data-mk="${k}" class="${mapKinds.has(k) ? 'on' : ''}">${ic} ${l}</button>`).join('')}</div>
+    <div class="filt mp-filt"><button data-mk="" class="${mapKinds.size ? '' : 'on'}">Todo</button>${KINDS.map(([k, l]) => `<button data-mk="${k}" class="${mapKinds.has(k) ? 'on' : ''}">${icon({ k, o: {} })}${l}</button>`).join('')}</div>
     <div class="mp-tree">${plane ? '<div class="mp-sec">En el plano</div>' + plane : ''}${drawers ? '<div class="mp-sec">En los cajones</div>' + drawers : ''}${plane || drawers ? '' : '<p class="none">Nada de esto todavía.</p>'}</div>`;
 }
 function renderPanel() {
