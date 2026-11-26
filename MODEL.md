@@ -3,8 +3,6 @@
 Qué hay en el plano, cómo se ordena y cómo responde a cada gesto. Cuando algo nuevo entra, se le da su género aquí
 primero; si un gesto hace en un género algo distinto que en otro, tiene que estar escrito el porqué.
 
-- **Forma**: color en el plano (rectángulo, redondeado, círculo, triángulo, rombo). Rango 1: no contiene nada; se mide por sus bordes; dentro de un marco, va con él.
-
 ## 1. Géneros (de mayor a menor)
 
 | Género | Piezas | Qué es |
@@ -14,6 +12,7 @@ primero; si un gesto hace en un género algo distinto que en otro, tiene que est
 | **Pieza suelta** | Post-it, Texto | Se lee sin abrir; se escribe encima. |
 | **Ficha** | Idea, Tarea | Un objeto único: el mismo en el plano y dentro de cualquier documento. Suelta, es un circulito. |
 | **Adorno** | Ribete | Marca un borde de otra cosa; no existe sin ella. |
+| **Color** | Forma | Rectángulo, redondeado, círculo, triángulo o rombo, de un color. No contiene nada; se mide por sus bordes. |
 
 Rango (para «quién lleva a quién»): contenedor 4 · hoja 3 · pieza suelta y ficha 2. El adorno no tiene rango: vive en
 su anfitrión.
