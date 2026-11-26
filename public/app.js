@@ -89,13 +89,15 @@ const ICON = { crear: '＋', borrar: '🗑', editar: '✎', hecha: '✔', reabri
 function applyView() {
   const { x, y, z } = S.view;
   world.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
+  world.style.setProperty('--zi', 1 / z);           // text in a page being read keeps a normal size on screen
+  if (inline) { inline.ed.view.requestMeasure(); clearTimeout(applyView.t); applyView.t = setTimeout(paintPage, 120); }
   $('#z-val').textContent = Math.round(z * 100) + ' %';
   drawGrid();
   if (!inline && ![...itemsEl.querySelectorAll('.doc')].some((el) => el.getBoundingClientRect().width >= NEAR_W * 0.9)) gridView = { ...S.view };
   nearDocs();
 }
 let gridView = null;
-const NEAR_W = 420;                     // a page this wide on screen (px) reads in place
+const NEAR_W = 300;                     // a page this wide on screen (px) is legible: it reads and writes in place                     // a page this wide on screen (px) reads in place
 let nearT = null;
 function nearDocs() {
   clearTimeout(nearT);
@@ -1564,7 +1566,8 @@ function placeActs(host) {
   const others = [...world.querySelectorAll('#items [data-k], .ftab, .fdesc:not(.empty), .dgroup, .sign')]
     .filter((o) => o !== host && !host.contains(o) && !o.contains(host)).map((o) => o.getBoundingClientRect());
   const hit = (r) => others.some((q) => q.left < r.right && r.left < q.right && q.top < r.bottom && r.top < q.bottom);
-  const pref = host.dataset.k === 'd' ? ACT_SIDES : ['at-bottom', 'at-top', 'at-right', 'at-left'];
+  // circles keep 'below' for what they say (the unfolding preview): their buttons go to a side
+  const pref = host.dataset.k === 'd' ? ACT_SIDES : host.classList.contains('circle') ? ['at-right', 'at-left', 'at-top', 'at-bottom'] : ['at-bottom', 'at-top', 'at-right', 'at-left'];
   acts.classList.add('measuring');                 // measured at their real size, not mid-animation
   for (const side of pref) {
     acts.classList.remove(...ACT_SIDES); acts.classList.add(side);
@@ -1578,6 +1581,28 @@ itemsEl.addEventListener('pointerover', (e) => {
   if (e.relatedTarget && host.contains(e.relatedTarget)) return;       // still inside the same thing
   placeActs(host);
 });
+
+// ---- hovering an idea or a task: what it says unfolds just under it, like a drawer (all of it when short) ----
+let ipeekT = null;
+itemsEl.addEventListener('pointerover', (e) => {
+  const el = e.target.closest('.item'), box = $('#ipeek');
+  if (!el || act || gh) return;
+  if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+  clearTimeout(ipeekT);
+  ipeekT = setTimeout(() => {
+    const it = find(el.dataset.id)?.o; if (!it || !el.isConnected || el.classList.contains('writing')) return;
+    const r = el.getBoundingClientRect(), txt = it.text || '…';
+    const kind = it.kind === 'idea' ? '💡 Idea' : it.done ? '☑ Tarea hecha' : '☐ Tarea';
+    box.innerHTML = `<span class="ip-k">${kind}</span>${esc(txt.length > 280 ? txt.slice(0, 280) + '…' : txt)}`;
+    Object.assign(box.style, { left: Math.min(innerWidth - 300, Math.max(8, r.left + r.width / 2 - 140)) + 'px', top: r.bottom + 8 + 'px' });
+    box.classList.add('on');
+  }, 220);
+});
+itemsEl.addEventListener('pointerout', (e) => {
+  const el = e.target.closest('.item'); if (!el || (e.relatedTarget && el.contains(e.relatedTarget))) return;
+  clearTimeout(ipeekT); $('#ipeek').classList.remove('on');
+});
+addEventListener('pointerdown', () => { clearTimeout(ipeekT); $('#ipeek')?.classList.remove('on'); }, true);
 
 // ---- peek: hovering something that is partly covered brings it forward for a moment, with what lies on it ----------
 let peekT = null, peeked = [];

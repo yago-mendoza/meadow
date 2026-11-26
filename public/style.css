@@ -793,3 +793,17 @@ button.cr:hover { background: #fff; color: var(--accent); box-shadow: var(--shad
 .doc.live { transform: none !important; }
 .doc.live .page { padding: 12px 6px 12px 4px; clip-path: none; }
 .doc.live .dbody { height: 236px; -webkit-mask-image: linear-gradient(#000 calc(100% - 9px), transparent); mask-image: linear-gradient(#000 calc(100% - 9px), transparent); }
+/* the text of a page being read is a normal size on screen whatever the zoom: coming closer gives more room, not bigger letters */
+.ied .cm-scroller { font-size: calc(12.5px * var(--zi, 1)); }
+.doc.near .dbody { font-size: calc(12px * var(--zi, 1)); }
+.doc.near .rh1 { font-size: 1.3em; } .doc.near .rh2 { font-size: 1.15em; } .doc.near .rh3 { font-size: 1.05em; }
+.ied .cm-chip { font-size: .92em; }
+.ied .cm-tooltip-autocomplete ul li { font-size: calc(12px * var(--zi, 1)); }
+
+/* what an idea or a task says, unfolding under it like a drawer */
+#ipeek { position: fixed; z-index: 58; width: 280px; padding: 9px 12px 10px; border-radius: 12px; background: #fff; box-shadow: var(--shadow-up);
+  font: 13.5px/1.45 Georgia, serif; color: #2f2735; white-space: pre-wrap; word-break: break-word; pointer-events: none;
+  clip-path: inset(0 0 100% 0 round 12px); opacity: 0;
+  transition: clip-path .32s cubic-bezier(.22, 1, .36, 1), opacity .12s ease; }
+#ipeek.on { clip-path: inset(0 0 0 0 round 12px); opacity: 1; }
+.ip-k { display: block; font: 700 10.5px "Segoe UI", sans-serif; letter-spacing: .04em; text-transform: uppercase; color: #9a8d98; margin-bottom: 3px; }
