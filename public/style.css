@@ -909,3 +909,33 @@ body.dragging .dhov, .doc.live .dhov { display: none; }
 .dhov-in button b { font: 600 11px "Segoe UI", sans-serif; letter-spacing: .02em; }
 .dhov-in button:hover { background: color-mix(in srgb, var(--accent) 10%, #fff); }
 .dhov-in i { width: 1px; margin: 10px 0; background: #e6dde6; }
+
+/* the map of nestings */
+.mp-head { padding: 6px 8px 2px; font-size: 13px; color: #4a3f4d; }
+.mp-head b { color: var(--accent); }
+.mp-filt { flex-wrap: wrap; }
+.mp-sec { margin: 12px 8px 4px; font: 700 10.5px "Segoe UI", sans-serif; letter-spacing: .05em; text-transform: uppercase; color: #a397a5; }
+.mp-n { position: relative; }
+.mp-n .mp-n::before { content: ""; position: absolute; left: calc(var(--d) * 16px - 6px); top: 0; bottom: 0; border-left: 1px solid #ece4ec; }
+.mp-row { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; padding: 5px 8px 5px calc(8px + var(--d) * 16px); border-radius: 8px; font-size: 13px; color: #2f2735; }
+button.mp-row:hover { background: #f6f1f5; }
+.mp-i { width: 18px; text-align: center; font-size: 12px; color: #8a7f8f; flex: none; }
+.mp-l { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-rel { flex: none; font-size: 11px; color: #a397a5; font-style: italic; }
+.mp-n.ctx > .mp-row { color: #a397a5; font-size: 12px; }
+.mp-n.tab > .mp-row .mp-l { font-weight: 600; color: #5a4e5c; }
+.mp-empty { padding: 2px 8px 4px calc(8px + var(--d) * 16px + 25px); font-size: 11.5px; color: #b8adb6; font-style: italic; }
+
+/* nothing to put in front of or behind: no front/back (and no empty button row) */
+.acts.no-z [data-a="front"], .acts.no-z [data-a="back"] { display: none !important; }
+.postit > .acts.no-z, .ftext > .acts.no-z { display: none !important; }
+/* a task circle on hover: ✓ | × inside it */
+.item.circle .cin { position: absolute; inset: 0; border-radius: 50%; display: flex; align-items: stretch; overflow: hidden; background: #fff;
+  opacity: 0; pointer-events: none; transition: opacity .15s ease; box-shadow: inset 0 0 0 1.5px #c7dcf5; }
+.item.circle:hover .cin { opacity: 1; pointer-events: auto; }
+body.dragging .item.circle .cin { display: none; }
+.cin button { flex: 1; display: grid; place-items: center; font: 700 13px/1 "Segoe UI", sans-serif; color: #5b7fae; padding: 0; }
+.cin button[data-c="done"]:hover { background: var(--teal); color: #fff; }
+.cin button[data-c="del"]:hover { background: #e7a3a3; color: #fff; }
+.cin i { width: 1px; margin: 8px 0; background: #dbe5f3; }
+.item.circle.tarea:hover > .x { display: none; }

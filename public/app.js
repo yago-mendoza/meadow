@@ -370,7 +370,7 @@ function itemHTML(it) {
   if (!it.dock) {                                   // loose: a small circle with its icon; a click reads it
     const sn = stackMembers(it).length;
     return `<div class="item circle ${it.kind}${it.done ? ' done' : ''}${sn ? ' stacked' : ''}${sel.has(it.id) ? ' sel' : ''}"${sn ? ` data-stack="${sn + 1}"` : ''} data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
-      <span class="cico">${it.kind === 'idea' ? '💡' : it.done ? '✔' : ''}</span>
+      <span class="cico">${it.kind === 'idea' ? '💡' : it.done ? '✔' : ''}</span>${k === 't' && !sn ? `<span class="cin"><button data-c="done" title="${it.done ? 'Reabrir' : 'Hecha'}">${it.done ? '↺' : '✓'}</button><i></i><button data-c="del" title="${uses ? 'Quitar del plano' : 'Borrar'}">×</button></span>` : ''}
       <button class="x" title="${uses ? 'Quitar del plano (sigue en sus documentos)' : 'Borrar'}">×</button>
       <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button>${it.pin ? '' : ZB}</div>${it.pin ? '' : PRS}</div>`;   // pinned: its size is its host's
   }
@@ -1170,7 +1170,7 @@ let act = null, space = false;
 vp.addEventListener('contextmenu', (e) => e.preventDefault());
 vp.addEventListener('dblclick', (e) => { if (inline && e.target.closest('.doc.live')) { e.stopPropagation(); $('#ep-edit').click(); } }, true);
 vp.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.ied, .dhov button')) return;                       // selecting text in the page being read
+  if (e.target.closest('.ied, .dhov button, .cin button')) return;                       // selecting text in the page being read
   const ae = document.activeElement;
   if (ae?.isContentEditable && !e.target.closest('[contenteditable="true"]')) ae.blur();   // a click elsewhere = Enter
   if (e.target.closest('.dgroup')) return;
@@ -1490,6 +1490,8 @@ vp.addEventListener('click', (e) => {
   }
   const fa = e.target.closest('.f-add');
   if (fa) return frameInside(find(fa.closest('.frame').dataset.id).o);
+  const cin = e.target.closest('.cin button');
+  if (cin) { const it = find(cin.closest('[data-k]').dataset.id).o; $('#ipeek')?.classList.remove('on'); return cin.dataset.c === 'done' ? toggleTask(it) : removeIds([it.id]); }
   const x = e.target.closest('.x');
   if (x) return removeIds([x.closest('[data-k]').dataset.id]);
   const dot = e.target.closest('.pal i');
@@ -1701,6 +1703,11 @@ function placeActs(host) {
   const others = [...world.querySelectorAll('#items [data-k], .ftab, .fdesc:not(.empty), .dgroup, .sign')]
     .filter((o) => o !== host && !host.contains(o) && !o.contains(host)).map((o) => o.getBoundingClientRect());
   const hit = (r) => others.some((q) => q.left < r.right && r.left < q.right && q.top < r.bottom && r.top < q.bottom);
+  const hr = host.getBoundingClientRect(), mine = new Set([...pinnedTo(host.dataset.id), ...(host.dataset.k === 'd' ? docked(find(host.dataset.id).o) : [])].map((t) => t.id));
+  const crossing = [...itemsEl.querySelectorAll('[data-k]')].some((o) => o !== host && !mine.has(o.dataset.id) && !o.contains(host) && !host.contains(o)
+    && (() => { const q = o.getBoundingClientRect(); return q.left < hr.right && hr.left < q.right && q.top < hr.bottom && hr.top < q.bottom; })());
+  acts.classList.toggle('no-z', !crossing);
+  const pal = host.querySelector(':scope > .pal'); if (pal) { const pr = pal.getBoundingClientRect(); others.push({ left: pr.left, top: pr.top - 16, right: pr.right, bottom: pr.bottom + 4 }); }
   // circles keep 'below' for what they say (the unfolding preview): their buttons go to a side
   const pref = host.dataset.k === 'd' ? ACT_SIDES : host.classList.contains('circle') ? ['at-right', 'at-left', 'at-top', 'at-bottom'] : ['at-bottom', 'at-top', 'at-right', 'at-left'];
   acts.classList.add('measuring');                 // measured at their real size, not mid-animation
@@ -1955,7 +1962,22 @@ $('#panel nav').onclick = (e) => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
   tab = b.dataset.tab; localStorage.setItem('meadow.tab', tab); renderPanel();
 };
+function nestPath(o) {
+  const { ownerOf } = owners(), parts = [];
+  let cur = o, k = kindOfObj(o), guard = 0;
+  while (cur && guard++ < 8) {
+    const p = parentOf(cur, k, ownerOf); if (!p) break;
+    if (p.tray) { parts.unshift('cajón «' + (p.tray.name || 'Cajón') + '»'); break; }
+    const pk = kindOfObj(p.o), nm = pk === 'f' ? (p.o.title || 'marco') : pk === 'd' ? '«' + p.o.name + '»' : pk === 'p' ? 'post-it' : pk === 'i' || pk === 't' ? 'pila' : '';
+    const tt = p.tab && pk === 'f' && tabsOf(p.o).length > 1 ? tabsOf(p.o).find((t) => t.id === p.tab) : null;
+    const tab = tt && tt !== tabsOf(p.o)[0] ? ' › ' + (tt.title || 'pestaña') : '';
+    parts.unshift(nm + tab + (cur === o && p.rel ? ' (' + p.rel + ')' : ''));
+    cur = p.o; k = pk;
+  }
+  return parts.join(' › ');
+}
 function whereOf(it) {
+  const np = nestPath(it); if (np) return np;
   const ds = docsUsing(it).map((d) => d.name);
   return [it.onCanvas ? 'plano' : '', ...ds.map((n) => `«${n}»`)].filter(Boolean).join(' · ') || 'en ningún sitio';
 }
@@ -2002,6 +2024,73 @@ function itemRow(it) {
   return `<div class="row${it.done ? ' done' : ''}" data-loc="${it.id}">${lead}<div class="r-main"><div class="r-text">${esc(it.text) || '…'}</div>
     <div class="r-sub">${esc(whereOf(it))}</div></div><button class="r-copy" data-copy="${it.id}" title="Copiar para pegar">⧉</button></div>`;
 }
+// ---- the map of nestings: everything, as a tree of what holds what (frames › tabs › pages › circles) ----
+const KINDS = [['f', 'Marcos', '⬚'], ['d', 'Documentos', '📄'], ['p', 'Post-its', '🗒️'], ['x', 'Textos', 'Aa'], ['i', 'Ideas', '💡'], ['t', 'Tareas', '☐']];
+let mapKinds = new Set(JSON.parse(localStorage.getItem('meadow.mapKinds') || '[]'));
+const kindOfObj = (o) => find(o.id)?.k || (S.docs.includes(o) ? 'd' : null);
+// What holds a thing, and how: { o, rel, tab } (null: it lies on the open plane)
+function parentOf(o, k, ownerOf) {
+  const smallestFrame = (x, y, not) => S.frames.filter((f) => f !== not && x > f.x && x < f.x + f.w && y > f.y && y < f.y + f.h).sort((p, q) => p.w * p.h - q.w * q.h)[0];
+  const ctr = (q) => { const el = elOf(q.id); const [w, h] = el ? sizeOf(el, q) : [q.w || 0, q.h || 0]; return [q.x + w / 2, q.y + h / 2]; };
+  if (k === 'i' || k === 't') {
+    if (o.stackOf && stackBase(o)) return { o: stackBase(o), rel: 'en su pila' };
+    if (o.pin && find(o.pin.host)) { const h = find(o.pin.host).o; return { o: h, rel: o.pin.side === 'desc' ? 'en la descripción' : 'en el borde', tab: o.pin.side === 'desc' ? o.pin.tab : null, edge: true }; }
+    if (o.dock && docById(o.dock)) return { o: docById(o.dock), rel: 'debajo' };
+    if (!o.onCanvas) { const d = docsUsing(o)[0]; return d ? { o: d, rel: 'en el texto' } : null; }
+  }
+  if (k === 'f') { const g = S.frames.filter((g) => g !== o && o.x >= g.x && o.y >= g.y && o.x + o.w <= g.x + g.w && o.y + o.h <= g.y + g.h).sort((p, q) => p.w * p.h - q.w * q.h)[0]; return g ? { o: g, rel: '' } : null; }
+  if (k === 'd' && o.place !== 'canvas') { const t = S.trays.find((t) => t.id === o.tray); return { tray: t || { id: 'tray', name: 'Cajón' } }; }
+  if (o.ftab && S.frames.find((f) => f.id === o.ftab.f)) return { o: S.frames.find((f) => f.id === o.ftab.f), rel: '', tab: o.ftab.t };
+  const own = ownerOf.get(o.id); if (own && find(own)) return { o: find(own).o, rel: 'encima' };
+  const [cx, cy] = ctr(o), f = smallestFrame(cx, cy); return f ? { o: f, rel: '' } : null;
+}
+function mapTree() {
+  const { ownerOf } = owners();
+  const nodes = [...S.frames.map((o) => ['f', o]), ...S.docs.map((o) => ['d', o]), ...S.postits.map((o) => ['p', o]), ...S.texts.map((o) => ['x', o]),
+    ...S.ideas.map((o) => ['i', o]), ...S.tasks.map((o) => ['t', o])];
+  const kids = new Map(), roots = [], trays = new Map();
+  const push = (key, n) => { if (!kids.has(key)) kids.set(key, []); kids.get(key).push(n); };
+  for (const [k, o] of nodes) {
+    const p = parentOf(o, k, ownerOf), n = { k, o, rel: p?.rel || '' };
+    if (!p) roots.push(n);
+    else if (p.tray) { if (!trays.has(p.tray.id)) trays.set(p.tray.id, { tray: p.tray, list: [] }); trays.get(p.tray.id).list.push(n); }
+    else if (find(p.o.id)?.k === 'f' && tabsOf(p.o).length > 1 && !p.edge) push(p.o.id + '|' + (p.tab || activeTab(p.o)), n);
+    else if (p.tab && tabsOf(p.o).length > 1) push(p.o.id + '|' + p.tab, n);
+    else push(p.o.id, n);
+  }
+  return { kids, roots, trays };
+}
+function mapHTML() {
+  const { kids, roots, trays } = mapTree();
+  const want = (k) => !mapKinds.size || mapKinds.has(k);
+  const label = (n) => n.k === 'f' ? (n.o.title || 'Marco sin título') : n.k === 'd' ? n.o.name : (n.o.text || '').split('\n')[0] || (n.k === 'p' ? 'Post-it' : n.k === 'x' ? 'Texto' : '…');
+  const icon = (n) => n.k === 't' ? (n.o.done ? '☑' : '☐') : KINDS.find((q) => q[0] === n.k)[2];
+  const order = (a, b) => 'fdpxit'.indexOf(a.k) - 'fdpxit'.indexOf(b.k) || (a.o.y || 0) - (b.o.y || 0) || (a.o.x || 0) - (b.o.x || 0);
+  const childrenOf = (n) => {
+    const own = [...(kids.get(n.o.id) || [])];
+    const tabs = n.k === 'f' && tabsOf(n.o).length > 1 ? tabsOf(n.o).map((t) => ({ tab: t, f: n.o, list: kids.get(n.o.id + '|' + t.id) || [] })) : [];
+    return { own: own.sort(order), tabs };
+  };
+  const draw = (n, depth) => {
+    const { own, tabs } = childrenOf(n);
+    const inner = [...tabs.map((t) => drawTab(t, depth + 1)), ...own.map((c) => draw(c, depth + 1))].filter(Boolean).join('');
+    const mine = want(n.k);
+    if (!mine && !inner) return '';
+    return `<div class="mp-n${mine ? '' : ' ctx'}" style="--d:${depth}"><button class="mp-row" data-loc2="${n.o.id}"><span class="mp-i">${icon(n)}</span><span class="mp-l">${esc(label(n))}</span>${n.rel ? `<span class="mp-rel">${n.rel}</span>` : ''}</button>${inner}</div>`;
+  };
+  const drawTab = (t, depth) => {
+    const inner = t.list.sort(order).map((c) => draw(c, depth + 1)).filter(Boolean).join('');
+    if (!inner && mapKinds.size) return '';
+    return `<div class="mp-n tab" style="--d:${depth}"><button class="mp-row" data-tabgo="${t.f.id}|${t.tab.id}"><span class="mp-i">▭</span><span class="mp-l">Pestaña «${esc(t.tab.title || 'sin título')}»</span>${t.tab.id === activeTab(t.f) ? '<span class="mp-rel">abierta</span>' : ''}</button>${inner || '<div class="mp-empty" style="--d:' + (depth + 1) + '">vacía</div>'}</div>`;
+  };
+  const plane = roots.sort(order).map((n) => draw(n, 0)).filter(Boolean).join('');
+  const drawers = [...trays.values()].map(({ tray, list }) => { const inner = list.sort(order).map((c) => draw(c, 1)).filter(Boolean).join(''); return inner ? `<div class="mp-n ctx" style="--d:0"><div class="mp-row"><span class="mp-i">🗄</span><span class="mp-l">${esc(tray.name || 'Cajón')}</span></div>${inner}</div>` : ''; }).join('');
+  const names = mapKinds.size ? KINDS.filter((q) => mapKinds.has(q[0])).map((q) => q[1].toLowerCase()) : [];
+  const viewing = names.length ? 'Solo ' + (names.length > 1 ? names.slice(0, -1).join(', ') + ' y ' + names.at(-1) : names[0]) : 'Todo';
+  return `<div class="mp-head"><b>Viendo:</b> ${viewing}</div>
+    <div class="filt mp-filt"><button data-mk="" class="${mapKinds.size ? '' : 'on'}">Todo</button>${KINDS.map(([k, l, ic]) => `<button data-mk="${k}" class="${mapKinds.has(k) ? 'on' : ''}">${ic} ${l}</button>`).join('')}</div>
+    <div class="mp-tree">${plane ? '<div class="mp-sec">En el plano</div>' + plane : ''}${drawers ? '<div class="mp-sec">En los cajones</div>' + drawers : ''}${plane || drawers ? '' : '<p class="none">Nada de esto todavía.</p>'}</div>`;
+}
 function renderPanel() {
   const open = S.tasks.filter((t) => !t.done).length;
   $('#pt-n').textContent = open || '';
@@ -2014,6 +2103,8 @@ function renderPanel() {
     html = `<div class="filt">${[['pend', 'Pendientes', pend], ['done', 'Hechas', hech], ['all', 'Todas', S.tasks.length]]
       .map(([k, l, n]) => `<button data-filt="${k}" class="${taskFilter === k ? 'on' : ''}">${l} <i>${n}</i></button>`).join('')}</div>`;
     html += groupedRows(list) || `<p class="none">${taskFilter === 'done' ? 'Nada hecho todavía.' : 'Sin tareas pendientes. Arrastra «Tarea» al plano, o escribe <b>[</b> en un documento.'}</p>`;
+  } else if (tab === 'mapa') {
+    html = mapHTML();
   } else if (tab === 'ideas') {
     html = groupedRows([...S.ideas].sort((a, b) => b.created - a.created)) || '<p class="none">Sin ideas todavía.</p>';
   } else {
@@ -2027,6 +2118,14 @@ function renderPanel() {
   $('#panel-body').innerHTML = html;
 }
 $('#panel-body').addEventListener('click', async (e) => {
+  const mk = e.target.closest('[data-mk]');
+  if (mk) { const k = mk.dataset.mk; if (!k) mapKinds.clear(); else if (mapKinds.has(k)) mapKinds.delete(k); else mapKinds.add(k); localStorage.setItem('meadow.mapKinds', JSON.stringify([...mapKinds])); return renderPanel(); }
+  const tg = e.target.closest('[data-tabgo]');
+  if (tg) { const [fid, tid] = tg.dataset.tabgo.split('|'), f = S.frames.find((x) => x.id === fid); if (f) { f.active = tid; save(); render(); goTo(fid); } return; }
+  const l2 = e.target.closest('[data-loc2]');
+  if (l2) { const f = find(l2.dataset.loc2); if (!f) return; if (f.k === 'i' || f.k === 't') return locate(f.o); if (f.k === 'd' && f.o.place !== 'canvas') return openEditor(f.o.id);
+    if (f.o.ftab) { const fr = S.frames.find((x) => x.id === f.o.ftab.f); if (fr && fr.active !== f.o.ftab.t) { fr.active = f.o.ftab.t; save(); render(); } }
+    if (edOpen()) closeEditor(); const el = elOf(f.o.id); if (el) { centerOn(f.o, el); sel.clear(); sel.add(f.o.id); paintSel(); } return; }
   const fb = e.target.closest('[data-filt]');
   if (fb) { taskFilter = fb.dataset.filt; localStorage.setItem('meadow.taskFilter', taskFilter); return renderPanel(); }
   const gt = e.target.closest('[data-goto]');
