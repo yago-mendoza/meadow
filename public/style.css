@@ -1007,3 +1007,18 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 .mw-leg::after { content: ""; position: absolute; right: -3px; top: -2px; width: 6px; height: 6px; border-radius: 50%; background: inherit; }
 .mw-leg.same { opacity: .35 !important; animation: none; }
 .mw-leg.on { width: 16px; background: var(--accent); }
+/* titles close together: barely any space above them */
+.cm-h1 { padding-top: .35em !important; } .cm-h2 { padding-top: .25em !important; } .cm-h3 { padding-top: .15em !important; }
+.ied .cm-h1 { padding-top: .25em !important; } .ied .cm-h2 { padding-top: .15em !important; } .ied .cm-h3 { padding-top: .1em !important; }
+.cm-hfirst, .ied .cm-hfirst { padding-top: 0 !important; }
+/* the caret: always there, dark, no blinking (it never fades out while you look for it) */
+#ed-body .cm-cursorLayer { animation: none !important; opacity: 1 !important; }
+#ed-body .cm-cursor { border-left: 2.5px solid #1e1622 !important; }
+/* titles the size of the text; ## and ### marked by a soft horizontal band; # (the one title) bold, without its pill */
+.cm-h1, .cm-h2, .cm-h3, .ied .cm-h1, .ied .cm-h2, .ied .cm-h3 { font-size: 1em !important; letter-spacing: 0 !important; padding-top: 0 !important; }
+.cm-line.cm-h2 { background: color-mix(in srgb, var(--accent) 10%, #fff); border-radius: 5px; }
+.cm-line.cm-h3 { background: color-mix(in srgb, var(--accent) 5%, #fff); border-radius: 5px; }
+.cm-hmark[data-d="1"] { display: none; }
+.doc.near .rh1, .doc.near .rh2, .doc.near .rh3 { font-size: 1em !important; }
+.doc.near .rh2 { background: color-mix(in srgb, var(--accent) 10%, #fff); border-radius: 4px; }
+.doc.near .rh3 { background: color-mix(in srgb, var(--accent) 5%, #fff); border-radius: 4px; }

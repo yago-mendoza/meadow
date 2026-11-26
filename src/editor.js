@@ -313,6 +313,20 @@ class Blocks {
     }
   }
 
+  // dragging straight from a title's «#»: its level's sections appear and this one is taken
+  dragFromHead(d, line, ev) {
+    if (this.level !== d) this.setLevel(d);
+    let tries = 0, y = ev.clientY;
+    const track = (e) => { y = e.clientY; }; addEventListener('pointermove', track);
+    const go = () => {
+      const L = this.last?.levels?.[d - 1];
+      const i = L ? L.findIndex((b) => b.from <= line && line <= b.to) : -1;
+      if (i < 0 && tries++ < 20) return requestAnimationFrame(go);
+      removeEventListener('pointermove', track);
+      if (i >= 0) this.startDrag({ clientY: y }, i);
+    };
+    requestAnimationFrame(go);
+  }
   // ---- dragging a block by its grip, and moving blocks with an animation that keeps the eye on them ----------------
   startDrag(e, i) {
     const m = this.last; if (!m || !this.level) return;
@@ -490,7 +504,16 @@ export function createEditor(parent, api) {
   const linkClicks = EditorView.domEventHandlers({
     mousedown(e, view) {
       const h = e.target.closest?.('.cm-hmark');
-      if (h) { e.preventDefault(); const d = +h.dataset.d; blocksPlugin?.setLevel(blocksPlugin.level === d ? 0 : d); return true; }
+      if (h) {                                    // a click splits into sections of this level; a drag moves this section
+        e.preventDefault();
+        const d = +h.dataset.d, sx = e.clientX, sy = e.clientY;
+        let line = 0; try { line = view.state.doc.lineAt(view.posAtDOM(h)).number; } catch { /* none */ }
+        const done = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); };
+        const mv = (ev) => { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return; done(); blocksPlugin?.dragFromHead(d, line, ev); };
+        const up = () => { done(); blocksPlugin?.setLevel(blocksPlugin.level === d ? 0 : d); };
+        addEventListener('pointermove', mv); addEventListener('pointerup', up);
+        return true;
+      }
       const el = e.target.closest?.('.cm-link, .cm-linkref'); if (!el) return false;
       if (e.ctrlKey || e.metaKey || el.classList.contains('cm-linkref')) {
         e.preventDefault();
@@ -535,7 +558,13 @@ export function createEditor(parent, api) {
 
   return {
     view,
-    setDoc(text) { blocksPlugin = null; view.setState(makeState(text)); parent.classList.toggle('mw-rich', !plain); parent.classList.remove('mw-active'); api.onLevel?.(0); },
+    setDoc(text) { blocksPlugin = null; view.setState(makeState(text));
+      { // the caret starts where one writes: under the title (never inside the «#»)
+        const doc = view.state.doc, l1 = doc.line(1);
+        const pos = /^#{1,6}\s/.test(l1.text) ? (doc.lines >= 2 ? doc.line(2).from : l1.to) : 0;
+        view.dispatch({ selection: { anchor: pos } });
+      }
+      parent.classList.toggle('mw-rich', !plain); parent.classList.remove('mw-active'); api.onLevel?.(0); },
     replaceText(text) {
       if (text === view.state.doc.toString()) return;
       const sel = view.state.selection.main.head;
