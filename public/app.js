@@ -311,7 +311,8 @@ const pinnedTo = (id) => [...S.ideas, ...S.tasks].filter((t) => t.onCanvas && !t
 const ANCHORS = ['tl', 't', 'tr', 'r', 'br', 'b', 'bl', 'l'];
 function anchorAt(h, hel, side, i, n, sc) {
   const [w, hh] = sizeOf(hel, h), gap = 44 * sc, off = (i - (n - 1) / 2) * gap;
-  const L = h.x, R = h.x + w, T = h.y, B = h.y + hh, CX = h.x + w / 2, CY = h.y + hh / 2;
+  const o = 21 * sc;                               // radius plus a hair: the circle touches the edge from outside
+  const L = h.x - o, R = h.x + w + o, T = h.y - o, B = h.y + hh + o, CX = h.x + w / 2, CY = h.y + hh / 2;
   switch (side) {
     case 'tl': return [L + i * gap, T]; case 'tr': return [R - i * gap, T];
     case 'bl': return [L + i * gap, B]; case 'br': return [R - i * gap, B];
@@ -363,7 +364,13 @@ function pinTarget(it, e) {
   const r = under.getBoundingClientRect();
   const dl = Math.abs(e.clientX - r.left), dr = Math.abs(e.clientX - r.right), dt = Math.abs(e.clientY - r.top), db = Math.abs(e.clientY - r.bottom);
   const nearX = Math.min(dl, dr) < near, nearY = Math.min(dt, db) < near;
-  if (!nearX && !nearY) return null;                                         // well inside: it just lies on it
+  if (!nearX && !nearY) {                                                     // inside: to the nearest anchor, never inside
+    const dmin = Math.min(dl, dr, dt, db);
+    const side0 = dmin === dl ? 'l' : dmin === dr ? 'r' : dmin === dt ? 't' : 'b';
+    const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    const side = side0 === 'l' || side0 === 'r' ? (fy < .2 ? 't' + side0 : fy > .8 ? 'b' + side0 : side0) : (fx < .2 ? side0 + 'l' : fx > .8 ? side0 + 'r' : side0);
+    return { host: under.dataset.id, side, at: side === 't' || side === 'b' ? e.clientX : e.clientY };
+  }
   const v = dt < db ? 't' : 'b', hside = dl < dr ? 'l' : 'r';
   const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
   let side;
@@ -374,7 +381,18 @@ function pinTarget(it, e) {
 }
 // The dotted slot: where a circle being dragged would be pinned if dropped now.
 function pinHint(it, e) {
-  const hint = $('#pinhint'), pt = it && pinTarget(it, e);
+  const hint = $('#pinhint');
+  // under a document, where it would dock: a horizontal dotted slot as wide as the page, at its place in the column
+  const w = toWorld(e.clientX, e.clientY), dk = it && dockAt(w.x, w.y, it);
+  if (dk) {
+    const de = elOf(dk.d.id), [dw, dh] = sizeOf(de, dk.d), sc = dk.d.s || 1, z = S.view.z;
+    let y = dk.d.y + dh + 8 * sc;
+    dk.others.slice(0, dk.at).forEach((x) => { const xe = elOf(x.id); y += (xe ? xe.offsetHeight * (x.s || 1) : 36) + 6 * sc; });
+    Object.assign(hint.style, { left: S.view.x + dk.d.x * z + 'px', top: S.view.y + y * z + 'px', width: dw * z + 'px', height: 36 * sc * z + 'px' });
+    hint.classList.add('on', 'bar'); return;
+  }
+  hint.classList.remove('bar');
+  const pt = it && pinTarget(it, e);
   if (!pt) { hint.classList.remove('on'); return; }
   const f = find(pt.host), hel = elOf(pt.host); if (!f || !hel) return hint.classList.remove('on');
   const z = S.view.z, h = f.o; let wx, wy, sc = 1;
@@ -393,15 +411,18 @@ function pinHint(it, e) {
 // Where a dropped task docks: under a document, if it lands in the strip below it (or among the tasks already there).
 function dockTarget(t) {
   const el = elOf(t.id); if (!el) return null;
-  const [w, h] = sizeOf(el, t), cx = t.x + w / 2, cy = t.y + h / 2;
+  const [w, h] = sizeOf(el, t);
+  return dockAt(t.x + w / 2, t.y + h / 2, t);
+}
+function dockAt(cx, cy, t) {
   for (const d of S.docs) {
     if (d.place !== 'canvas' || d.id === t.dock && false) continue;
     const de = elOf(d.id); if (!de) continue;
     const [dw, dh] = sizeOf(de, d);
     const stack = docked(d).filter((x) => x !== t).reduce((acc, x) => { const xe = elOf(x.id); return acc + (xe ? xe.offsetHeight * (x.s || 1) + 6 : 0); }, 0);
-    if (cx > d.x && cx < d.x + dw && cy > d.y + dh + EDGE_NEAR / S.view.z && cy < d.y + dh + stack + 110) {   // below the bottom-edge anchors
+    if (cx > d.x && cx < d.x + dw && cy > d.y + dh + 50 * (d.s || 1) && cy < d.y + dh + stack + 130) {   // below the bottom anchors
       const others = docked(d).filter((x) => x !== t);
-      const at = others.filter((x) => x.y + 10 < t.y).length;           // its place in the stack, by where it was dropped
+      const at = others.filter((x) => x.y + 10 < cy - 18).length;           // its place in the stack, by where it was dropped
       return { d, at, others };
     }
   }
@@ -592,7 +613,8 @@ function create(kind, w, inStash) {
     editInline(elOf(f.id).querySelector('.ftitle'), (v) => { f.title = v; save(); render(); }, true);
   } else {
     const it = newItem(kind, '', { x: w.x - 19, y: w.y - 19 });
-    if (w.pin) { it.pin = { ...w.pin, at: w.pin.side === 'tab' ? 99 : w.pin.at }; }
+    if (w.dock) { const list = w.dock.others; list.splice(w.dock.at, 0, it); list.forEach((x, i) => { x.dock = w.dock.d.id; x.dockAt = i; }); }
+    else if (w.pin) { it.pin = { ...w.pin, at: w.pin.side === 'tab' ? 99 : w.pin.at }; }
     sel.clear(); sel.add(it.id); save(); render();
     writeInline(it, true);
   }
@@ -1069,7 +1091,8 @@ addEventListener('pointerup', (e) => {
   else if (a.k === 'move' && a.moved) {
     const movedDocs = new Set(a.moving.filter((m) => m.k === 'd').map((m) => m.o.id));
     for (const m of a.moving) {
-      if ((m.k !== 't' && m.k !== 'i') || !sel.has(m.o.id) || (m.o.dock && movedDocs.has(m.o.dock))) continue;
+      // only the circle you grabbed is re-placed by where the pointer is; everything carried keeps its edge
+      if ((m.k !== 't' && m.k !== 'i') || m.o.id !== a.id || (m.o.dock && movedDocs.has(m.o.dock))) continue;
       const tg = dockTarget(m.o);
       if (tg) { delete m.o.pin; tg.others.splice(tg.at, 0, m.o); tg.others.forEach((x, i) => { x.dock = tg.d.id; x.dockAt = i; }); continue; }
       if (m.o.dock) { delete m.o.dock; delete m.o.dockAt; m.o.s = 1; }
@@ -1352,12 +1375,13 @@ function placeActs(host) {
     .filter((o) => o !== host && !host.contains(o) && !o.contains(host)).map((o) => o.getBoundingClientRect());
   const hit = (r) => others.some((q) => q.left < r.right && r.left < q.right && q.top < r.bottom && r.top < q.bottom);
   const pref = host.dataset.k === 'd' ? ACT_SIDES : ['at-bottom', 'at-top', 'at-right', 'at-left'];
+  acts.classList.add('measuring');                 // measured at their real size, not mid-animation
   for (const side of pref) {
     acts.classList.remove(...ACT_SIDES); acts.classList.add(side);
     const r = [...acts.children].reduce((u, b) => { const q = b.getBoundingClientRect(); return u ? { left: Math.min(u.left, q.left), top: Math.min(u.top, q.top), right: Math.max(u.right, q.right), bottom: Math.max(u.bottom, q.bottom) } : q; }, null);
-    if (r && !hit(r)) return;
+    if (r && !hit({ left: r.left - 6, top: r.top - 6, right: r.right + 6, bottom: r.bottom + 6 })) { acts.classList.remove('measuring'); return; }
   }
-  acts.classList.remove(...ACT_SIDES); acts.classList.add(pref[0]);
+  acts.classList.remove(...ACT_SIDES, 'measuring'); acts.classList.add(pref[0]);
 }
 itemsEl.addEventListener('pointerover', (e) => {
   const host = e.target.closest('[data-k]'); if (!host || act || gh) return;
@@ -1439,7 +1463,9 @@ function dropGhost(e) {
   const tray = trayAt;
   if (tray) { if (g.kind === 'doc') create('doc', { x: 0, y: 0 }, tray); return; }
   $('#pinhint').classList.remove('on');
-  if (overCanvas(e)) create(g.kind, { ...toWorld(e.clientX, e.clientY), free: true, pin: (g.kind === 'idea' || g.kind === 'tarea') ? pinTarget({ id: '__new' }, e) : null }, false);
+  const wpt = toWorld(e.clientX, e.clientY), isItem = g.kind === 'idea' || g.kind === 'tarea';
+  const dk = isItem ? dockAt(wpt.x, wpt.y, { id: '__new' }) : null;
+  if (overCanvas(e)) create(g.kind, { ...wpt, free: true, dock: dk, pin: isItem && !dk ? pinTarget({ id: '__new' }, e) : null }, false);
 }
 
 const TOOLS = [
