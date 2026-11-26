@@ -633,12 +633,51 @@ function editPostit(p) {
 // Stacking: what is on the plane has a z; new things and «Al frente» go on top, «Al fondo» under everything.
 const stackable = () => [...S.docs.filter((d) => d.place === 'canvas'), ...S.postits, ...S.ideas, ...S.tasks];
 const topZ = () => Math.max(0, ...stackable().map((o) => o.z || 0)) + 1;
+// Interior: who owns whom. A thing belongs to the smallest bigger thing (not of a lower kind) whose rectangle holds its
+// centre; ties go to the one on top. Edge things (pinned, docked) belong to their host and are left out here.
+function owners() {
+  const boxes = [...itemsEl.querySelectorAll('[data-k]')].map((el) => {
+    const { k, o } = find(el.dataset.id), [w, h] = sizeOf(el, o); return { id: o.id, k, x: o.x, y: o.y, w, h, z: o.z || 0, o };
+  });
+  const ownerOf = new Map();
+  for (const Y of boxes) {
+    if (Y.o.pin || Y.o.dock) continue;
+    const cx = Y.x + Y.w / 2, cy = Y.y + Y.h / 2, area = Y.w * Y.h;
+    let best = null;
+    for (const X of boxes) {
+      if (X === Y || RANK[X.k] < RANK[Y.k] || X.w * X.h <= area * 1.05) continue;
+      if (cx <= X.x || cx >= X.x + X.w || cy <= X.y || cy >= X.y + X.h) continue;
+      if (!best || X.w * X.h < best.w * best.h || (X.w * X.h === best.w * best.h && X.z > best.z)) best = X;
+    }
+    if (best) ownerOf.set(Y.id, best.id);
+  }
+  return { boxes, ownerOf };
+}
+// What lies inside a thing is never behind it: after any change of order, each thing sits above its owner.
+function enforceStack() {
+  const { ownerOf } = owners();
+  const kids = new Map();
+  for (const [id, own] of ownerOf) { if (!kids.has(own)) kids.set(own, []); kids.get(own).push(find(id)?.o); }
+  // owners from the bottom up; each one's things above it, in the order they already had
+  const order = [...kids.keys()].map((id) => find(id)?.o).filter(Boolean).sort((p, q) => (p.z || 0) - (q.z || 0));
+  for (let pass = 0; pass < 4; pass++) for (const x of order) {
+    let base = (x.z || 0) + 1;
+    for (const y of kids.get(x.id).filter(Boolean).sort((p, q) => (p.z || 0) - (q.z || 0))) { y.z = Math.max(y.z || 0, base); base = y.z + 1; }
+  }
+}
 function restack(objs, front) {
   objs = objs.filter((o) => !('w' in o && 'title' in o));        // frames always stay behind
   if (!objs.length) return;
   snap();
+  const { ownerOf } = owners();
   if (front) { let z = topZ(); for (const o of objs) o.z = z++; }
-  else { const set = new Set(objs); for (const o of stackable()) if (!set.has(o)) o.z = (o.z || 0) + objs.length; objs.forEach((o, i) => { o.z = i; }); }
+  else {
+    const set = new Set(objs);
+    const floor = Math.max(0, ...objs.map((o) => { const own = ownerOf.get(o.id); return own ? (find(own)?.o.z || 0) + 1 : 0; }));
+    for (const o of stackable()) if (!set.has(o) && (o.z || 0) >= floor) o.z = (o.z || 0) + objs.length;
+    objs.forEach((o, i) => { o.z = floor + i; });
+  }
+  enforceStack();
   save(); renderItems(); paintSel();
 }
 // A frame dropped near loose things wraps them: it takes their outline plus a margin.
@@ -928,23 +967,7 @@ function collectMoving(alone) {
     }
   }
   for (const m of [...out.values()]) { if (m.k === 'd') for (const t of docked(m.o)) add(t.id); for (const t of pinnedTo(m.o.id)) add(t.id); }
-  const boxes = [...itemsEl.querySelectorAll('[data-k]')].map((el) => {
-    const { k, o } = find(el.dataset.id), [w, h] = sizeOf(el, o); return { id: o.id, k, x: o.x, y: o.y, w, h, z: o.z || 0, o };
-  });
-  // the owner of each thing: the smallest bigger thing (not of a lower kind) whose rectangle holds its centre;
-  // ties go to the one on top
-  const ownerOf = new Map();
-  for (const Y of boxes) {
-    if (Y.o.pin || Y.o.dock) continue;                                   // edge things belong to their host already
-    const cx = Y.x + Y.w / 2, cy = Y.y + Y.h / 2, area = Y.w * Y.h;
-    let best = null;
-    for (const X of boxes) {
-      if (X === Y || RANK[X.k] < RANK[Y.k] || X.w * X.h <= area * 1.05) continue;
-      if (cx <= X.x || cx >= X.x + X.w || cy <= X.y || cy >= X.y + X.h) continue;
-      if (!best || X.w * X.h < best.w * best.h || (X.w * X.h === best.w * best.h && X.z > best.z)) best = X;
-    }
-    if (best) ownerOf.set(Y.id, best.id);
-  }
+  const { boxes, ownerOf } = owners();
   // carry: whatever is owned by something moving moves too (and what it owns, and so on)
   let grew = true;
   while (grew) {
@@ -1071,6 +1094,7 @@ addEventListener('pointerup', (e) => {
       if (fitFrame(f)) toast('Marco ajustado a lo que tiene cerca', [['Deshacer', () => { Object.assign(f, before); save(); render(); }]]);
     }
     pushApart([...a.moving.filter((m) => m.k === 'f').map((m) => m.o), ...(a.fitOrig ? a.fitOrig.keys() : [])]);
+    enforceStack();
     save(); render();
   } else if (a.k === 'move' && a.title && !a.toggle) {
     const f = find(a.id).o;                              // one click on a frame's or a document's title edits it
@@ -1086,7 +1110,7 @@ addEventListener('pointerup', (e) => {
     const wasAll = a.selBefore && a.selBefore.size === all.length && all.every((id) => a.selBefore.has(id));
     sel.clear(); for (const id of wasAll ? keep : all) sel.add(id);
     paintSel();
-  } else if (a.k === 'move' && !a.toggle && a.kind === 'd') {
+  } else if (a.k === 'move' && !a.toggle && (a.kind === 'd' || a.kind === 'p' || a.kind === 'x')) {
     const d = find(a.id).o; sel.clear(); sel.add(d.id);
     const all = collectMoving(false).map((m) => m.o.id);
     const wasAll = all.length > 1 && a.selBefore && a.selBefore.size === all.length && all.every((id) => a.selBefore.has(id));
