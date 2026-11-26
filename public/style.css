@@ -1034,3 +1034,7 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 .tinted .cm-line.cm-h3, .doc.tinted.near .rh3 { background: color-mix(in srgb, var(--tint) 38%, #fff); }
 .tinted .cm-hmark { background: color-mix(in srgb, var(--tint) 55%, #5a4660); }
 .tinted .cm-hmark:hover { background: color-mix(in srgb, var(--tint) 35%, #3b2a40); }
+/* sections (# ## ### at the top right): only the separations show — a fine line between blocks, no colour inside */
+.mw-band, .mw-band.odd { background: none !important; mix-blend-mode: normal; }
+.mw-band + .mw-grip + .mw-bar-tools ~ .mw-band::before, .mw-band ~ .mw-band::before { content: ""; position: absolute; left: 24px; right: 140px; top: -1px; height: 0;
+  border-top: 1.5px dashed color-mix(in srgb, var(--tint, var(--accent)) 60%, #6a5a70); opacity: .7; }
