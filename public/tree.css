@@ -420,9 +420,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .fr-out:hover { background: #fff; box-shadow: 0 1px 3px rgba(60, 40, 70, .15); }
 
 /* a firm line under the document's tabs, and a little room before the text starts */
+/* the document's tabs: every tab has its edge; the open one joins the page, the others sit on the line */
 #ed-tabs { border-bottom: 2px solid color-mix(in srgb, var(--tint, #e3d9f7) 55%, #6a5070); padding-bottom: 0; }
-#ed-tabs .bt, #ed-tabs .bt-add { margin-bottom: -2px; }
-#ed-tabs .bt.on { border-color: color-mix(in srgb, var(--tint, #e3d9f7) 55%, #6a5070); border-width: 2px 2px 0; border-style: solid; border-bottom-color: transparent; background: #fff; }
-#ed-body .cm-content { padding-top: 22px; }
-#ed-body .cm-content { padding-bottom: 55vh; }   /* the last titles can also reach the top */
-#ed-body .cm-scroller { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22px); mask-image: linear-gradient(to bottom, transparent 0, #000 22px); }
+#ed-tabs .bt { margin-bottom: 0; border: 1.5px solid color-mix(in srgb, var(--tint, #e3d9f7) 50%, #b9abc0); border-bottom: 0; }
+#ed-tabs .bt:hover { background: color-mix(in srgb, var(--tint, #e3d9f7) 20%, #fff); }
+#ed-tabs .bt.on { margin-bottom: -2px; padding-bottom: 7px; border: 2px solid color-mix(in srgb, var(--tint, #e3d9f7) 55%, #6a5070); border-bottom: 0; background: #fff; }
+#ed-tabs .bt-add { margin-bottom: 0; border-bottom: 0; }
+/* a clean margin under the line: the text scrolls away below it, not against it */
+#ed-body { padding-top: 12px; background: #fff; }
+#ed-body .cm-content { padding-top: 10px; padding-bottom: 55vh; }   /* the last titles can also reach the top */
