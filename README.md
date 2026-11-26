@@ -19,9 +19,12 @@ A zoomable grid (pastel, dotted) of documents, post-its, ideas, tasks, frames an
   a document carries the post-its, ideas and tasks lying on it; small things carry the small things they touch, except
   what lies on a document that is not moving. The corner handle scales a thing as a whole, with what it carries.
 - Hover something partly covered: it comes forward (with what lies on it) while the pointer is over it. «Al frente» / «Al fondo» keep it there.
-- **Tasks dropped just under a document** dock to it: stacked, as wide as the page, moving and scaling with it.
+- **Ideas and tasks**: loose, they are small circles (a click reads them, a double click writes on their own colour); dropped on a
+  document or post-it they pin to its nearer side edge, on a frame next to its tab. Dropped just under a document they dock: as
+  wide as the page, three lines at most. Beyond five docked, the larger kind folds into a numbered circle (blue tasks, gold ideas)
+  that lists them beside it.
 - **Frames**: dropped near loose things they wrap them; dragging something into a frame makes it (and the frames holding it) grow to fit, live, and back if you pull it out; «＋» on the tab makes a frame inside; square corners.
-- **Tags** («etiquetas»): a paper tag tied with a string to the nearest edge of what you drop it on, with a scribble; a click reads it.
+- **Ribbons** («ribetes»): a strip of cloth standing out of the nearest edge, red unless you pick another colour in its reader; drag it to move it.
 - **Drawers** («cajones», bottom left): one shape that changes size, like the InfraPhysics site assistant (opening: width then
   height; closing: height down, then width). Tucked, a little chest: the drawer under the pointer slides out, a click opens that
   drawer, a click anywhere else puts them away. They also come out when a dragged document reaches their corner. Up to four,

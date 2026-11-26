@@ -203,12 +203,12 @@ function scribble(seed) {
   }
   return d;
 }
-const tagSVG = (g) => `<svg class="tag" viewBox="0 0 64 36" width="64" height="36" aria-hidden="true">
-  <path d="M0 18 C6 18 8 13 13 15 S17 19 21 18" fill="none" stroke="#b7a68f" stroke-width="1.1" stroke-linecap="round"/>
-  <path d="M16 18 L25 5.5 L60 5.5 Q62 5.5 62 7.5 L62 28.5 Q62 30.5 60 30.5 L25 30.5 Z" fill="${g.color || '#f6ead6'}" stroke="rgba(110,80,50,.28)" stroke-width=".8" stroke-linejoin="round"/>
-  <circle cx="22.5" cy="18" r="2.3" fill="#fff" stroke="rgba(110,80,50,.3)" stroke-width=".7"/>
-  <path d="${scribble(g.id)}" fill="none" stroke="rgba(80,55,35,.55)" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const signHTML = (g, extra = '') => `<div class="sign e-${g.edge}${extra}" data-sign="${g.id}" style="--t:${(g.t * 100).toFixed(1)}%" title="Clic para leer">${tagSVG(g)}</div>`;
+const ribbonSVG = (g) => { const c = g.color || RIBBON_RED; return `<svg class="tag" viewBox="0 0 46 18" width="46" height="18" aria-hidden="true">
+  <defs><linearGradient id="rb-${g.id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".82"/><stop offset=".5" stop-color="${c}"/><stop offset="1" stop-color="${c}" stop-opacity=".9"/></linearGradient></defs>
+  <path d="M0 2 H44 L37 9 L44 16 H0 Z" fill="url(#rb-${g.id})"/>
+  <path d="M0 2 H44 L37 9 L44 16 H0 Z" fill="none" stroke="rgba(0,0,0,.12)" stroke-width=".7"/>
+  <path d="M1 4.5 H36" stroke="rgba(255,255,255,.35)" stroke-width="1"/><rect x="0" y="2" width="4" height="14" fill="rgba(0,0,0,.1)"/></svg>`; };
+const signHTML = (g, extra = '') => `<div class="sign ribbon e-${g.edge}${extra}" data-sign="${g.id}" style="--t:${(g.t * 100).toFixed(1)}%" title="Ribete · clic para verlo">${ribbonSVG(g)}</div>`;
 function signsHTML(id) { return signsOf(id).map((g) => signHTML(g)).join(''); }
 // Where a sign dropped at the pointer would stand: the edge of the thing under it nearest to the pointer.
 function signSpot(e) {
@@ -233,7 +233,8 @@ function renderItems() {
   framesEl.innerHTML = [...S.frames].sort((a, b) => b.w * b.h - a.w * a.h).map(frameHTML).join('');
   itemsEl.innerHTML = S.docs.map((d, i) => (d.place === 'canvas' ? docHTML(d, i + 1) : '')).join('')
     + S.postits.filter((p) => !p.riding).map(postitHTML).join('')
-    + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas && !it.riding).map(itemHTML).join('');
+    + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas && !it.riding && !hiddenInFold(it)).map(itemHTML).join('')
+    + groupsHTML();
   $('#empty').classList.toggle('on', !itemsEl.children.length && !S.frames.length);
   S.signs = (S.signs || []).filter((g) => find(g.host));
   addSignsToHosts();
@@ -244,6 +245,28 @@ function renderItems() {
 }
 // ---- tasks docked under a document: stacked in order, as wide as the document, moving and scaling with it ----------
 const docked = (d) => [...S.ideas, ...S.tasks].filter((t) => t.onCanvas && t.dock === d.id).sort((a, b) => (a.dockAt ?? 0) - (b.dockAt ?? 0));
+const DOCK_MAX = 5, MINOR_MAX = 2;
+// Which kinds are folded into a numbered circle under a document.
+function foldedKinds(d) {
+  const list = docked(d), out = new Set();
+  if (list.length <= DOCK_MAX) return out;
+  const n = { idea: list.filter((t) => t.kind === 'idea').length, tarea: list.filter((t) => t.kind === 'tarea').length };
+  const major = n.tarea >= n.idea ? 'tarea' : 'idea', minor = major === 'tarea' ? 'idea' : 'tarea';
+  out.add(major); if (n[minor] > MINOR_MAX) out.add(minor);
+  return out;
+}
+const hiddenInFold = (it) => { if (!it.dock) return false; const d = docById(it.dock); return !!d && foldedKinds(d).has(it.kind); };
+function groupsHTML() {
+  let html = '';
+  for (const d of S.docs) {
+    if (d.place !== 'canvas') continue;
+    for (const kind of foldedKinds(d)) {
+      const items = docked(d).filter((t) => t.kind === kind), open = kind === 'tarea' ? items.filter((t) => !t.done).length : items.length;
+      html += `<button class="dgroup ${kind}" data-doc="${d.id}" data-kind="${kind}" title="${items.length} ${kind === 'idea' ? 'ideas' : 'tareas'}">${kind === 'idea' ? '💡' : '☑'}<b>${open}</b></button>`;
+    }
+  }
+  return html;
+}
 function layoutDocks() {
   for (const t of [...S.ideas, ...S.tasks]) if (t.dock && !t.riding && !S.docs.some((d) => d.id === t.dock && d.place === 'canvas')) delete t.dock;
   for (const d of S.docs) {
@@ -251,7 +274,10 @@ function layoutDocks() {
     const list = docked(d); if (!list.length) continue;
     const del = elOf(d.id); if (!del) continue;
     const sc = d.s || 1; let y = d.y + del.offsetHeight * sc + 8 * sc;
-    list.forEach((t, i) => {
+    const groups = [...itemsEl.querySelectorAll(`.dgroup[data-doc="${d.id}"]`)];
+    groups.forEach((g, i) => { Object.assign(g.style, { left: d.x + i * 52 * sc + 'px', top: y + 'px', zIndex: (d.z || 0) + 1 }); g.style.setProperty('--s', sc); });
+    if (groups.length) y += 46 * sc;
+    list.filter((t) => !hiddenInFold(t)).forEach((t, i) => {
       t.dockAt = i; t.x = d.x; t.y = Math.round(y); t.s = sc; t.z = Math.max(t.z || 0, (d.z || 0));
       const el = elOf(t.id); if (!el) return;
       Object.assign(el.style, { left: t.x + 'px', top: t.y + 'px', zIndex: t.z }); el.style.setProperty('--s', sc);
@@ -558,7 +584,9 @@ function frameInside(outer) {
   elOf(f.id)?.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 280, easing: 'cubic-bezier(.34,1.56,.64,1)' });
   editInline(elOf(f.id).querySelector('.ftitle'), (v) => { f.title = v || ''; save(); render(); }, true);
 }
-const SIGN_COLORS = ['#ffd9c2', '#f9d0e3', '#cfe5fb', '#cdeedd', '#fff1b8', '#e3d9f7'];
+const RIBBON_RED = '#d9534f';
+const SIGN_COLORS = [RIBBON_RED, RIBBON_RED];          // new ribbons are red; the reader offers the others
+const RIBBON_COLORS = [RIBBON_RED, '#e8973a', '#e5c33f', '#5cae6b', '#4a90d9', '#8e6bd1', '#d96aa6', '#6b6470'];
 function dropSign(e) {
   const sp = signSpot(e);
   if (!sp) return toast('Suéltalo junto al borde de un documento, post-it, idea, tarea o marco');
@@ -605,6 +633,7 @@ function openItem(it, editing = false, fresh = false) {
   const box = $('#reader'), name = it.kind === 'idea' ? 'Idea' : 'Tarea';
   const where = docsUsing(it).map((d) => `«${d.name}»`).join(', ');
   box.classList.add('is-item');
+  box.querySelector('.rd-colors').hidden = true;
   box.querySelector('.rd-where').textContent = name + (it.kind === 'tarea' ? (it.done ? ' · hecha' : ' · pendiente') : '') + (where ? ` · en ${where}` : '');
   box.querySelector('.rd-panel').style.setProperty('--sc', it.kind === 'idea' ? '#cdeedd' : '#cfe5fb');
   const done = box.querySelector('[data-rd="done"]');
@@ -636,7 +665,12 @@ function openSign(g, editing = false) {
   const host = find(g.host)?.o;
   const where = host ? (host.name || host.title || host.text || '').split('\n')[0].slice(0, 40) : '';
   const box = $('#reader');
-  box.querySelector('.rd-where').textContent = where ? `Etiqueta en «${where}»` : 'Etiqueta';
+  box.querySelector('.rd-where').textContent = where ? `Ribete en «${where}»` : 'Ribete';
+  const cols = box.querySelector('.rd-colors');
+  cols.hidden = false;
+  cols.innerHTML = RIBBON_COLORS.map((c) => `<i data-rc="${c}" style="--d:${c}" class="${(g.color || RIBBON_RED) === c ? 'on' : ''}"></i>`).join('');
+  cols.onclick = (e) => { const i = e.target.closest('[data-rc]'); if (!i) return; snap(); g.color = i.dataset.rc; save(); renderItems(); paintSel();
+    for (const x of cols.children) x.classList.toggle('on', x === i); box.querySelector('.rd-panel').style.setProperty('--sc', g.color); };
   box.querySelector('.rd-panel').style.setProperty('--sc', g.color);
   const text = box.querySelector('.rd-text'), area = box.querySelector('.rd-edit');
   const show = (ed) => {
@@ -650,7 +684,7 @@ function openSign(g, editing = false) {
     if (e.target === box.querySelector('.rd-back') || a === 'close') close();
     else if (a === 'edit') show(true);
     else if (a === 'save') { snap(); g.text = area.value.replace(/\s+$/, ''); save(); renderItems(); paintSel(); show(false); }
-    else if (a === 'del') { snap(); S.signs = S.signs.filter((x) => x !== g); save(); renderItems(); paintSel(); close(); toast('Etiqueta quitada', [['Deshacer', doUndo]]); }
+    else if (a === 'del') { snap(); S.signs = S.signs.filter((x) => x !== g); save(); renderItems(); paintSel(); close(); toast('Ribete quitado', [['Deshacer', doUndo]]); }
   };
   area.onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) box.querySelector('[data-rd="save"]').click(); if (e.key === 'Escape') { e.stopPropagation(); if (!g.text && !area.value) { S.signs = S.signs.filter((x) => x !== g); save(); renderItems(); } close(); } };
   const close = () => closeReader();
@@ -733,6 +767,7 @@ async function docAction(a, d) {
 let act = null, space = false;
 vp.addEventListener('contextmenu', (e) => e.preventDefault());
 vp.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.dgroup')) return;
   const sgEl = e.target.closest('.sign');
   if (sgEl) {
     if (e.button !== 0) return;
@@ -939,6 +974,8 @@ addEventListener('pointerup', (e) => {
 });
 
 vp.addEventListener('click', (e) => {
+  const grp = e.target.closest('.dgroup');
+  if (grp) return openGroup(grp);
   if (e.target.closest('.sign')) return;                // a tag is read on pointerup (a click), or dragged
   const b = e.target.closest('.acts button');
   if (b) {
@@ -1071,6 +1108,24 @@ function endFit(a, undoIt) {
   for (const [f, o] of a.fitOrig) { if (undoIt) Object.assign(f, o); paintFrame(f); }
 }
 
+function openGroup(btn) {
+  const d = docById(btn.dataset.doc), kind = btn.dataset.kind; if (!d) return;
+  const items = docked(d).filter((t) => t.kind === kind);
+  const pop = $('#dlist'), r = btn.getBoundingClientRect();
+  pop.innerHTML = `<div class="dl-h">${kind === 'idea' ? '💡 Ideas' : '☑ Tareas'} de «${esc(d.name)}» <i>${items.length}</i></div>`
+    + items.map((t) => `<div class="dl-row${t.done ? ' done' : ''}" data-item="${t.id}">${t.kind === 'tarea' ? `<button class="chk${t.done ? ' on' : ''}">${t.done ? '✔' : ''}</button>` : '<span>💡</span>'}<span class="dl-t">${esc(t.text)}</span></div>`).join('');
+  Object.assign(pop.style, { left: Math.min(r.right + 10, innerWidth - 340) + 'px', top: Math.max(70, Math.min(r.top, innerHeight - 380)) + 'px' });
+  pop.classList.add('on');
+  pop.onclick = (e) => {
+    const row = e.target.closest('[data-item]'); if (!row) return;
+    const it = find(row.dataset.item).o;
+    if (e.target.closest('.chk')) { toggleTask(it); return openGroup(itemsEl.querySelector(`.dgroup[data-doc="${d.id}"][data-kind="${kind}"]`) || btn); }
+    pop.classList.remove('on'); openItem(it);
+  };
+}
+addEventListener('pointerdown', (e) => { if (!e.target.closest('#dlist, .dgroup')) $('#dlist')?.classList.remove('on'); }, true);
+addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#dlist')?.classList.remove('on'); });
+
 // ---- viewer: zoomed out too far to read, the thing under the pointer says its title at the bottom ------------------
 const VIEWER_BELOW = 0.6;
 function titleLine(f) {
@@ -1160,7 +1215,7 @@ function dropGhost(e) {
     }
     return;
   }
-  if (g.kind === 'sign') { if (g.moved) dropSign(e); else toast('Arrastra la etiqueta hasta el borde de un documento, post-it o marco'); return; }
+  if (g.kind === 'sign') { if (g.moved) dropSign(e); else toast('Arrastra el ribete hasta el borde de un documento, post-it o marco'); return; }
   if (!g.moved) return create(g.kind, centerWorld(), false);
   const tray = trayAt;
   if (tray) { if (g.kind === 'doc') create('doc', { x: 0, y: 0 }, tray); return; }
@@ -1173,7 +1228,7 @@ const TOOLS = [
   ['idea', '💡', 'Idea', '#cdeedd', 'Una idea que puedes pegar en el plano y dentro de documentos'],
   ['tarea', '☑️', 'Tarea', '#cfe5fb', 'Una tarea que puedes pegar en el plano y dentro de documentos'],
   ['frame', '⬚', 'Marco', '#e3d9f7', 'Un marco para agrupar lo que hay suelto'],
-  ['sign', '🏷️', 'Etiqueta', '#ffd9c2', 'Átala al borde de un documento, post-it, idea, tarea o marco; se lee con un clic'],
+  ['sign', '🔖', 'Ribete', '#f6c9c7', 'Una cinta roja (o del color que quieras) en el borde de un documento, post-it o marco'],
 ];
 $('#types').innerHTML = TOOLS.map(([k, ico, name, c, tip]) => `<div class="tool" data-kind="${k}" style="--c:${c}" title="${tip} · clic o arrastra al plano">
   <span class="ico">${ico}</span><span>${name}</span></div>`).join('');

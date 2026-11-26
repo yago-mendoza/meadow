@@ -64,16 +64,17 @@
 <div id="reader">
   <div class="rd-back"></div>
   <div class="rd-panel">
-    <header><span class="rd-where"></span><div class="grow"></div>
+    <header><span class="rd-where"></span><div class="rd-colors" hidden></div><div class="grow"></div>
       <button class="pill" data-rd="done" hidden>✔ Hecha</button><button class="pill rd-view-only" data-rd="edit">Editar</button><button class="pill rd-edit-only" data-rd="save">Guardar</button>
-      <button class="ib" data-rd="del" title="Quitar la etiqueta">🗑</button><button class="ib" data-rd="close" title="Cerrar (Esc)">×</button></header>
+      <button class="ib" data-rd="del" title="Quitar el ribete">🗑</button><button class="ib" data-rd="close" title="Cerrar (Esc)">×</button></header>
     <div class="rd-text"></div>
-    <textarea class="rd-edit" placeholder="Escribe la etiqueta… (Ctrl+Enter guarda)"></textarea>
+    <textarea class="rd-edit" placeholder="Escribe una nota para el ribete… (Ctrl+Enter guarda)"></textarea>
   </div>
 </div>
 <button id="backpill">↩ Volver a donde estabas <kbd>Enter</kbd></button>
 <div id="crumb-peek"></div>
 <div id="viewer"></div>
+<div id="dlist"></div>
 <div id="toasts"></div>
 <div id="ghost"></div>
 <script type="module" src="app.js"></script>
