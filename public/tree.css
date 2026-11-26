@@ -617,3 +617,56 @@ body.drag-hang #stage .ft { outline-offset: 1px; }
 .lst { background: #eef3fb; color: #5a6f8f; }
 .lst.s-curso, .lst.s-madurando { background: #fdf1dc; color: #9a6b1f; } .lst.s-bloqueada { background: #fbe4e1; color: #a8463f; }
 .lst.s-hecha, .lst.s-lista { background: #e4f4e7; color: #3f7f4b; } .lst.s-descartada { background: #f0eef1; color: #8a8290; } .lst.s-cruda { background: #fff4d6; color: #8a7262; }
+
+/* blocked by other tasks */
+.tk-st.locked button:not(.on) { opacity: .35; cursor: not-allowed; }
+.tk-block { margin: 0; padding: 14px 20px 14px; background: #fdf3f2; border-bottom: 1px solid #f4dcd8; display: flex; flex-direction: column; gap: 8px; }
+.tk-bl-h { display: flex; flex-direction: column; gap: 1px; }
+.tk-bl-h b { font: 700 14px "Segoe UI", sans-serif; color: #8a3a33; } .tk-bl-h span { font: 12.5px "Segoe UI", sans-serif; color: #a87a75; }
+.tk-warn { margin: 0; padding: 8px 11px; border-radius: 9px; background: #fff; border: 1px solid #f2d3ce; font: 12.5px/1.45 "Segoe UI", sans-serif; color: #8a5a55; }
+.tk-warn::before { content: '⚠ '; color: #d2685f; }
+.tk-bl-q { padding: 8px 11px; border: 1px solid #ecd6d3; border-radius: 9px; font: 13px "Segoe UI", sans-serif; outline: none; background: #fff; }
+.tk-bl-q:focus { border-color: #dba7a1; box-shadow: 0 0 0 3px #fbe7e4; }
+.tk-bl-list { max-height: 190px; overflow: auto; display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin; }
+.tk-bl-row { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 9px; text-align: left; background: transparent; }
+.tk-bl-row:hover { background: #fff; }
+.tk-bl-row i { flex: none; width: 16px; height: 16px; border-radius: 5px; border: 1.6px solid #d9a9a3; background: #fff; display: grid; place-items: center; }
+.tk-bl-row.on { background: #fff; box-shadow: 0 1px 3px rgba(120, 50, 45, .1); }
+.tk-bl-row.on i { background: #d2685f; border-color: #d2685f; }
+.tk-bl-row.on i::after { content: ''; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
+.tk-bl-row span { display: flex; flex-direction: column; min-width: 0; }
+.tk-bl-row b { font: 600 13px "Segoe UI", sans-serif; color: #3a2f3f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-bl-row small { font: 11.5px "Segoe UI", sans-serif; color: #a397a5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-bl-act { display: flex; justify-content: flex-end; gap: 8px; }
+.tk-bl-act button { padding: 7px 14px; border-radius: 9px; font: 600 12.5px "Segoe UI", sans-serif; }
+.tk-bl-cancel { color: #8a7d8e; } .tk-bl-cancel:hover { background: #fff; }
+.tk-bl-ok { background: #d2685f; color: #fff; } .tk-bl-ok:hover { background: #bf564e; }
+.tk-blocked { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 20px; background: #fbeeec; border-bottom: 1px solid #f4dcd8; }
+.tk-blocked.hard { background: repeating-linear-gradient(135deg, #f9e1de 0 10px, #fbe9e7 10px 20px); }
+.tk-bl-lab { font: 700 12px "Segoe UI", sans-serif; color: #a8463f; margin-right: 4px; }
+.tk-dep { display: inline-flex; align-items: center; border-radius: 20px; background: #fff; box-shadow: 0 1px 2px rgba(120, 50, 45, .12); overflow: hidden; }
+.tk-dep button { padding: 3px 4px 3px 10px; font: 600 12px "Segoe UI", sans-serif; color: #6a3e3a; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-dep button + button { padding: 3px 9px 3px 5px; color: #c08a85; } .tk-dep button + button:hover { color: #b8443f; }
+.tk-dep.done button:first-child { text-decoration: line-through; color: #9aa59c; }
+.tk-bl-add { width: 24px; height: 24px; border-radius: 50%; background: #fff; color: #a8463f; font: 600 14px/1 "Segoe UI", sans-serif; box-shadow: 0 1px 2px rgba(120, 50, 45, .12); }
+.tk-frees { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.tk-frees button { padding: 5px 11px; border-radius: 9px; font: 600 12.5px "Segoe UI", sans-serif; color: #3f7f4b; background: #eef7ef; }
+.tk-frees button:hover { background: #e1f1e3; }
+.it.tarea.st-bloqueada.dep { background: #f3c9c4; } .it.tarea.st-bloqueada.dep::before { border-color: #b8443f; border-width: 2px; background: #fbe4e1; }
+
+/* columns as an accordion (v3): folded ones are strips side by side, always reachable; the hovered one widens and
+   pushes the ones on its right over the stage, so no strip is ever covered */
+#areas .ar-col { margin-left: 0; clip-path: none; transition: width .3s cubic-bezier(.22, 1, .36, 1), box-shadow .2s; overflow: hidden; }
+#areas .ar-col:not(.last) { width: 48px; padding: 14px 12px 70px; box-shadow: inset -1px 0 0 #e2d6e7; }
+#areas .ar-col:not(.last).hov, #areas .ar-col:not(.last):has([contenteditable="true"]) { width: 172px; box-shadow: 8px 0 18px -8px rgba(70, 45, 80, .35); }
+#areas .ar-col:not(.last) > :not(.ar-strip) { min-width: 148px; }
+#areas .ar-col.last { width: 172px; box-shadow: none; }
+#areas .ar-col + .ar-col { box-shadow: inset -1px 0 0 #e2d6e7; }
+#areas .ar-col:not(.last).hov + .ar-col, #areas .ar-col.last { box-shadow: none; }
+
+/* ideas in soft gold, so they read at a glance (Yago, 26.11: «más doradito, si no apenas se ve») */
+.it.idea { background: radial-gradient(circle at 35% 30%, #fff8dc, #f4d98a 75%); box-shadow: 0 0 0 1px #e8c96a, 0 1px 4px rgba(150, 110, 20, .25); }
+.it.idea.st-hecha { background: radial-gradient(circle at 35% 30%, #f3f9e8, #cfe6b4 75%); box-shadow: 0 0 0 1px #b6d69a; }
+.cm-chip-idea { background: #fdf3d3; border-color: #ecd391; }
+#ipeek.k-idea { --ip-h: #fcefc4; }
+.tk-h.st-cruda { --sc: #fcefc4; --sf: #8a6a1f; }

@@ -284,7 +284,7 @@ function tidy() {
 
 // ---- drawing ---------------------------------------------------------------------------------------------------------
 const itemsAt = (id) => [...S.tasks, ...S.ideas].filter((t) => t.at === id);
-const circles = (id) => { const l = itemsAt(id); return l.length ? `<span class="its">${l.map((it) => `<i class="it ${it.kind}${it.done ? ' done' : ''}${' st-' + stOf(it) + (whoOf(it.who) === 'Agente' ? ' agent' : '')}" data-it="${it.id}" data-drag="item:${it.id}">${it.kind === 'idea' ? '💡' : ''}</i>`).join('')}</span>` : ''; };
+const circles = (id) => { const l = itemsAt(id); return l.length ? `<span class="its">${l.map((it) => `<i class="it ${it.kind}${it.done ? ' done' : ''}${' st-' + stOf(it) + (whoOf(it.who) === 'Agente' ? ' agent' : '') + (it.kind === 'tarea' && stOf(it) === 'bloqueada' && activeBlockers(it).length ? ' dep' : '')}" data-it="${it.id}" data-drag="item:${it.id}">${it.kind === 'idea' ? '💡' : ''}</i>`).join('')}</span>` : ''; };
 function frameHTML(id, depth) {
   const f = nd(id), at = activeTab(f), t = nd(at), tabs = f.kids.map(nd);
   const kids = t.kids.map((k) => (nd(k).kind === 'frame' ? (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)) : docHTML(k))).join('');
@@ -338,14 +338,15 @@ function renderAreas(peek) {
   const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b></span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; paintHov(); }   // unchanged: leave it (keeps hover, double clicks)
   arPids = cols.map((c) => c.pid);
-  if (!peek) document.documentElement.style.setProperty('--areas-w', $('#areas').offsetWidth + 'px');
+  if (!peek) document.documentElement.style.setProperty('--areas-w', (cols.length - 1) * 48 + 172 + 'px');   // folded strips + the open column, whatever is hovered
 }
 // hovering a folded column opens it to read; only a click chooses. The hover is kept by hand so a redraw (after a
 // click) does not fold and reopen it
 let arHov = -1;
 const paintHov = () => document.querySelectorAll('#areas .ar-col').forEach((c, i) => c.classList.toggle('hov', i === arHov));
-$('#areas').addEventListener('pointerover', (e) => { const c = e.target.closest('.ar-col'); const i = c ? [...c.parentNode.children].indexOf(c) : -1; if (i !== arHov) { arHov = i; paintHov(); } });
-$('#areas').addEventListener('pointerleave', () => { arHov = -1; paintHov(); });
+let arShut = -1;   // a column folded by a click stays folded until the pointer goes to another one
+$('#areas').addEventListener('pointerover', (e) => { const c = e.target.closest('.ar-col'); let i = c ? [...c.parentNode.children].indexOf(c) : -1; if (!c) return; if (c.classList.contains('last')) i = -1; else if (i !== arShut) arShut = -1; if (i === arShut && i !== -1) return; if (i !== arHov) { arHov = i; paintHov(); } });
+$('#areas').addEventListener('pointerleave', () => { arHov = -1; arShut = -1; paintHov(); });
 function renderTop() {
   const p = pathOf(S.focus);
   $('#crumbs').innerHTML = p.map((n, i) => `${i ? '<span class="sep">›</span>' : ''}<button class="cr${i === p.length - 1 ? ' on' : ''}" data-go="${n.id}" data-drop="into" data-id="${n.kind === 'frame' ? activeTab(n) : n.id}" title="${i === 0 ? 'Doble clic: renombrar el proyecto' : ''}">${esc(n.title)}</button>`).join('');
@@ -656,7 +657,9 @@ addEventListener('click', (e) => {
   const ar = t.closest('.ar'); if (ar) {
     const id = ar.dataset.area;   // the second click of a double click lands on the redrawn button: it renames
     if (e.detail >= 2) { const el = $(`.ar[data-area="${id}"] .ar-t`); return el && editInline(el, (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
-    arPeek = null; return focusTo(id);
+    arPeek = null;
+    const col = ar.closest('.ar-col'); if (col && !col.classList.contains('last')) { arShut = [...col.parentNode.children].indexOf(col); arHov = -1; }   // chosen: fold it, show the next column
+    return focusTo(id);
   }
   const add = t.closest('.ar-add'); if (add) {
     snap(); const P = nd(add.dataset.pid), a = mk('area', 'Apartado nuevo'); P.kids.push(a.id);
@@ -743,7 +746,7 @@ function setItemText(it, v) {
   else it.text = v;
   save(); renderAll(); ed?.refresh?.();
 }
-function toggleTask(it) { if (!it) return; snap(); setState(it, it.done ? 'pendiente' : 'hecha'); save(); renderAll(); ed?.refresh?.(); if (taskOpen) paintTask(); }
+function toggleTask(it) { if (!it) return; if (stOf(it) === 'bloqueada' && activeBlockers(it).length) return toast('La bloquean tareas sin hacer'); snap(); setState(it, it.done ? 'pendiente' : 'hecha'); save(); renderAll(); ed?.refresh?.(); if (taskOpen) paintTask(); }
 // Deleting asks when there is something inside; «al cajón» keeps it aside
 function canLift(n) {
   const p = nd(PAR.get(n.id)); if (!p || !n.kids.length) return false;
@@ -891,9 +894,28 @@ const WHO = ['Yo', 'Agente'];
 const whoOf = (w) => (!w || w === 'Yo' ? 'Yo' : 'Agente');            // older names (Claude, Qwen…) are the agent
 const whoList = () => WHO;
 const whenStr = (t) => new Date(t).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const taskById = (id) => S.tasks.find((t) => t.id === id);
+const blockers = (it) => (it.blockedBy || []).map(taskById).filter(Boolean);
+const activeBlockers = (it) => blockers(it).filter((t) => !t.done);
+const dependents = (it) => S.tasks.filter((d) => (d.blockedBy || []).includes(it.id) && stOf(d) === 'bloqueada');
+const dependsOn = (a, b, seen = new Set()) => { if (seen.has(a.id)) return false; seen.add(a.id); return blockers(a).some((x) => x.id === b.id || dependsOn(x, b, seen)); };
 function setState(it, st) {
-  if (stOf(it) === st) return;
+  if (stOf(it) === st) return true;
+  if (stOf(it) === 'bloqueada' && activeBlockers(it).length) { toast('La bloquean tareas sin hacer: se desbloquea sola cuando estén hechas'); return false; }
+  if (st === 'bloqueada') it.before = stOf(it);
   it.state = st; it.done = st === 'hecha'; it.doneAt = it.done ? Date.now() : null;
+  if (it.done) for (const d of S.tasks.filter((x) => (x.blockedBy || []).includes(it.id) && stOf(x) === 'bloqueada' && !activeBlockers(x).length)) {
+    d.state = d.before && d.before !== 'bloqueada' ? d.before : 'pendiente'; toast(`«${d.text || 'Tarea'}» ya no está bloqueada`);
+  }
+  return true;
+}
+let blockPick = null, blockQ = '';          // the picker: which tasks block this one (a Set), and its search
+function blockListHTML(it) {
+  const q = blockQ.trim().toLowerCase();
+  const cand = S.tasks.filter((t) => t.id !== it.id && !t.done && !dependsOn(t, it) && (!q || (t.text || '').toLowerCase().includes(q)))
+    .sort((a, b) => blockPick.has(b.id) - blockPick.has(a.id));
+  return cand.length ? cand.slice(0, 40).map((t) => `<button class="tk-bl-row${blockPick.has(t.id) ? ' on' : ''}" data-pick="${t.id}"><i></i><span><b>${esc(t.text || '…')}</b><small>${stLabel(t)}${placeOf(t) ? ' · ' + esc(nestPath(placeOf(t))) : ''}</small></span></button>`).join('')
+    : `<p class="tk-none">${q ? 'Ninguna tarea con ese nombre.' : 'No hay otras tareas sin hacer.'}</p>`;
 }
 // the plan has versions: the last is the current one; the older ones stay, to look back with the arrows
 const plansOf = (it) => (it.plans ||= [{ t: it.created || Date.now(), text: it.body || '' }]);
@@ -903,7 +925,7 @@ function taskEdit(fn) { if (!taskSnapped) { snap(); taskSnapped = true; } fn(); 
 function openTask(it) {
   if (!it) return;
   clearTimeout(peekT); peekBox.classList.remove('on');
-  taskOpen = it.id; taskSnapped = false; planAt = plansOf(it).length - 1; paintTask();
+  taskOpen = it.id; taskSnapped = false; blockPick = null; planAt = plansOf(it).length - 1; paintTask();
   const box = $('#task'); box.hidden = false;
   box.querySelector('.tk-in').animate([{ opacity: 0, transform: 'translateY(10px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
   if (!it.text) box.querySelector('.tk-title').focus();
@@ -925,9 +947,20 @@ function paintTask() {
   $('#task .tk-in').innerHTML = `
     <header class="tk-h st-${st}">
       <span class="tk-k" title="${DEF[it.kind]}">${idea ? '💡 Idea' : 'Tarea'}</span>
-      ${`<span class="tk-st">${STATES[it.kind].map(([k, l]) => `<button data-st="${k}" class="s-${k}${k === st ? ' on' : ''}">${l}</button>`).join('')}</span>`}
+      ${`<span class="tk-st${!idea && st === 'bloqueada' && activeBlockers(it).length ? ' locked' : ''}">${STATES[it.kind].map(([k, l]) => `<button data-st="${k}" class="s-${k}${k === st ? ' on' : ''}">${l}</button>`).join('')}</span>`}
       <button class="tk-x" title="Cerrar (Esc)">×</button>
     </header>
+    ${idea ? '' : blockPick ? `<div class="tk-block">
+      <div class="tk-bl-h"><b>¿Qué la bloquea?</b><span>Elige las tareas que tienen que estar hechas antes.</span></div>
+      <p class="tk-warn">Mientras alguna esté sin hacer, esta no podrá cambiar de estado. Cuando estén todas hechas se desbloquea sola.</p>
+      <input class="tk-bl-q" placeholder="Buscar una tarea…" value="${esc(blockQ)}">
+      <div class="tk-bl-list">${blockListHTML(it)}</div>
+      <div class="tk-bl-act"><button class="tk-bl-cancel">Cancelar</button><button class="tk-bl-ok">${blockPick.size ? `Bloquear por ${blockPick.size === 1 ? 'esta tarea' : 'estas ' + blockPick.size + ' tareas'}` : 'Bloquear sin tarea concreta'}</button></div>
+    </div>` : st === 'bloqueada' ? `<div class="tk-blocked${activeBlockers(it).length ? ' hard' : ''}">
+      <span class="tk-bl-lab">${blockers(it).length ? (activeBlockers(it).length ? '🔒 La bloquean' : 'Ya están hechas las que la bloqueaban') : 'Bloqueada: espera a algo de fuera'}</span>
+      ${blockers(it).map((t) => `<span class="tk-dep${t.done ? ' done' : ''}"><button data-open="${t.id}" title="Abrir">${esc(t.text || '…')}</button><button data-unblock="${t.id}" title="Ya no la bloquea">×</button></span>`).join('')}
+      <button class="tk-bl-add" title="Añadir una tarea que la bloquea">＋</button>
+    </div>` : ''}
     <div class="tk-body">
       <div class="tk-title" contenteditable="true" spellcheck="false" data-ph="${idea ? 'La idea, en una línea…' : 'Qué hay que hacer, en una línea…'}">${esc(it.text || '')}</div>
       <div class="tk-meta">
@@ -944,12 +977,14 @@ function paintTask() {
       <div class="tk-log">${comments.length ? comments.map((e) => `<div class="tk-e by-${whoOf(e.by) === 'Yo' ? 'yo' : 'ag'}"><div class="tk-e-h"><b>${whoOf(e.by)}</b><time>${whenStr(e.t)}</time><button data-rm-log="${e.i}" title="Borrar el comentario">×</button></div><span>${esc(e.text)}</span></div>`).join('') : '<p class="tk-none">Por ahora nadie ha dejado aquí un comentario.</p>'}</div>
       <div class="tk-say"><span class="tk-by">${WHO.map((w) => `<button class="w-${w === 'Yo' ? 'yo' : 'ag'}${commentBy === w ? ' on' : ''}" data-by="${w}">${w}</button>`).join('')}</span>
         <div class="tk-log-in" contenteditable="true" spellcheck="false" data-ph="Lo que se ha hecho, lo que se piensa… (Enter)"></div></div>`}
+      ${!idea && dependents(it).length ? `<div class="tk-sec">Al terminarla se desbloquean</div><div class="tk-frees">${dependents(it).map((d) => `<button data-open="${d.id}">🔓 ${esc(d.text || '…')}</button>`).join('')}</div>` : ''}
     </div>
     <footer><button class="tk-rm">${idea ? 'Quitar la idea' : 'Quitar la tarea'}</button></footer>`;
 }
 $('#task').addEventListener('input', (e) => {
   const it = taskNow(); if (!it) return;
   const t = e.target;
+  if (t.matches('.tk-bl-q')) { blockQ = t.value; $('#task .tk-bl-list').innerHTML = blockListHTML(it); return; }
   if (t.classList.contains('tk-title')) taskEdit(() => { it.text = t.innerText.replace(/\s+/g, ' ').trim(); });
   else if (t.dataset.plan != null) taskEdit(() => { const ps = plansOf(it), k = +t.dataset.plan; ps[k].text = t.innerText.replace(/\n$/, ''); if (k === ps.length - 1) it.body = ps[k].text; });
   else if (t.dataset.f) taskEdit(() => { it[t.dataset.f] = t.innerText.replace(/\n$/, ''); });
@@ -969,7 +1004,15 @@ $('#task').addEventListener('click', (e) => {
   const it = taskNow(); if (!it) return;
   const t = e.target;
   if (t === $('#task') || t.closest('.tk-x')) return closeTask();
-  const s = t.closest('[data-st]'); if (s) { taskEdit(() => setState(it, s.dataset.st)); paintTask(); return renderAll(); }
+  const s = t.closest('[data-st]');
+  if (s && it.kind === 'tarea' && s.dataset.st === 'bloqueada' && stOf(it) !== 'bloqueada') { blockPick = new Set(it.blockedBy || []); blockQ = ''; paintTask(); return $('#task .tk-bl-q')?.focus(); }
+  if (s) { if (s.dataset.st !== stOf(it)) taskEdit(() => setState(it, s.dataset.st)); paintTask(); return renderAll(); }
+  const pk = t.closest('[data-pick]'); if (pk) { blockPick.has(pk.dataset.pick) ? blockPick.delete(pk.dataset.pick) : blockPick.add(pk.dataset.pick); return paintTask(); }
+  if (t.closest('.tk-bl-cancel')) { blockPick = null; return paintTask(); }
+  if (t.closest('.tk-bl-ok')) { const ids = [...blockPick]; blockPick = null; taskEdit(() => { it.blockedBy = ids; if (stOf(it) !== 'bloqueada') setState(it, 'bloqueada'); }); paintTask(); return renderAll(); }
+  if (t.closest('.tk-bl-add')) { blockPick = new Set(it.blockedBy || []); blockQ = ''; paintTask(); return $('#task .tk-bl-q')?.focus(); }
+  const ub = t.closest('[data-unblock]'); if (ub) { taskEdit(() => { it.blockedBy = (it.blockedBy || []).filter((x) => x !== ub.dataset.unblock); }); paintTask(); return renderAll(); }
+  const op = t.closest('[data-open]'); if (op) { blockPick = null; const o = taskById(op.dataset.open); if (o) openTask(o); return; }
   const w = t.closest('[data-who]'); if (w) { taskEdit(() => { it.who = w.dataset.who; }); return paintTask(); }
   const by = t.closest('[data-by]'); if (by) { commentBy = by.dataset.by; paintTask(); return $('#task .tk-log-in').focus(); }
   const pv = t.closest('[data-pv]'); if (pv) { planAt = Math.max(0, Math.min(plansOf(it).length - 1, planAt + +pv.dataset.pv)); return paintTask(); }

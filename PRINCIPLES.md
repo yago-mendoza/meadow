@@ -5,7 +5,7 @@ aquí con su frase y la fecha; si sustituye a uno, se cambia el viejo, no se api
 
 ## De la aplicación
 
-1. **Calma.** Tonos pastel, limpio, al estilo Odoo. Nada chillón ni dorado. Sin animaciones decorativas («es cutre»):
+1. **Calma.** Tonos pastel, limpio, al estilo Odoo. Nada chillón ni dorado, salvo las ideas: en dorado suave («más doradito», 26.11). Sin animaciones decorativas («es cutre»):
    solo las que ayudan a no perder la vista (un bloque que cambia de sitio, el zoom a algo, los cajones al plegarse),
    y entonces suaves y rápidas.
 2. **Sin lenguaje interno.** Nada de números de documento (`*N`), ids ni estados del sistema en pantalla. Ni textos
