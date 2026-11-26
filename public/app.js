@@ -315,16 +315,27 @@ function renderStage() {
   if (!skipFlip) flip(stage, before, () => 1, { sel: '.dc[data-id]', appear: false });
 }
 let skipFlip = false;
-function renderAreas() {
-  const chain = pathOf(S.area).filter((n) => n.kind === 'area').map((n) => n.id), cols = [];
+let arPeek = null, arPids = [];
+const COLBG = ['#d9c9e2', '#e4d6eb', '#efe5f3', '#fdfbfe'];   // outer columns darker, the one you are in the lightest
+const SCALES = ['#f7e4ec', '#e3edf9', '#e5f3e4', '#f9eedb', '#ece3f7', '#dff2f0'];
+function renderAreas(peek) {
+  const ids = (x) => pathOf(x).filter((n) => n.kind === 'area').map((n) => n.id);
+  const real = ids(S.area), chain = peek && nd(peek) ? ids(leafOf(peek)) : real, cols = [];
   for (let lv = 0, pid = S.root; ; lv++) {
     cols.push({ pid, ids: nd(pid).kids.filter((k) => nd(k)?.kind === 'area') });
     const nx = chain[lv]; if (!nx || !isGroup(nd(nx))) break; pid = nx;
   }
-  const btn = (k) => { const a = nd(k), g = isGroup(a); return `<button class="ar${k === S.area ? ' on' : chain.includes(k) ? ' path' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><span class="ar-t">${esc(a.title)}</span><i>${a.kids.length || ''}</i><b class="ar-x" title="Borrar el apartado o guardarlo en el cajón">×</b></button>`; };
-  $('#areas').innerHTML = cols.map((c, lv) => `<div class="ar-col">${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv === 0 && colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Mete todos estos apartados dentro de uno nuevo, en una columna a la izquierda (hasta 4)">＋ Columna encima</button>' : ''}</div>`).join('');
-  document.documentElement.style.setProperty('--areas-w', $('#areas').offsetWidth + 'px');
+  const btn = (k, i) => { const a = nd(k), g = isGroup(a); return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><span class="ar-t">${esc(a.title)}</span><i>${a.kids.length || ''}</i><b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
+  const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
+  $('#areas').innerHTML = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button></div>`).join('');
+  arPids = cols.map((c) => c.pid);
+  if (!peek) document.documentElement.style.setProperty('--areas-w', $('#areas').offsetWidth + 'px');
 }
+$('#areas').addEventListener('pointerover', (e) => {
+  const a = e.target.closest('.ar.grp'); if (!a || a.querySelector('[contenteditable="true"]') || a.dataset.area === arPeek) return;
+  arPeek = a.dataset.area; renderAreas(arPeek);
+});
+$('#areas').addEventListener('pointerleave', () => { if (!arPeek || $('#areas [contenteditable="true"]')) return; arPeek = null; renderAreas(); });
 function renderTop() {
   const p = pathOf(S.focus);
   $('#crumbs').innerHTML = p.map((n, i) => `${i ? '<span class="sep">›</span>' : ''}<button class="cr${i === p.length - 1 ? ' on' : ''}" data-go="${n.id}" data-drop="into" data-id="${n.kind === 'frame' ? activeTab(n) : n.id}" title="${i === 0 ? 'Doble clic: renombrar el proyecto' : ''}">${esc(n.title)}</button>`).join('');
@@ -583,7 +594,11 @@ addEventListener('click', (e) => {
   const go = t.closest('[data-go]'); if (go) return focusTo(go.dataset.go);
   if (t.closest('.new-frame')) { snap(); return makeAt('frame', { kind: 'place', pid: S.area || S.root }); }
   const arx = t.closest('.ar-x'); if (arx) return askDelete(arx.closest('.ar').dataset.area, arx);
-  const ar = t.closest('.ar'); if (ar) return focusTo(ar.dataset.area);
+  const ar = t.closest('.ar'); if (ar) {
+    const id = ar.dataset.area;   // the second click of a double click lands on the redrawn button: it renames
+    if (e.detail >= 2) { const el = $(`.ar[data-area="${id}"] .ar-t`); return el && editInline(el, (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
+    arPeek = null; return focusTo(id);
+  }
   const add = t.closest('.ar-add'); if (add) {
     snap(); const P = nd(add.dataset.pid), a = mk('area', 'Apartado nuevo'); P.kids.push(a.id);
     // next to groups, it gets the same columns inside, so it can be filled at once
@@ -631,7 +646,7 @@ const wrapText = (el) => { const s = document.createElement('span'); s.textConte
 addEventListener('dblclick', (e) => {
   const t = e.target;
   const ttl = t.closest('.fr-title, .dc-title'); if (ttl) { const id = ttl.closest('[data-id]').dataset.id; return editInline(ttl, (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
-  const arn = t.closest('.ar'); if (arn) { const id = arn.dataset.area; return editInline(arn.querySelector('.ar-t'), (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
+  const arn = t.closest('.ar'); if (arn) { const id = arn.dataset.area, el = $(`.ar[data-area="${id}"] .ar-t`); if (!el) return; return editInline(el, (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
   const ft = t.closest('.ft'); if (ft) { const id = ft.dataset.tab; return editInline(wrapText(ft), (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
   const cr = t.closest('.cr[data-go="' + S.root + '"]'); if (cr) return editInline(cr, (v) => { if (v) { snap(); nd(S.root).title = v; save(); } renderAll(); });
   const it = t.closest('.it'); if (it) { const x = [...S.ideas, ...S.tasks].find((y) => y.id === it.dataset.it); return popEdit(it, x.text, (v) => setItemText(x, v)); }
@@ -650,16 +665,41 @@ function setItemText(it, v) {
 }
 function toggleTask(it) { if (!it) return; snap(); it.done = !it.done; it.doneAt = it.done ? Date.now() : null; save(); renderAll(); ed?.refresh?.(); }
 // Deleting asks when there is something inside; «al cajón» keeps it aside
+function canLift(n) {
+  const p = nd(PAR.get(n.id)); if (!p || !n.kids.length) return false;
+  if (n.kind === 'area') return isGroup(n) || p.kids.some((k) => k !== n.id && nd(k)?.kind === 'area' && !isGroup(nd(k)));
+  if (n.kind === 'frame') return true;
+  if (n.kind === 'ftab') return p.kids.length > 1;
+  if (n.kind === 'doc') return n.kids.length > 1;
+  return false;
+}
+function lift(id) {
+  const n = nd(id), p = nd(PAR.get(id)), i = p.kids.indexOf(id); let put = [];
+  if (n.kind === 'area') {
+    if (isGroup(n)) put = n.kids;
+    else { const sib = p.kids.filter((k) => k !== id && nd(k)?.kind === 'area' && !isGroup(nd(k))); const near = sib.filter((k) => p.kids.indexOf(k) < i).pop() || sib[0]; nd(near).kids.push(...n.kids); }
+  } else if (n.kind === 'frame') {
+    if (p.kind === 'ftab') put = n.kids.flatMap((t) => nd(t).kids);
+    else for (const t of n.kids) {                       // in an area: each tab becomes a frame; a lone tab lets its frames out as they are
+      const T = nd(t);
+      if (n.kids.length === 1) { put.push(...T.kids.filter((k) => nd(k)?.kind === 'frame')); T.kids = T.kids.filter((k) => nd(k)?.kind !== 'frame'); if (!T.kids.length) { delete S.nodes[t]; continue; } }
+      const f = mk('frame', T.title, n.color ? { color: n.color } : {}); f.kids = [t]; f.active = t; put.push(f.id);
+    }
+  } else if (n.kind === 'ftab') { const near = p.kids[i - 1] ?? p.kids[i + 1]; nd(near).kids.push(...n.kids); p.active = near; }
+  else if (n.kind === 'doc') put = n.kids.map((t) => { const d = mk('doc', n.title + ' · ' + nd(t).title); d.kids = [t]; d.active = t; return d.id; });
+  p.kids.splice(i, 1, ...put); delete S.nodes[id];
+  for (const it of [...S.ideas, ...S.tasks]) if (it.at === id) it.at = p.id;
+}
 function askDelete(id, anchor) {
   const n = nd(id); if (!n) return;
   const inside = countIn(id) + (n.kind === 'doc' ? (docText(n).trim() ? 1 : 0) : 0);
   const name = { area: 'el apartado', frame: 'el marco', ftab: 'la pestaña', doc: 'el documento' }[n.kind];
   const drop = () => { snap(); detach(id); removeTree(id); tidy(); save(); renderAll(); toast('Borrado', [['Deshacer', doUndo]]); };
   const aside = () => { snap(); detach(id); const k = n.kind === 'ftab' ? 'ftab' : n.kind; S.drawer.push(id); n.kind = k; tidy(); save(); renderAll(); toast('Al cajón', [['Deshacer', doUndo]]); };
-  const lift = () => { snap(); const p = nd(PAR.get(id)); p.kids.splice(p.kids.indexOf(id), 1, ...n.kids); delete S.nodes[id]; tidy(); save(); renderAll(); toast('Quitada esa columna', [['Deshacer', doUndo]]); };
+  const keep = () => { snap(); lift(id); tidy(); save(); renderAll(); toast('Borrado; lo de dentro sigue ahí', [['Deshacer', doUndo]]); };
   if (!inside && n.kind !== 'ftab') return drop();
   askChoice(anchor, `¿Qué hago con ${name} «${esc(n.title)}»?`, inside ? 'Tiene cosas dentro.' : '', [
-    ...(isGroup(n) ? [{ label: 'Quitar solo este apartado (lo de dentro sube)', run: lift }] : []),
+    ...(canLift(n) ? [{ label: `Borrar solo ${name}: lo de dentro se queda en su sitio`, run: keep }] : []),
     { label: 'Guardarlo en el cajón', run: aside },
     { label: `Borrar ${name} y todo lo suyo`, danger: true, run: drop },
   ]);

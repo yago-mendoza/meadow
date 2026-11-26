@@ -291,3 +291,45 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .ar.grp i::after { content: ' ›'; }
 .ar-wrap { margin-top: auto; padding: 7px 12px; border-radius: 10px; text-align: left; font-size: 11.5px; color: #b8adbb; }
 .ar-wrap:hover { background: #efe9f0; color: var(--accent); }
+
+/* the areas as scales: each its own pastel, tucked under the one above; plain background */
+#areas { bottom: 0; padding: 14px 10px 70px; }
+.ar-col { gap: 0; }
+.ar-col.in { animation: ar-in .2s cubic-bezier(.2, .8, .2, 1); }
+@keyframes ar-in { from { opacity: 0; transform: translateX(-8px); } }
+.ar { position: relative; background: var(--sc); border: 1px solid rgba(120, 90, 130, .14); border-radius: 12px 12px 22px 22px / 10px 10px 18px 18px;
+  padding: 15px 12px 11px; box-shadow: 0 3px 5px -2px rgba(70, 45, 80, .22); color: #5d4f62; transition: transform .15s, box-shadow .15s; }
+.ar + .ar { margin-top: -9px; }
+.ar:hover { background: var(--sc); transform: translateY(-2px); box-shadow: 0 6px 10px -3px rgba(70, 45, 80, .28); border-color: rgba(120, 90, 130, .22); }
+.ar.path { background: #fff; border-color: var(--accent); color: var(--accent); }
+.ar.peek { background: #fff; border-color: #c9b3cf; color: #6b4f66; }
+.ar.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ar-add { margin-top: 8px; }
+.ar-wrap { order: -1; margin: 0 0 10px; display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 11px;
+  border: 1.5px dashed #b9a3c0; background: #fff; font: 600 12px "Segoe UI", sans-serif; color: #7a5f80; }
+.ar-wrap b { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; background: var(--accent); color: #fff; font: 700 15px/1 "Segoe UI", sans-serif; flex: none; }
+.ar-wrap:hover { border-style: solid; border-color: var(--accent); color: var(--accent); }
+
+/* «+ column on top»: a bar as wide as the column, one big + */
+.ar-wrap { display: grid; place-items: center; width: 100%; height: 38px; margin: 0 0 12px; padding: 0; border: 0; border-radius: 12px;
+  background: #e6d8ee; color: var(--accent); font: 300 30px/1 'Segoe UI', sans-serif; }
+.ar-wrap:hover { background: var(--accent); color: #fff; }
+
+/* the columns are the scales (horizontal): each one tucks over the one before, the inner one in front and lightest */
+#areas { gap: 0; padding: 0; }
+.ar-col { position: relative; width: 150px; padding: 14px 20px 70px 12px; background: var(--cb); border-radius: 0 30px 30px 0 / 0 46px 46px 0;
+  box-shadow: 5px 0 12px -5px rgba(70, 45, 80, .28); gap: 5px; }
+.ar-col + .ar-col { margin-left: -16px; padding-left: 26px; border-left: 0; }
+.ar, .ar + .ar { margin-top: 0; border-radius: 11px; padding: 9px 12px; box-shadow: 0 1px 2px rgba(70, 45, 80, .1); }
+.ar:hover { transform: none; box-shadow: var(--shadow); }
+
+/* the + drawn with two bars, so it sits exactly in the middle */
+.ar-wrap { position: relative; font-size: 0; }
+.ar-wrap::before, .ar-wrap::after { content: ''; position: absolute; left: 50%; top: 50%; width: 18px; height: 2.5px; border-radius: 2px; background: currentColor; transform: translate(-50%, -50%); }
+.ar-wrap::after { transform: translate(-50%, -50%) rotate(90deg); }
+
+/* room for the names: wider columns, the × floats over the end on hover */
+.ar-col { width: 172px; }
+.ar { padding-right: 10px; }
+.ar .ar-x { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); margin: 0; }
+.ar:hover i { visibility: hidden; }
