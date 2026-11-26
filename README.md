@@ -1,5 +1,7 @@
 # Meadow
 
+Principles of the app and of how to work on it: `PRINCIPLES.md` (read first).
+
 A zoomable grid (pastel, dotted) of documents, post-its, ideas, tasks, frames and signs, with a Notepad-like editor.
 
 - **Start:** double-click `Meadow.vbs` (or the Meadow shortcut on the desktop): it starts `node server.mjs` without a window and
