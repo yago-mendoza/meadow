@@ -110,26 +110,29 @@ function nearDocs() {
         el.classList.toggle('near', near);
         const d = docById(el.dataset.id), body = el.querySelector('.dbody');
         if (d && body && !near) { if (inline?.id === d.id) unmountInline(); body.innerHTML = previewHTML(d); }
-        else if (d && body) body.innerHTML = readingHTML(d);
+        else if (d && body && inline?.id !== d.id) body.innerHTML = readingHTML(d);
       }
-      if (near) { const dd = Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy); if (dd < bestD && r.left < cx && r.right > cx) { bestD = dd; best = el; } }
+      if (near) {
+        const vis = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)) * Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+        const dd = -vis + Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy);
+        if (vis > r.width * r.height * 0.3 && dd < bestD) { bestD = dd; best = el; }
+      }
     }
     // the closest page in the middle of the screen is the live document; the others just read
-    if (!edOpen()) { if (best) mountInline(best); else unmountInline(); }
     const pill = $('#editpill');
-    if (best && !edOpen()) { const d = docById(best.dataset.id); pill.dataset.id = d.id; pill.querySelector('b').textContent = d.name; pill.classList.add('on'); setTimeout(paintPage, 80); }
-    else pill.classList.remove('on');
+    if (inline && !entering && inline.el.getBoundingClientRect().width < NEAR_W * 0.8) { unmountInline(); pill.classList.remove('on'); }
+    if (inline) setTimeout(paintPage, 80); else pill.classList.remove('on');
   }, 60);
 }
 let inline = null;                      // { id, ed, el }: the page being edited in place
-function mountInline(el) {
+function mountInline(el, center = true) {
   const d = docById(el.dataset.id); if (!d) return;
   if (inline?.id === d.id && inline.el.isConnected) return;
   unmountInline();
   const body = el.querySelector('.dbody'); if (!body) return;
   body.innerHTML = '<div class="ied"></div>';
   const host = body.firstChild;
-  const api = { ...edApi, onOutline() {}, onLevel() {},
+  const api = { ...edApi, readOnly: true, onOutline() {}, onLevel() {},
     onChange(text) {
       if (d.text === text) return;
       d.text = text; d.updated = Date.now();
@@ -140,12 +143,30 @@ function mountInline(el) {
   e2.setDoc(d.text || '');
   inline = { id: d.id, ed: e2, el };
   el.classList.add('live');
+  document.body.classList.add('reading');            // reading a page: the top bar steps aside
+  if (center) centerLive();
+}
+// once the zooming settles, the live page glides to the middle of the screen (the zoom is kept)
+let lastWheel = 0, entering = false;
+addEventListener('wheel', () => { lastWheel = performance.now(); }, { capture: true, passive: true });
+function centerLive() {
+  clearTimeout(centerLive.t);
+  centerLive.t = setTimeout(() => {
+    if (!inline || !inline.el.isConnected) return;
+    if (performance.now() - lastWheel < 250 || act) return centerLive();
+    const r = inline.el.getBoundingClientRect(), a = visibleArea(), z0 = S.view.z;
+    const wx = (r.left - S.view.x) / z0, wy = (r.top - S.view.y) / z0, ww = r.width / z0, wh = r.height / z0;
+    const z1 = Math.min(12, Math.min((a.b - a.t - 36) / wh, (a.r - a.l - 60) / ww));
+    const to = { z: z1, x: (a.l + a.r) / 2 - (wx + ww / 2) * z1, y: (a.t + a.b) / 2 - (wy + wh / 2) * z1 };
+    if (Math.abs(to.x - S.view.x) > 3 || Math.abs(to.y - S.view.y) > 3 || Math.abs(z1 - z0) > 0.01) { entering = true; animateView(to, 520); setTimeout(() => { entering = false; paintPage(); }, 560); }
+  }, 260);
 }
 function unmountInline() {
   if (!inline) return;
   try { inline.ed.view.destroy(); } catch {}
   inline.el.classList.remove('live');
   inline = null;
+  document.body.classList.remove('reading');
 }
 // the whole text, lightly read: titles as titles, ideas/tasks/links as words
 function readingHTML(d) {
@@ -259,6 +280,7 @@ function docHTML(d, n) {
       <div class="dbody">${text ? esc(text.split('\n').slice(0, 14).join('\n')) : NOTHING_DOC}</div>
       <div class="dfoot"><span>📄</span><span>${words ? words + (words === 1 ? ' palabra' : ' palabras') : ''}</span></div>
     </div>
+    <div class="dhov"><div class="dhov-in"><button data-a="read" title="Leer aquí, pasando páginas">${EYE}<b>Leer</b></button><i></i><button data-a="edit" title="Abrir el editor">${PEN}<b>Editar</b></button></div></div>
     <button class="x" title="Borrar">×</button>
     <div class="acts">
       <button data-a="copy">⧉<b>Copiar</b></button><button data-a="add">＋<b>Añadir lo copiado</b></button><button data-a="replace">⇄<b>Reemplazar</b></button>${ZB}
@@ -292,6 +314,9 @@ const NOTHING_FRAME = `<div class="nothing"><svg viewBox="0 0 120 70" width="120
     <path d="M-14 -6 C-4 -16 8 -14 14 -4 M-15 5 C-6 14 9 14 15 3 M-8 -14 C-2 -2 2 4 -6 15 M6 -15 C1 -3 -3 6 7 15 M-16 -1 C-5 -4 6 2 16 0" fill="none" stroke="#c7b598" stroke-width="1.1"/></g>
   <path d="M24 34 H36 M18 42 H34 M26 50 H38" stroke="#d9cfda" stroke-width="1.6" stroke-linecap="round"/>
 </svg><span>Aquí no hay nada… todavía</span></div>`;
+// read here / edit: two halves of one control, in the middle of the page, over a blur of it
+const EYE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const PEN = '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/><path d="M14.5 5.5l3 3"/></svg>';
 const NOTHING_DOC = `<div class="nothing doc-nothing"><svg viewBox="0 0 80 50" width="70" height="44" aria-hidden="true">
   <g transform="rotate(-28 40 25)"><rect x="12" y="20" width="46" height="9" rx="2" fill="#fbe7a6" stroke="#d9b75c" stroke-width="1"/>
     <path d="M58 20 L68 24.5 L58 29 Z" fill="#f3dcc0" stroke="#c9a679" stroke-width="1"/><path d="M65 23.2 L68 24.5 L65 25.8 Z" fill="#6b5b50"/>
@@ -398,7 +423,7 @@ function renderItems() {
   flip(world, before, (el) => S.view.z * (find(el.dataset.id)?.o.s || 1));
   firstRender = false;
   for (const el of itemsEl.querySelectorAll('.doc.near')) el.classList.remove('near');   // re-read after a redraw
-  if (inline && !inline.el.isConnected) { try { inline.ed.view.destroy(); } catch {} inline = null; }
+  if (inline && !inline.el.isConnected) { const rid = inline.id; try { inline.ed.view.destroy(); } catch {} inline = null; const ne = elOf(rid); if (ne) { ne.classList.add('near'); mountInline(ne, false); } else document.body.classList.remove('reading'); }
   nearDocs();
   assignTabs();                                    // what is in a frame with tabs belongs to its open tab
   for (const f of S.frames) {
@@ -457,11 +482,11 @@ const pinnedTo = (id) => [...S.ideas, ...S.tasks].filter((t) => t.onCanvas && !t
 // line (it runs through the circle's centre). Several circles on one anchor spread along the side.
 const ANCHORS = ['tl', 't', 'tr', 'r', 'br', 'b', 'bl', 'l'];
 const hostRect = (f, hel) => f.k === 'f' ? [f.o.w, f.o.h] : sizeOf(hel, f.o);
-const DESC_S = 0.68;                                            // circles in a description strip are a little smaller
+const DESC_S = 1;                                               // circles in a description strip: the same size as all
 function descBox(f) { const d = elOf(f.o.id)?.querySelector('.fdesc'); return d ? d.offsetHeight : 0; }
 function anchorAt(f, hel, side, i, n, sc) {
-  if (f.k === 'f' && side === 'desc') { const h = Math.max(30, descBox(f)); return [f.o.x + f.o.w - 22 - i * 30, f.o.y + h / 2]; }
-  if (f.k === 'f') return [f.o.x, f.o.y + 30 + i * 44];          // a frame: only its left side, stacked from the top
+  if (f.k === 'f' && side === 'desc') { const h = Math.max(48, descBox(f)); return [f.o.x + f.o.w - 28 - i * 44, f.o.y + h / 2]; }
+  if (f.k === 'f') return [f.o.x, f.o.y + descBox(f) + 34 + i * 46];   // a frame: its left side, from under its description down
   const h = f.o, [w, hh] = hostRect(f, hel), gap = 44 * sc, off = (i - (n - 1) / 2) * gap;
   const col = f.k === 'd' ? docked(h).filter((x) => !hiddenInFold(x)).reduce((a, x) => { const xe = elOf(x.id); return a + (xe ? xe.offsetHeight * (x.s || 1) + 6 * sc : 0); }, 0) + (itemsEl.querySelector('.dgroup[data-doc="' + h.id + '"]') ? 46 * sc : 0) : 0;
   const L = h.x, R = h.x + w, T = h.y, B = h.y + hh + (col ? col + 8 * sc : 0), CX = h.x + w / 2, CY = h.y + hh / 2;
@@ -527,6 +552,13 @@ function pinTarget(it, e) {
 // The dotted slot: where a circle being dragged would land if dropped now (a dock slot under a page, or an anchor).
 function pinHint(it, e) {
   const hint = $('#pinhint');
+  const onto = it && document.elementsFromPoint(e.clientX, e.clientY).map((x) => x.closest?.('.item.circle')).find((x) => x && x.dataset.id !== it.id);
+  hint.classList.toggle('stack', !!onto);
+  if (onto) {
+    const r = onto.getBoundingClientRect(), p = 10;
+    Object.assign(hint.style, { left: r.left - p + 'px', top: r.top - p + 'px', width: r.width + p * 2 + 'px', height: r.height + p * 2 + 'px' });
+    hint.classList.remove('bar'); hint.classList.add('on'); return;
+  }
   const w = toWorld(e.clientX, e.clientY), dk = it && dockAt(w.x, w.y, it);
   if (dk) {
     const de = elOf(dk.d.id), [dw, dh] = sizeOf(de, dk.d), sc = dk.d.s || 1, z = S.view.z;
@@ -899,6 +931,7 @@ function fitFrame(f, near) {
   const boxes = [];
   for (const el of itemsEl.querySelectorAll('[data-k]')) {
     const o = find(el.dataset.id).o, [w, h] = sizeOf(el, o);
+    if (o.pin && find(o.pin.host)?.k === 'f') continue;
     if (o.x + w > R.x && o.x < R.x + R.w && o.y + h > R.y && o.y < R.y + R.h) boxes.push([o.x, o.y, w, h]);
   }
   if (!boxes.length) return false;
@@ -1117,6 +1150,8 @@ function restoreFrom(h) {
 
 // ---- actions on the plane ------------------------------------------------------------------------------------------
 async function docAction(a, d) {
+  if (a === 'read') { const el = elOf(d.id); if (el) { mountInline(el); $('#editpill').dataset.id = d.id; $('#editpill b').textContent = d.name; $('#editpill').classList.add('on'); } return; }
+  if (a === 'edit') return openEditor(d.id);
   if (a === 'copy') { await navigator.clipboard.writeText(readable(d.text)); return toast(`Copiado «${d.name}»`); }
   let clip;
   try { clip = (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'); } catch { return toast('El navegador no deja leer el portapapeles'); }
@@ -1133,8 +1168,9 @@ async function docAction(a, d) {
 // ---- pointer: pan, box select, move, resize ------------------------------------------------------------------------
 let act = null, space = false;
 vp.addEventListener('contextmenu', (e) => e.preventDefault());
+vp.addEventListener('dblclick', (e) => { if (inline && e.target.closest('.doc.live')) { e.stopPropagation(); $('#ep-edit').click(); } }, true);
 vp.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.ied')) return;                       // writing in a live page
+  if (e.target.closest('.ied, .dhov button')) return;                       // selecting text in the page being read
   const ae = document.activeElement;
   if (ae?.isContentEditable && !e.target.closest('[contenteditable="true"]')) ae.blur();   // a click elsewhere = Enter
   if (e.target.closest('.dgroup')) return;
@@ -1303,7 +1339,7 @@ addEventListener('pointermove', (e) => {
     const dx = (e.clientX - act.sx) / z, dy = (e.clientY - act.sy) / z, c = act.c, f = act.f;
     let W = Math.max(160, Math.round(c.includes('l') ? act.w - dx : act.w + dx)), H = Math.max(100, Math.round(c.includes('t') ? act.h - dy : act.h + dy));
     if (act.hold) {                                // never smaller than what it holds
-      const p = FIT_PAD, hd = act.hold, top = p + (act.f.desc ? 30 : 0);
+      const p = FIT_PAD, hd = act.hold, top = p + descBox({ o: act.f });
       W = Math.max(W, c.includes('l') ? act.x + act.w - (hd.x0 - p) : hd.x1 + p - act.x);
       H = Math.max(H, c.includes('t') ? act.y + act.h - (hd.y0 - top) : hd.y1 + p - act.y);
     }
@@ -1423,7 +1459,7 @@ vp.addEventListener('click', (e) => {
   const grp = e.target.closest('.dgroup');
   if (grp) return openGroup(grp);
   if (e.target.closest('.sign')) return;                // a tag is read on pointerup (a click), or dragged
-  const b = e.target.closest('.acts button');
+  const b = e.target.closest('.acts button, .dhov button');
   if (b) {
     const host = b.closest('[data-k]'), f = find(host.dataset.id);
     if (b.dataset.a === 'front' || b.dataset.a === 'back') return restack(sel.has(f.o.id) ? [...sel].map(find).filter(Boolean).map((x) => x.o) : [f.o], b.dataset.a === 'front');
@@ -1509,7 +1545,8 @@ function animateView(to, ms = 380) {
 }
 function visibleArea() {
   const panelOpen = !$('#panel').classList.contains('closed');
-  return { l: 24, r: innerWidth - (panelOpen ? 340 : 24), t: 70, b: innerHeight - 20 };
+  const reading = document.body.classList.contains('reading');
+  return { l: 24, r: innerWidth - (panelOpen ? 340 : 24), t: reading ? 20 : 70, b: innerHeight - (reading ? 84 : 20) };
 }
 function focusOn(id) {
   const f = find(id), el = elOf(id); if (!f || !el) return;
@@ -1560,6 +1597,7 @@ function liveFit(a) {
     const r = [];
     for (const el of itemsEl.querySelectorAll('[data-k]')) {
       const o = find(el.dataset.id)?.o; if (!o || moving.has(o)) continue;
+      if (o.pin && find(o.pin.host)?.k === 'f') continue;        // a frame's own edge things follow it, they do not size it
       const [w, h] = sizeOf(el, o);
       if (holds(f, o.x + w / 2, o.y + h / 2)) r.push({ x0: o.x, y0: o.y, x1: o.x + w, y1: o.y + h });
     }
@@ -1570,7 +1608,7 @@ function liveFit(a) {
   let inner = box;
   for (const f of chain) {
     if (!a.fitOrig.has(f)) a.fitOrig.set(f, { x: f.x, y: f.y, w: f.w, h: f.h });
-    const all = [inner, ...contents(f)], top = FIT_PAD + (f.desc ? 30 : 0);
+    const all = [inner, ...contents(f)], top = FIT_PAD + descBox({ o: f });
     const x0 = Math.min(...all.map((q) => q.x0)) - FIT_PAD, y0 = Math.min(...all.map((q) => q.y0)) - top;
     const x1 = Math.max(...all.map((q) => q.x1)) + FIT_PAD, y1 = Math.max(...all.map((q) => q.y1)) + FIT_PAD;
     Object.assign(f, { x: Math.round(x0), y: Math.round(y0), w: Math.max(160, Math.round(x1 - x0)), h: Math.max(100, Math.round(y1 - y0)) });

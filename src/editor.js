@@ -512,7 +512,7 @@ export function createEditor(parent, api) {
   let plain = false;
   const makeState = (text) => EditorState.create({
     doc: text,
-    extensions: [history(), drawSelection(), EditorView.lineWrapping, codeFolding({
+    extensions: [...(api.readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []), history(), drawSelection(), EditorView.lineWrapping, codeFolding({
       // a quiet label set apart from the title: how many lines are folded; a click unfolds
       preparePlaceholder: (state, range) => state.doc.lineAt(range.to).number - state.doc.lineAt(range.from).number,
       placeholderDOM: (view, onclick, n) => { const s = document.createElement('span'); s.className = 'mw-fph'; s.textContent = n + (n === 1 ? ' línea' : ' líneas'); s.title = 'Desplegar'; s.onclick = onclick; return s; },
