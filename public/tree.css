@@ -227,3 +227,15 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .lk-in { width: 26px; height: 26px; border-radius: 7px; color: #8a7d8e; font-size: 16px; flex: none; }
 .lk-in:hover { background: #fff; color: var(--accent); }
 .lk-foot { padding: 6px 12px 8px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); }
+
+/* the areas (apartados): a column on the left; the open one shows its frames */
+#areas { position: fixed; left: 0; top: 56px; bottom: 64px; width: 170px; padding: 16px 10px; display: flex; flex-direction: column; gap: 4px; overflow: auto; z-index: 15; }
+#stage { left: 170px; }
+.ar { display: flex; align-items: center; gap: 8px; text-align: left; padding: 9px 12px; border-radius: 11px; font: 700 12.5px "Segoe UI", sans-serif; letter-spacing: .04em; color: #7a6f80; cursor: pointer; }
+.ar i { margin-left: auto; font: 600 11px "Segoe UI", sans-serif; font-style: normal; color: #b3a7b8; }
+.ar:hover { background: #efe9f0; color: #3a2f3f; }
+.ar.on { background: #fff; color: #2f2735; box-shadow: var(--shadow); }
+.ar span[contenteditable="true"] { outline: none; cursor: text; }
+.ar-add { margin-top: 6px; padding: 7px 12px; border-radius: 10px; text-align: left; font-size: 12.5px; color: #a99cab; }
+.ar-add:hover { background: #efe9f0; color: var(--accent); }
+.mr.k-area { background: #fbf9fc; border: 1px solid #e4dce8; }

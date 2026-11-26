@@ -53,7 +53,18 @@ async function load() {
   else if (st) { S = migrate(st); save(); setTimeout(() => toast('Tu Meadow ahora es un árbol: marcos, pestañas, documentos. (Hay copia de lo de antes.)', [], 7000), 400); }
   else S = fresh();
   S.ideas ||= []; S.tasks ||= []; S.drawer ||= []; S.seq ||= { idea: 0, tarea: 0, doc: 0 }; S.focus ||= S.root;
+  ensureAreas();
   renderAll();
+}
+function ensureAreas() {
+  const root = nd(S.root);
+  if (root.kids.every((k) => nd(k)?.kind === 'area') && root.kids.length) return;
+  const frames = root.kids.filter((k) => nd(k)?.kind !== 'area'), areas = root.kids.filter((k) => nd(k)?.kind === 'area');
+  if (!areas.length) {
+    const p = mk('area', 'PRINCIPIOS'), u = mk('area', 'UIX');
+    u.kids.push(...frames); root.kids = [p.id, u.id]; S.area = u.id;
+  } else { nd(areas[0]).kids.push(...frames); root.kids = areas; }
+  save();
 }
 function fresh() {
   return { v: 2, root: 'root', focus: 'root', drawer: [], ideas: [], tasks: [], seq: { idea: 0, tarea: 0, doc: 0 }, history: [],
@@ -176,9 +187,10 @@ function cutHead(tabId, line) {
 }
 // What a thing becomes inside a parent of each kind
 function childKind(pk, g) {
-  if (pk === 'project') return 'frame';
+  if (pk === 'project') return 'area';
+  if (pk === 'area') return 'frame';
   if (pk === 'frame') return 'ftab';
-  if (pk === 'ftab') return g.kind === 'frame' || g.kind === 'project' ? 'frame' : 'doc';
+  if (pk === 'ftab') return g.kind === 'frame' || g.kind === 'project' || g.kind === 'area' ? 'frame' : 'doc';
   if (pk === 'doc') return 'dtab';
   return 'h';
 }
@@ -188,6 +200,12 @@ function build(g, kind) {
   const n = mk(kind, g.title || '', { ...keep, ...(g.color ? { color: g.color } : {}), ...(kind === 'doc' && g.kind === 'doc' && g.n && !docs().some((d) => d.n === g.n) ? { n: g.n } : {}) });
   if (kind === 'dtab') { n.text = joinText(g.body, serialize(g.kids, 1)); if (!n.title) n.title = 'Página'; return n.id; }
   const notesDoc = () => { const d = mk('doc', g.title || 'Notas'); d.kids.push(mk('dtab', 'Página 1', { text: g.body }).id); return d.id; };
+  if (kind === 'area') {
+    if (!n.title) n.title = 'Apartado';
+    for (const k of g.kids) n.kids.push(build(k, 'frame'));
+    if (g.body) { const f = mk('frame', 'Notas'); f.kids.push(mk('ftab', 'General').id); nd(f.kids[0]).kids.push(notesDoc()); n.kids.unshift(f.id); }
+    return n.id;
+  }
   if (kind === 'frame') {
     if (!n.title) n.title = 'Marco';
     if (g.kids.length && g.kids.every((k) => k.kind === 'ftab' || k.implicit || k.kind === 'h' || k.kind === 'doc' || k.kind === 'dtab' || k.kind === 'frame')) for (const k of g.kids) n.kids.push(build(k, 'ftab'));
@@ -233,7 +251,10 @@ function tidy() {
   reindex();
   for (const n of Object.values(S.nodes)) if (n.kind === 'frame' || n.kind === 'doc') ensureTab(n);
   for (const it of [...S.ideas, ...S.tasks]) if (it.at && !nd(it.at)) it.at = null;
-  if (!nd(S.focus) || !['project', 'frame'].includes(nd(S.focus).kind) || (S.focus !== S.root && !PAR.has(S.focus))) S.focus = S.root;
+  if (!nd(S.area) || nd(S.area).kind !== 'area' || !PAR.has(S.area)) S.area = nd(S.root).kids.find((k) => nd(k)?.kind === 'area') || null;
+  if (!nd(S.focus) || !['project', 'area', 'frame'].includes(nd(S.focus).kind) || (S.focus !== S.root && !PAR.has(S.focus))) S.focus = S.area || S.root;
+  if (S.focus === S.root && S.area) S.focus = S.area;
+  const ar = pathOf(S.focus).find((n) => n.kind === 'area'); if (ar) S.area = ar.id;
   reindex();
 }
 
@@ -271,12 +292,17 @@ function docHTML(id) {
 function renderStage() {
   const f = nd(S.focus);
   const before = measure(stage, '.fr[data-id], .dc[data-id]');
-  stage.innerHTML = f.kind === 'project'
+  stage.innerHTML = f.kind === 'project' || f.kind === 'area'
     ? `<div class="grid">${f.kids.map((k) => frameHTML(k, 0)).join('')}<div class="fr-new" data-drop="into" data-id="${f.id}"><button class="new-frame">＋ Marco</button></div></div>`
     : `<div class="solo">${frameHTML(f.id, 0)}</div>`;
   if (!skipFlip) flip(stage, before, () => 1, { sel: '.dc[data-id]', appear: false });
 }
 let skipFlip = false;
+function renderAreas() {
+  const root = nd(S.root);
+  $('#areas').innerHTML = root.kids.map((k) => { const a = nd(k); return `<button class="ar${k === S.area ? ' on' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo">${esc(a.title)}<i>${a.kids.length || ''}</i></button>`; }).join('')
+    + '<button class="ar-add" title="Nuevo apartado">＋ Apartado</button>';
+}
 function renderTop() {
   const p = pathOf(S.focus);
   $('#crumbs').innerHTML = p.map((n, i) => `${i ? '<span class="sep">›</span>' : ''}<button class="cr${i === p.length - 1 ? ' on' : ''}" data-go="${n.id}" data-drop="into" data-id="${n.kind === 'frame' ? activeTab(n) : n.id}" title="${i === 0 ? 'Doble clic: renombrar el proyecto' : ''}">${esc(n.title)}</button>`).join('');
@@ -333,7 +359,7 @@ function renderList() {
   const l = listTab === 'tareas' ? [...S.tasks].sort((a, b) => a.done - b.done) : S.ideas;
   $('#list-body').innerHTML = rows(l) || `<p class="none">${listTab === 'tareas' ? 'Sin tareas. Arrastra «Tarea» a cualquier sitio.' : 'Sin ideas todavía.'}</p>`;
 }
-function renderAll() { tidy(); renderTop(); renderStage(); renderMap(); renderDrawer(); renderList(); renderDock(); if (cur) renderEdHead(); }
+function renderAll() { tidy(); renderAreas(); renderTop(); renderStage(); renderMap(); renderDrawer(); renderList(); renderDock(); if (cur) renderEdHead(); }
 
 // ---- zooming in and out of frames (the frame grows from where it was / shrinks back to its place) -------------------
 function glideFrom(el, r0, ms = 420) {
@@ -345,6 +371,7 @@ function glideFrom(el, r0, ms = 420) {
 function focusTo(id) {
   let n = nd(id); if (!n) return;
   if (n.kind === 'ftab') { const f = parent(id); f.active = id; n = f; }
+  if (n.kind === 'project') n = nd(S.area) || n;
   if (n.kind === 'doc' || n.kind === 'dtab') { const d = n.kind === 'dtab' ? parent(id) : n; return openDoc(d.id, n.kind === 'dtab' ? id : null); }
   if (n.id === S.focus) return renderAll();
   const going = n.id, coming = S.focus;
@@ -357,7 +384,8 @@ function focusTo(id) {
 }
 function zoomOut() {
   const f = nd(S.focus); if (f.kind === 'project') return;
-  const up = pathOf(f.id).slice(0, -1).reverse().find((n) => n.kind === 'frame' || n.kind === 'project');
+  if (f.kind === 'area') return;
+  const up = pathOf(f.id).slice(0, -1).reverse().find((n) => n.kind === 'frame' || n.kind === 'area');
   focusTo(up.id);
 }
 
@@ -380,7 +408,7 @@ function labelOf(src) {
   if (src.head) { const l = (nd(src.head.tab)?.text || '').split('\n')[src.head.line - 1] || ''; return l.replace(/^#+\s*/, '# '); }
   if (src.item) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === src.item); return it ? (it.kind === 'idea' ? '💡 ' : '☐ ') + it.text : ''; }
   if (src.make) return { frame: '⬚ Marco nuevo', doc: '📄 Documento nuevo', idea: '💡 Idea nueva', tarea: '☐ Tarea nueva' }[src.make];
-  const n = nd(src.node); return n ? ({ frame: '⬚ ', ftab: '▭ ', doc: '📄 ', dtab: '▭ ' }[n.kind] || '') + n.title : '';
+  const n = nd(src.node); return n ? ({ area: '▤ ', frame: '⬚ ', ftab: '▭ ', doc: '📄 ', dtab: '▭ ' }[n.kind] || '') + n.title : '';
 }
 addEventListener('pointermove', (e) => {
   if (!drag) return;
@@ -415,7 +443,10 @@ function targetAt(x, y) {
   else if (mode === 'tabs') spec = { kind: 'place', pid: id, idx: indexByX(t.querySelectorAll('.ft'), x), forced: 'ftab', el: t };
   else if (mode === 'dtabs') spec = { kind: 'place', pid: id, idx: indexByX(t.querySelectorAll('.bt'), x), forced: 'dtab', el: t };
   else if (mode === 'into') spec = { kind: 'place', pid: id, idx: indexInFlow(t, x, y), el: t };
-  else if (mode === 'doc') {
+  else if (mode === 'area') {
+    const r = t.getBoundingClientRect(), fy = (y - r.top) / r.height, root = nd(S.root), i = root.kids.indexOf(id);
+    spec = src.node && nd(src.node)?.kind === 'area' ? { kind: 'place', pid: S.root, idx: fy < .5 ? i : i + 1, el: t, side: fy < .5 ? 't' : 'b' } : { kind: 'place', pid: id, el: t };
+  } else if (mode === 'doc') {
     const r = t.getBoundingClientRect(), fx = (x - r.left) / r.width, p = PAR.get(id), i = nd(p)?.kids.indexOf(id);
     spec = fx < 0.25 ? { kind: 'place', pid: p, idx: i, el: t, side: 'l' } : fx > 0.75 ? { kind: 'place', pid: p, idx: i + 1, el: t, side: 'r' } : { kind: 'place', pid: id, forced: 'dtab', el: t };
   } else if (mode === 'map') {
@@ -454,7 +485,8 @@ function paintTarget(t) {
   t.el.classList.add(t.ok ? 'drop-on' : 'drop-bad');
   if (!t.ok) return;
   // where exactly: a bar between things
-  if (t.side) { const r = t.el.getBoundingClientRect(); Object.assign(bar.style, { left: (t.side === 'l' ? r.left - 8 : r.right + 5) + 'px', top: r.top + 'px', width: '3px', height: r.height + 'px' }); bar.classList.add('on'); }
+  if (t.side === 't' || t.side === 'b') { const r = t.el.getBoundingClientRect(); Object.assign(bar.style, { left: r.left + 'px', top: (t.side === 't' ? r.top - 3 : r.bottom + 1) + 'px', width: r.width + 'px', height: '3px' }); bar.classList.add('on'); }
+  else if (t.side) { const r = t.el.getBoundingClientRect(); Object.assign(bar.style, { left: (t.side === 'l' ? r.left - 8 : r.right + 5) + 'px', top: r.top + 'px', width: '3px', height: r.height + 'px' }); bar.classList.add('on'); }
   else if (t.kind === 'place' && t.idx != null && t.el.matches('.fr-body')) {
     const kids = [...t.el.children].filter((c) => c.dataset?.id), k = kids[t.idx] || kids.at(-1);
     if (k) { const r = k.getBoundingClientRect(), after = !kids[t.idx]; Object.assign(bar.style, { left: (after ? r.right + 5 : r.left - 8) + 'px', top: r.top + 'px', width: '3px', height: r.height + 'px' }); bar.classList.add('on'); }
@@ -483,7 +515,7 @@ function drop(src, t) {
   }
   tidy();
   const now = becomes;
-  if (now && now !== before) toast(`${{ frame: 'Marco', ftab: 'Pestaña', doc: 'Documento', dtab: 'Pestaña', h: 'Título' }[before]} → ${{ frame: 'marco', ftab: 'pestaña de marco', doc: 'documento', dtab: 'pestaña de documento', h: 'título' }[now]}`, [['Deshacer', doUndo]]);
+  if (now && now !== before && before !== 'area') toast(`${{ frame: 'Marco', ftab: 'Pestaña', doc: 'Documento', dtab: 'Pestaña', h: 'Título' }[before]} → ${{ frame: 'marco', ftab: 'pestaña de marco', doc: 'documento', dtab: 'pestaña de documento', h: 'título' }[now]}`, [['Deshacer', doUndo]]);
   save(); renderAll();
   if (cur) { if (!nd(cur)) closeDoc(); else showTab(nd(curTab) ? curTab : activeTab(nd(cur))); }
 }
@@ -508,7 +540,7 @@ function makeAt(kind, t) {
 }
 function defaultHome(kind) {
   const f = nd(S.focus);
-  if (kind === 'frame') return f.kind === 'project' ? f.id : activeTab(f);
+  if (kind === 'frame') return f.kind === 'project' || f.kind === 'area' ? (f.kind === 'area' ? f.id : S.area) : activeTab(f);
   if (f.kind === 'frame') return activeTab(f);
   let first = f.kids.map(nd).find((x) => x.kind === 'frame');
   if (!first) { first = mk('frame', 'General'); f.kids.push(first.id); reindex(); }
@@ -526,7 +558,9 @@ addEventListener('click', (e) => {
   const t = e.target;
   const tool = t.closest('#tools .tool'); if (tool) { snap(); return makeAt(tool.dataset.drag.slice(4), null); }
   const go = t.closest('[data-go]'); if (go) return focusTo(go.dataset.go);
-  if (t.closest('.new-frame')) { snap(); return makeAt('frame', { kind: 'place', pid: S.root }); }
+  if (t.closest('.new-frame')) { snap(); return makeAt('frame', { kind: 'place', pid: S.area || S.root }); }
+  const ar = t.closest('.ar'); if (ar) return focusTo(ar.dataset.area);
+  if (t.closest('.ar-add')) { snap(); const a = mk('area', 'Apartado nuevo'); nd(S.root).kids.push(a.id); S.area = a.id; S.focus = a.id; save(); renderAll(); const el = $(`.ar[data-area="${a.id}"]`); if (el) editInline(el.firstChild.nodeType === 3 ? wrapText(el) : el, (v) => { if (v) { a.title = v; save(); } renderAll(); }); return; }
   const fin = t.closest('.fr-in'); if (fin) return focusTo(fin.closest('.fr').dataset.id);
   const pal = t.closest('.fr-pal i'); if (pal) { snap(); nd(pal.closest('.fr').dataset.id).color = pal.dataset.c; save(); return renderAll(); }
   const ftx = t.closest('.ft-x'); if (ftx) return askDelete(ftx.closest('.ft').dataset.tab, ftx);
@@ -559,6 +593,7 @@ const wrapText = (el) => { const s = document.createElement('span'); s.textConte
 addEventListener('dblclick', (e) => {
   const t = e.target;
   const ttl = t.closest('.fr-title, .dc-title'); if (ttl) { const id = ttl.closest('[data-id]').dataset.id; return editInline(ttl, (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
+  const arx = t.closest('.ar'); if (arx) { const id = arx.dataset.area; return editInline(wrapText(arx), (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
   const ft = t.closest('.ft'); if (ft) { const id = ft.dataset.tab; return editInline(wrapText(ft), (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
   const cr = t.closest('.cr[data-go="' + S.root + '"]'); if (cr) return editInline(cr, (v) => { if (v) { snap(); nd(S.root).title = v; save(); } renderAll(); });
   const it = t.closest('.it'); if (it) { const x = [...S.ideas, ...S.tasks].find((y) => y.id === it.dataset.it); return popEdit(it, x.text, (v) => setItemText(x, v)); }
@@ -580,7 +615,7 @@ function toggleTask(it) { if (!it) return; snap(); it.done = !it.done; it.doneAt
 function askDelete(id, anchor) {
   const n = nd(id); if (!n) return;
   const inside = countIn(id) + (n.kind === 'doc' ? (docText(n).trim() ? 1 : 0) : 0);
-  const name = { frame: 'el marco', ftab: 'la pestaña', doc: 'el documento' }[n.kind];
+  const name = { area: 'el apartado', frame: 'el marco', ftab: 'la pestaña', doc: 'el documento' }[n.kind];
   const drop = () => { snap(); detach(id); removeTree(id); tidy(); save(); renderAll(); toast('Borrado', [['Deshacer', doUndo]]); };
   const aside = () => { snap(); detach(id); const k = n.kind === 'ftab' ? 'ftab' : n.kind; S.drawer.push(id); n.kind = k; tidy(); save(); renderAll(); toast('Al cajón', [['Deshacer', doUndo]]); };
   if (!inside && n.kind !== 'ftab') return drop();
@@ -778,7 +813,7 @@ $('#ed-back').onclick = () => {
 function headLine(tabId, title) { const ls = (nd(tabId)?.text || '').split('\n'); const i = ls.findIndex((l) => { const m = l.match(HEAD); return m && m[2].trim() === title; }); return i < 0 ? null : i + 1; }
 function openRef(ref, head) {
   const n = nd(ref); if (!n) return toast('Eso ya no existe');
-  if (n.kind === 'project' || n.kind === 'frame' || n.kind === 'ftab') { if (cur) closeDoc(); return focusTo(n.id); }
+  if (['project', 'area', 'frame', 'ftab'].includes(n.kind)) { if (cur) closeDoc(); return focusTo(n.id); }
   const d = n.kind === 'doc' ? n : parent(n.id), tab = n.kind === 'dtab' ? n.id : null;
   openDoc(d.id, tab);
   if (head) { const ln = headLine(curTab, head); if (ln) setTimeout(() => ed.gotoLine(ln), 40); else toast(`El título «${head}» ya no está`); }
@@ -800,7 +835,7 @@ function allEntries() {
   for (const id of S.drawer) if (nd(id)) walk(entryOf(id), ['Cajón']);
   return out;
 }
-const KICON = { frame: '⬚', ftab: '▭', doc: '📄', dtab: '▭', h: '#' };
+const KICON = { area: '▤', frame: '⬚', ftab: '▭', doc: '📄', dtab: '▭', h: '#' };
 const fold = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 let lk = null;                                               // { from, to, text, stack: [entry], list: [entry], i }
 function openLinker() {

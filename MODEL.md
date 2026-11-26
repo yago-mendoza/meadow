@@ -5,11 +5,12 @@ está, siguiendo una escalera:
 
 ```
 Proyecto (GGUF.OS)
- └ Marco
-    └ Pestaña de marco          (un marco tiene siempre al menos una)
-       └ Marco … | Documento     (marcos dentro de marcos, los que haga falta; al final, documentos)
-          └ Pestaña de documento (un documento tiene siempre al menos una)
-             └ # Título › ## › ### › … › líneas   (dentro del texto)
+ └ Apartado                   (columna de la izquierda: PRINCIPIOS, UIX…)
+    └ Marco
+       └ Pestaña de marco          (un marco tiene siempre al menos una)
+          └ Marco … | Documento     (marcos dentro de marcos, los que haga falta; al final, documentos)
+             └ Pestaña de documento (un documento tiene siempre al menos una)
+                └ # Título › ## › ### › … › líneas   (dentro del texto)
 ```
 
 ## Convertir es arrastrar
@@ -22,7 +23,7 @@ Soltar algo en otro peldaño lo convierte, y todo lo que lleva dentro baja o sub
 - Un marco soltado en un texto → títulos; sus pestañas → subtítulos; y así hacia abajo.
 - Nada escrito se pierde: el texto que no tiene página donde vivir se guarda en un documento.
 
-Qué hijo admite cada uno: proyecto → marco · marco → pestaña · pestaña de marco → marco o documento · documento →
+Qué hijo admite cada uno: proyecto → apartado · apartado → marco · marco → pestaña · pestaña de marco → marco o documento · documento →
 pestaña · pestaña de documento → títulos en el texto.
 
 ## Pantalla
