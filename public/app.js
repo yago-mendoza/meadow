@@ -59,7 +59,7 @@ async function load() {
   if (st?.v === 2) S = st;
   else if (st) { S = migrate(st); save(); setTimeout(() => toast('Tu Meadow ahora es un árbol: marcos, pestañas, documentos. (Hay copia de lo de antes.)', [], 7000), 400); }
   else S = fresh();
-  S.ideas ||= []; S.tasks ||= []; S.drawer ||= []; S.seq ||= { idea: 0, tarea: 0, doc: 0 }; S.focus ||= S.root;
+  S.ideas ||= []; S.tasks ||= []; S.drawings ||= []; S.drawer ||= []; S.seq ||= { idea: 0, tarea: 0, doc: 0 }; S.focus ||= S.root;
   ensureAreas();
   renderAll();
 }
@@ -292,7 +292,7 @@ function frameHTML(id, depth) {
     <div class="fr-head">
       <span class="fr-title" data-drag="${id}" title="Arrastra para moverlo · doble clic: renombrar">${esc(f.title)}</span>
       <span class="fr-tabs" data-drop="tabs" data-id="${id}">${tabs.length > 1 ? tabs.map((x) => `<span class="ft${x.id === at ? ' on' : ''}" data-tab="${x.id}" data-drag="${x.id}" data-id="${x.id}">${esc(x.title)}${x.id === at ? '<button class="ft-x" title="Borrar esta pestaña">×</button>' : ''}</span>`).join('') : ''}<button class="ft-add" title="Nueva pestaña">＋</button></span>
-      ${circles(id)}${tabs.length > 1 ? circles(at) : ''}
+      ${circles(id)}${tabs.length > 1 ? circles(at) : ''}${thumbs(id)}
       <span class="grow"></span>
       <span class="fr-pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</span>
       <button class="fr-see" data-see="tarea" title="Ver sus tareas"><span class="ed-task-ico"></span></button><button class="fr-see" data-see="idea" title="Ver sus ideas">💡</button>${depth || S.focus !== id ? '<button class="fr-in" title="Entrar">⤢</button>' : '<button class="fr-out" title="Salir (Esc)">⤡ Salir</button>'}<button class="fr-x" title="Borrar o guardar en el cajón">×</button>
@@ -310,7 +310,7 @@ function docHTML(id) {
     <h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}</h3>
     ${many ? `<div class="dc-tabs">${d.kids.map((k) => `<span data-pg="${k}" class="${k === at ? 'on' : ''}">${esc(nd(k).title)}</span>`).join('')}</div>`
       : `<div class="dc-prev">${prev ? esc(prev).replace(/^(#{1,6})\s+(.*)$/gm, '<b class="h$1">$2</b>') : '<span class="dc-empty">Página en blanco</span>'}</div>`}
-    ${circles(id)}<button class="dc-x" title="Borrar o guardar en el cajón">×</button>
+    ${thumbs(id)}${circles(id)}<button class="dc-x" title="Borrar o guardar en el cajón">×</button>
   </article>`;
 }
 function renderStage() {
@@ -345,13 +345,13 @@ function renderAreas(peek) {
 let arHov = -1;
 const paintHov = () => document.querySelectorAll('#areas .ar-col').forEach((c, i) => c.classList.toggle('hov', i === arHov));
 let arShut = -1;   // a column folded by a click stays folded until the pointer goes to another one
-$('#areas').addEventListener('pointerover', (e) => { const c = e.target.closest('.ar-col'); let i = c ? [...c.parentNode.children].indexOf(c) : -1; if (!c) return; if (c.classList.contains('last')) i = -1; else if (i !== arShut) arShut = -1; if (i === arShut && i !== -1) return; if (i !== arHov) { arHov = i; paintHov(); } });
+$('#areas').addEventListener('pointermove', (e) => { const c = e.target.closest('.ar-col'); let i = c ? [...c.parentNode.children].indexOf(c) : -1; if (!c) return; if (c.classList.contains('last')) i = -1; else if (i !== arShut) arShut = -1; if (i === arShut && i !== -1) return; if (i !== arHov) { arHov = i; paintHov(); } });
 $('#areas').addEventListener('pointerleave', () => { arHov = -1; arShut = -1; paintHov(); });
 function renderTop() {
   const p = pathOf(S.focus);
   $('#crumbs').innerHTML = p.map((n, i) => `${i ? '<span class="sep">›</span>' : ''}<button class="cr${i === p.length - 1 ? ' on' : ''}" data-go="${n.id}" data-drop="into" data-id="${n.kind === 'frame' ? activeTab(n) : n.id}" title="${i === 0 ? 'Doble clic: renombrar el proyecto' : ''}">${esc(n.title)}</button>`).join('');
 }
-const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea']];
+const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo']];
 $('#tools').innerHTML = TOOLS.map(([k, ico, name]) => `<button class="tool t-${k}" data-drag="new:${k}" title="${k === 'tarea' || k === 'idea' ? DEF[k].replace(/'/g, '') + ' ' : ''}Clic: crear aquí · arrastra: crear donde lo sueltes"><span class="ico">${ico}</span>${name}</button>`).join('');
 
 // the map: every node as a rectangle inside its parent; a frame's (or page's) only tab adds no level
@@ -494,7 +494,7 @@ function srcOf(key) {
 function labelOf(src) {
   if (src.head) { const l = (nd(src.head.tab)?.text || '').split('\n')[src.head.line - 1] || ''; return l.replace(/^#+\s*/, '# '); }
   if (src.item) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === src.item); return it ? (it.kind === 'idea' ? '💡 ' : '☐ ') + it.text : ''; }
-  if (src.make) return { frame: '⬚ Marco nuevo', doc: '📄 Documento nuevo', idea: '💡 Idea nueva', tarea: '☐ Tarea nueva' }[src.make];
+  if (src.make) return { frame: '⬚ Marco nuevo', doc: '📄 Documento nuevo', idea: '💡 Idea nueva', tarea: '☐ Tarea nueva', dibujo: '🖍 Dibujo nuevo' }[src.make];
   const n = nd(src.node); return n ? ({ area: '▤ ', frame: '⬚ ', ftab: '▭ ', doc: '📄 ', dtab: '▭ ' }[n.kind] || '') + n.title : '';
 }
 addEventListener('pointermove', (e) => {
@@ -503,6 +503,7 @@ addEventListener('pointermove', (e) => {
     if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
     drag.on = true; drag.src = srcOf(drag.key);
     ghost.textContent = labelOf(drag.src); ghost.classList.add('on'); document.body.classList.add('dragging'); if (drag.src.item || drag.src.make === 'idea' || drag.src.make === 'tarea') document.body.classList.add('drag-hang');
+    if (drag.src.make === 'dibujo') document.body.classList.add('drag-draw');
     drag.el.classList.add('lifted'); $('#drawer').classList.add('near');
   }
   Object.assign(ghost.style, { left: e.clientX + 12 + 'px', top: e.clientY + 10 + 'px' });
@@ -514,7 +515,7 @@ addEventListener('pointerup', () => {
   const d = drag; drag = null;
   if (!d.on) return;
   justDragged = true; setTimeout(() => { justDragged = false; }, 0);
-  ghost.classList.remove('on'); document.body.classList.remove('dragging', 'drag-hang'); d.el.classList.remove('lifted'); $('#drawer').classList.remove('near');
+  ghost.classList.remove('on'); document.body.classList.remove('dragging', 'drag-hang', 'drag-draw'); d.el.classList.remove('lifted'); $('#drawer').classList.remove('near');
   paintTarget(null);
   if (d.t?.ok) drop(d.src, d.t);
 });
@@ -522,7 +523,7 @@ addEventListener('pointerup', () => {
 function targetAt(x, y) {
   const el = document.elementFromPoint(x, y); if (!el) return null;
   const src = drag.src;
-  if ((src.item || src.make === 'idea' || src.make === 'tarea') && el.closest('#areas')) return null;   // not on a column's buttons: loose in the area instead
+  if ((src.item || src.make === 'idea' || src.make === 'tarea' || src.make === 'dibujo') && el.closest('#areas')) return null;   // not on a column's buttons: loose in the area instead
   const bg = el.closest('#stage') && !el.closest('.fr, .dc') ? stage.querySelector(':scope > .grid') : null;   // the empty space of an area counts as the area
   if (src.item) { const h = el.closest('[data-id]') || bg; const id = h?.dataset.id; return id && nd(id) ? { kind: 'hang', pid: id, el: h, ok: true } : null; }
   const t = el.closest('[data-drop]') || bg; if (!t) return null;
@@ -613,6 +614,7 @@ function drop(src, t) {
 }
 // creating: where it was dropped, or (a click) where you are
 function makeAt(kind, t) {
+  if (kind === 'dibujo') return newDrawing(t?.kind === 'place' ? t.pid : t?.kind === 'head' ? t.tab : cur || S.focus);
   if (kind === 'idea' || kind === 'tarea') {
     const at = t?.kind === 'place' ? (nd(t.pid).kind === 'ftab' ? parent(t.pid).id : t.pid) : t?.kind === 'head' ? t.tab : (cur || S.focus);
     const it = newItem(kind, '', at); save(); renderAll();
@@ -1155,6 +1157,140 @@ addEventListener('click', (e) => {
   e.preventDefault(); e.stopPropagation(); selRotate(pick[0], pick[1]);
 }, true);
 addEventListener('dblclick', (e) => { if (selMode && e.target.closest('#stage')) { e.preventDefault(); e.stopPropagation(); } }, true);
+
+// ---- drawings: quick sketches hung on a frame or a document ------------------------------------------------------------
+// Stored as shapes (rectangles, ellipses, lines, strokes), never pixels; drawn each time on a small sheet, a bit pixelated.
+// A stroke that looks like a circle becomes one, like a rectangle becomes one; edges and centres snap to what is there.
+const DW_W = 192, DW_H = 128;
+const DW_COLORS = {
+  top: ['#f6c9d6', '#f9d8b8', '#f8eaa6', '#cfeccd', '#c4e3f3', '#cfd3f5', '#e3cdf1', '#f2f0ee'],
+  left: ['#2f2735', '#3d5a80', '#7a2e3a', '#2e6b4a', '#8a5a2b', '#6b6670'],
+  right: ['#e0607e', '#f0954a', '#e8c547', '#56b37f', '#4a9fd8', '#8f78d6'],
+};
+const drawsAt = (id) => (S.drawings || []).filter((d) => d.at === id);
+const darker = (hex, k = 0.72) => { const n = parseInt(hex.slice(1), 16); const c = (v) => Math.round(v * k).toString(16).padStart(2, '0'); return '#' + c(n >> 16) + c((n >> 8) & 255) + c(n & 255); };
+function paintShapes(ctx, shapes, w = DW_W, h = DW_H) {
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#fffdf8'; ctx.fillRect(0, 0, w, h);
+  ctx.save(); ctx.scale(w / DW_W, h / DW_H);
+  for (const s of shapes) {
+    ctx.lineWidth = s.t === 'path' || s.t === 'line' ? 2 : 1.4; ctx.strokeStyle = s.t === 'path' || s.t === 'line' ? s.c : darker(s.c); ctx.fillStyle = s.c;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (s.t === 'rect') { ctx.fillRect(s.x, s.y, s.w, s.h); ctx.strokeRect(s.x + 0.5, s.y + 0.5, s.w - 1, s.h - 1); }
+    else if (s.t === 'ellipse') { ctx.beginPath(); ctx.ellipse(s.x + s.w / 2, s.y + s.h / 2, Math.max(1, s.w / 2), Math.max(1, s.h / 2), 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    else if (s.t === 'line') { ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke(); }
+    else if (s.t === 'path') { ctx.beginPath(); s.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+const thumbCache = new Map();
+function drawThumb(d) {
+  const key = d.id + ':' + JSON.stringify(d.shapes).length + ':' + d.v;
+  if (!thumbCache.has(key)) { const c = document.createElement('canvas'); c.width = 72; c.height = 48; paintShapes(c.getContext('2d'), d.shapes, 72, 48); thumbCache.set(key, c.toDataURL()); }
+  return thumbCache.get(key);
+}
+const thumbs = (id) => drawsAt(id).map((d) => `<img class="dw-th" data-draw="${d.id}" src="${drawThumb(d)}" alt="" title="Dibujo · clic para abrirlo">`).join('');
+
+// recognizing a stroke
+function recognize(pts) {
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), w = x1 - x0, h = y1 - y0;
+  let len = 0; for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  const ends = Math.hypot(pts.at(-1)[0] - pts[0][0], pts.at(-1)[1] - pts[0][1]), diag = Math.hypot(w, h) || 1;
+  if (len < 3) return null;
+  if (ends > len * 0.9 && len > 6) return { t: 'line', x1: pts[0][0], y1: pts[0][1], x2: pts.at(-1)[0], y2: pts.at(-1)[1] };   // a straight stroke
+  if (ends < diag * 0.3 && w > 5 && h > 5) {                                       // closed: a circle or a rectangle?
+    const cx = x0 + w / 2, cy = y0 + h / 2, m = Math.min(w, h);
+    const ell = pts.reduce((a, [x, y]) => a + Math.abs(Math.hypot((x - cx) / (w / 2), (y - cy) / (h / 2)) - 1), 0) / pts.length;
+    const rec = pts.reduce((a, [x, y]) => a + Math.min(Math.abs(x - x0), Math.abs(x - x1), Math.abs(y - y0), Math.abs(y - y1)) / m, 0) / pts.length;
+    if (rec < 0.09 && rec < ell * 0.8) return { t: 'rect', x: x0, y: y0, w, h };
+    if (ell < 0.16) return { t: 'ellipse', x: x0, y: y0, w, h };
+  }
+  return { t: 'path', pts: pts.filter((p, i) => i % 2 === 0 || i === pts.length - 1).map(([x, y]) => [Math.round(x * 2) / 2, Math.round(y * 2) / 2]) };
+}
+// snapping: almost-square becomes square; edges and centres close to another shape's (or the sheet's) line up with them
+function snapShape(s, others) {
+  if (s.t !== 'rect' && s.t !== 'ellipse') return s;
+  if (Math.abs(s.w - s.h) < Math.max(s.w, s.h) * 0.1) { const m = (s.w + s.h) / 2; s.x += (s.w - m) / 2; s.y += (s.h - m) / 2; s.w = s.h = m; }
+  const boxes = [{ x: 0, y: 0, w: DW_W, h: DW_H }, ...others.filter((o) => o.t === 'rect' || o.t === 'ellipse')];
+  const T = 4;
+  const fit = (pos, size, lines) => {            // try the near edge, the far edge, then the centre
+    let best = null;
+    for (const L of lines) for (const [mine, shift] of [[pos, 0], [pos + size, -size], [pos + size / 2, -size / 2]]) {
+      const d = Math.abs(mine - L); if (d < T && (!best || d < best.d)) best = { d, v: L + shift };
+    }
+    return best ? best.v : pos;
+  };
+  const xs = boxes.flatMap((b) => [b.x, b.x + b.w, b.x + b.w / 2]), ys = boxes.flatMap((b) => [b.y, b.y + b.h, b.y + b.h / 2]);
+  s.x = fit(s.x, s.w, xs); s.y = fit(s.y, s.h, ys);
+  for (const k of ['x', 'y', 'w', 'h']) s[k] = Math.round(s[k]);
+  return s;
+}
+
+// the sheet
+let dwOpen = null, dwColor = DW_COLORS.top[4], dwSnapped = false;
+const dwNow = () => (S.drawings || []).find((d) => d.id === dwOpen);
+function openDrawing(d) {
+  if (!d) return;
+  dwOpen = d.id; dwSnapped = false;
+  const box = $('#draw');
+  box.querySelector('.dw-top').innerHTML = DW_COLORS.top.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
+  box.querySelector('.dw-left').innerHTML = DW_COLORS.left.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
+  box.querySelector('.dw-right').innerHTML = DW_COLORS.right.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
+  box.querySelector('.dw-where').textContent = nestPath(d.at) || '';
+  box.hidden = false; dwPaint(); dwPickColor(dwColor);
+  box.querySelector('.dw-in').animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
+}
+function closeDrawing() {
+  const d = dwNow(); if (!dwOpen) return;
+  if (d?.fresh && !d.shapes.length) S.drawings.splice(S.drawings.indexOf(d), 1);
+  if (d) delete d.fresh;
+  dwOpen = null; $('#draw').hidden = true; save(); renderAll();
+}
+function dwPaint(live) {
+  const d = dwNow(); if (!d) return;
+  const ctx = $('#dw-c').getContext('2d'); paintShapes(ctx, d.shapes);
+  if (live?.length > 1) { ctx.strokeStyle = dwColor; ctx.lineWidth = 1.5; ctx.beginPath(); live.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); }
+}
+function dwPickColor(c) { dwColor = c; for (const el of document.querySelectorAll('#draw [data-col]')) el.classList.toggle('on', el.dataset.col === c); $('#draw .dw-cur').style.background = c; }
+function dwEdit(fn) { if (!dwSnapped) { snap(); dwSnapped = true; } fn(); const d = dwNow(); d.v = (d.v || 0) + 1; save(); dwPaint(); }
+// colours are taken by passing over them, no click
+let dwHoverT = null;
+$('#draw').addEventListener('pointerover', (e) => { const sw = e.target.closest('[data-col]'); clearTimeout(dwHoverT); if (sw) dwHoverT = setTimeout(() => dwPickColor(sw.dataset.col), 90); });
+// drawing with the mouse
+$('#dw-c').addEventListener('pointerdown', (e) => {
+  const c = e.currentTarget, r = c.getBoundingClientRect(), at = (ev) => [(ev.clientX - r.left) * DW_W / r.width, (ev.clientY - r.top) * DW_H / r.height];
+  const pts = [at(e)]; c.setPointerCapture(e.pointerId);
+  const mv = (ev) => { pts.push(at(ev)); dwPaint(pts); };
+  const up = () => {
+    c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', up);
+    const s = recognize(pts); if (!s) return dwPaint();
+    s.c = dwColor;
+    dwEdit(() => { const d = dwNow(); d.shapes.push(snapShape(s, d.shapes)); });
+  };
+  c.addEventListener('pointermove', mv); c.addEventListener('pointerup', up);
+});
+$('#draw').addEventListener('click', (e) => {
+  const d = dwNow(); if (!d) return; const t = e.target;
+  if (t === $('#draw') || t.closest('.dw-close')) return closeDrawing();
+  if (t.closest('.dw-undo')) return d.shapes.length && dwEdit(() => d.shapes.pop());
+  if (t.closest('.dw-clear')) return d.shapes.length && dwEdit(() => { d.shapes = []; });
+  if (t.closest('.dw-rm')) { dwOpen = null; $('#draw').hidden = true; snap(); S.drawings.splice(S.drawings.indexOf(d), 1); save(); renderAll(); return toast('Dibujo quitado', [['Deshacer', doUndo]]); }
+});
+addEventListener('keydown', (e) => {
+  if (!dwOpen) return;
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeDrawing(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.stopPropagation(); const d = dwNow(); if (d.shapes.length) dwEdit(() => d.shapes.pop()); }
+}, true);
+// a new drawing, on the container it was dropped on (only frames and documents)
+function newDrawing(at) {
+  let n = nd(at); if (n?.kind === 'ftab') n = parent(at); if (n?.kind === 'dtab') n = parent(at);
+  if (!n || (n.kind !== 'frame' && n.kind !== 'doc')) return toast('Un dibujo va en un marco o en un documento: arrástralo encima de uno');
+  snap(); S.drawings ||= []; S.seq.dibujo = (S.seq.dibujo || 0) + 1;
+  const d = { id: 'd' + S.seq.dibujo + '-' + uid().slice(0, 3), n: S.seq.dibujo, at: n.id, shapes: [], created: Date.now(), fresh: true };
+  S.drawings.push(d); save(); renderAll(); openDrawing(d);
+}
+addEventListener('click', (e) => { const th = e.target.closest('.dw-th'); if (!th || selMode) return; e.preventDefault(); e.stopPropagation(); openDrawing((S.drawings || []).find((d) => d.id === th.dataset.draw)); }, true);
 
 // ---- the editor: a document, its tabs (pages), the writing ----------------------------------------------------------
 let ed = null, cur = null, curTab = null;

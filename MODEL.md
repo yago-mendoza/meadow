@@ -35,6 +35,8 @@ pestaña · pestaña de documento → títulos en el texto.
 - **El mapa** (abajo a la izquierda): todo el árbol como rectángulos anidados, con nombres; rueda para acercar, clic
   para ir, y se puede arrastrar desde y hacia él. Arriba de un rectángulo (su nombre) = como pestaña; dentro = dentro.
 - **Un cajón**: lo que se aparta del árbol, para volver a soltarlo donde sea.
+- **Dibujos** (🖍): bocetos rápidos colgados de un marco o un documento; se guardan como formas (lo que parece un
+  círculo o un rectángulo lo es, y se alinea con lo que hay), se pintan pixelados y se ven en miniatura.
 - **Seleccionar** (◳): un clic elige algo con todo lo de dentro, otro solo él, otro lo saca; la pill de abajo cuenta lo
   elegido (palabras, tamaño, documentos, títulos, tareas, ideas) y lo copia como un texto Markdown: el contexto a mano.
 - **Ideas y tareas**: se cuelgan de cualquier nodo (arrastrándolas encima) o se escriben en una línea del texto. Una tarea es algo que hay
