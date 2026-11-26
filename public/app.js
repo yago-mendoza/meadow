@@ -1860,14 +1860,14 @@ function showPlant(pl) {
   $('#to-home').textContent = pl;
   document.querySelector('link[rel=icon]').href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>" + pl + "</text></svg>";
 }
-function pickPlant(anchor, id, now) {   // the stickers: one is chosen with a click
+function pickPlant(anchor, now, onPick) {   // the stickers: one is chosen with a click
   document.querySelector('#plants')?.remove();
   const box = document.createElement('div'); box.id = 'plants';
   box.innerHTML = PLANTS.map((pl, i) => `<button data-pl="${pl}" class="${pl === now ? 'on' : ''}" style="--r:${((i * 37) % 23) - 11}deg">${pl}</button>`).join('');
   document.body.append(box);
   const r = anchor.getBoundingClientRect(); box.style.left = Math.min(innerWidth - box.offsetWidth - 12, r.left - 8) + 'px'; box.style.top = Math.min(innerHeight - box.offsetHeight - 12, r.bottom + 8) + 'px';
   requestAnimationFrame(() => box.classList.add('in'));
-  box.onclick = async (e) => { const b = e.target.closest('[data-pl]'); if (!b) return; box.remove(); paintHome(await api('/api/projects/plant', { id, plant: b.dataset.pl })); };
+  box.onclick = (e) => { const b = e.target.closest('[data-pl]'); if (!b) return; box.remove(); onPick(b.dataset.pl); };
   setTimeout(() => addEventListener('pointerdown', function off(e) { if (e.target.closest('#plants')) return; box.remove(); removeEventListener('pointerdown', off, true); }, true), 0);
 }
 function paintHome(L) {
@@ -1883,15 +1883,17 @@ $('#home').addEventListener('click', async (e) => {
   const t = e.target;
   try {
     if (t.closest('#hm-new')) {
-      const box = document.createElement('div'); box.className = 'hm-p hm-newrow'; const pl = randomPlant(); box.innerHTML = `<div class="hm-ico">${pl}</div><input placeholder="Nombre del proyecto…">`;
-      $('#hm-list').prepend(box); const inp = box.querySelector('input'); inp.focus();
-      inp.onkeydown = async (ev) => { if (ev.key === 'Escape') box.remove(); if (ev.key === 'Enter' && inp.value.trim()) { const j = await api('/api/projects', { name: inp.value.trim(), plant: pl }); location.href = '/?p=' + j.id; } };
-      return;
+      let pl = randomPlant();
+      return hmDialog({ title: 'Proyecto nuevo', plant: pl, onPlant: (v) => { pl = v; }, placeholder: 'Su nombre…', ok: 'Crear', valid: (v) => !!v.trim(),
+        run: async (v) => { const j = await api('/api/projects', { name: v.trim(), plant: pl }); location.href = '/?p=' + j.id; } });
     }
-    const ico = t.closest('[data-plant]'); if (ico) return pickPlant(ico, ico.dataset.plant, ico.dataset.now);
+    const ico = t.closest('[data-plant]'); if (ico) return pickPlant(ico, ico.dataset.now, async (pl) => paintHome(await api('/api/projects/plant', { id: ico.dataset.plant, plant: pl })));
     if (t.closest('#hm-add')) { toast('Elige la carpeta en la ventana que se abre…'); const j = await api('/api/projects/add', {}); if (j.id) location.href = '/?p=' + j.id; return; }
     const mv = t.closest('[data-mv]'); if (mv) { toast('Elige a dónde moverlo en la ventana que se abre…'); paintHome(await api('/api/projects/move', { id: mv.dataset.mv })); return toast('Movido'); }
-    const rm = t.closest('[data-rm]'); if (rm) return askChoice(rm, '¿Quitarlo de la lista?', 'Su carpeta y sus datos se quedan donde están; puedes volver a abrirlo con «Abrir carpeta…».', [{ label: 'Quitar de la lista', danger: true, run: async () => paintHome(await api('/api/projects/remove', { id: rm.dataset.rm })) }]);
+    const rm = t.closest('[data-rm]'); if (rm) { const name = rm.closest('.hm-p').querySelector('.hm-t b').textContent, NAME = name.toUpperCase();
+      return hmDialog({ title: `Quitar «${esc(name)}» de la lista`, note: 'Su carpeta y sus datos se quedan donde están; puedes volver a abrirlo con «Abrir carpeta…».',
+        ask: `Para confirmarlo, escribe <b>${esc(NAME)}</b>`, placeholder: NAME, ok: 'Quitar', danger: true, valid: (v) => v.trim() === NAME,
+        run: async () => paintHome(await api('/api/projects/remove', { id: rm.dataset.rm })) }); }
     if (t.closest('#hm-root-ch')) return askChoice(t.closest('#hm-root-ch'), '¿Dónde guardo los proyectos?', 'Eliges la carpeta en la ventana que se abre.', [
       { label: 'Cambiar la carpeta y llevar allí los proyectos que hay en la actual', run: async () => { const j = await api('/api/root', { move: true }); if (!j.cancelled) { paintHome(j); toast(j.failed.length ? `Movidos ${j.moved.length}; no pude mover ${j.failed.length}` : `Hecho: ${j.moved.length} movidos`); } } },
       { label: 'Solo para los proyectos nuevos', run: async () => { const j = await api('/api/root', { move: false }); if (!j.cancelled) paintHome(j); } },
@@ -1899,6 +1901,22 @@ $('#home').addEventListener('click', async (e) => {
     const card = t.closest('.hm-p[data-p]'); if (card && !card.classList.contains('gone')) location.href = '/?p=' + card.dataset.p;
   } catch (err) { toast('No se pudo: ' + err.message); }
 });
+// the home's little dialog: a title, maybe a plant, one line to write, and its button
+function hmDialog(o) {
+  document.querySelector('#hm-dlg')?.remove();
+  const d = document.createElement('div'); d.id = 'hm-dlg';
+  d.innerHTML = `<div class="hd-card${o.danger ? ' danger' : ''}">${o.plant ? `<button class="hd-plant" title="Elegir otra planta">${o.plant}</button>` : ''}<h3>${o.title}</h3>${o.note ? `<p class="hd-note">${o.note}</p>` : ''}${o.ask ? `<p class="hd-ask">${o.ask}</p>` : ''}
+    <input spellcheck="false" placeholder="${esc(o.placeholder || '')}"><div class="hd-acts"><button class="hd-no">Cancelar</button><button class="hd-ok" disabled>${o.ok}</button></div></div>`;
+  document.body.append(d); requestAnimationFrame(() => d.classList.add('in'));
+  const inp = d.querySelector('input'), ok = d.querySelector('.hd-ok'), close = () => { d.classList.remove('in'); setTimeout(() => d.remove(), 180); };
+  inp.focus();
+  inp.oninput = () => { ok.disabled = !o.valid(inp.value); };
+  const go = async () => { if (ok.disabled) return; ok.disabled = true; try { await o.run(inp.value); close(); } catch (err) { ok.disabled = false; toast('No se pudo: ' + err.message); } };
+  inp.onkeydown = (e) => { if (e.key === 'Enter') go(); if (e.key === 'Escape') close(); };
+  ok.onclick = go; d.querySelector('.hd-no').onclick = close;
+  let downOut = false; d.onpointerdown = (e) => { downOut = e.target === d; }; d.onclick = (e) => { if (e.target === d && downOut) close(); };
+  const pb = d.querySelector('.hd-plant'); if (pb) pb.onclick = () => pickPlant(pb, pb.textContent, (v) => { pb.textContent = v; o.onPlant?.(v); inp.focus(); });
+}
 $('#to-home').onclick = () => { flush(); location.href = '/'; };
 
 window.meadow = { get S() { return S; }, render: () => renderAll() };   // for tests and the console

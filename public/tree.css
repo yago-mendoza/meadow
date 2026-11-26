@@ -951,3 +951,26 @@ body.no-pics .fr.has-pic { margin-top: 0; } body.no-pics .fr.has-pic::before { d
   filter: drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff) drop-shadow(0 3px 4px rgba(60, 40, 70, .22)); }
 #plants button:hover { transform: rotate(0) scale(1.16); }
 #plants button.on { background: #eef6ea; }
+
+/* the home's dialog: new project, removing one */
+#hm-dlg { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; background: rgba(60, 40, 70, 0); transition: background .18s; }
+#hm-dlg.in { background: rgba(60, 40, 70, .22); }
+.hd-card { width: 380px; padding: 24px 24px 18px; border-radius: 20px; background: #fff; box-shadow: 0 20px 60px rgba(60, 40, 70, .25); text-align: center;
+  opacity: 0; transform: translateY(8px) scale(.98); transition: opacity .18s, transform .25s cubic-bezier(.22, 1, .36, 1); }
+#hm-dlg.in .hd-card { opacity: 1; transform: none; }
+.hd-plant { width: 72px; height: 72px; margin: 0 auto 10px; display: grid; place-items: center; border-radius: 20px; background: #eef6ea; font-size: 40px; transition: transform .2s cubic-bezier(.22, 1, .36, 1); }
+.hd-plant:hover { transform: rotate(-8deg) scale(1.08); }
+.hd-card h3 { margin: 0 0 6px; font: 700 18px "Segoe UI", sans-serif; color: #2f2735; overflow-wrap: anywhere; }
+.hd-note { margin: 0 0 4px; font: 13px/1.5 "Segoe UI", sans-serif; color: #8a7f8d; }
+.hd-ask { margin: 12px 0 0; font: 13px "Segoe UI", sans-serif; color: #5a4f5d; }
+.hd-ask b { font-family: Consolas, monospace; color: #b0485a; letter-spacing: .03em; }
+.hd-card input { width: 100%; box-sizing: border-box; margin-top: 14px; padding: 11px 14px; border-radius: 12px; border: 1.5px solid #e6dee9; outline: none; font: 600 15px "Segoe UI", sans-serif; color: #2f2735; text-align: center; }
+.hd-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #f1e9f4; }
+.hd-card.danger input { font-family: Consolas, monospace; }
+.hd-acts { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+.hd-acts button { padding: 9px 18px; border-radius: 11px; font: 600 13.5px "Segoe UI", sans-serif; }
+.hd-no { color: #7a6f7d; background: #f4f0f5; }
+.hd-ok { color: #fff; background: var(--accent); }
+.hd-card.danger .hd-ok { background: #c0566a; }
+.hd-ok:disabled { opacity: .35; cursor: default; }
+#plants { z-index: 400; }
