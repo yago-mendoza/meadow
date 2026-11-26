@@ -27,7 +27,7 @@ A zoomable grid (pastel, dotted) of documents, post-its, ideas, tasks, frames an
 - **Ribbons** («ribetes»): a strip of cloth standing out of the nearest edge, red unless you pick another colour in its reader; drag it to move it.
 - **Drawers** («cajones», bottom left): one shape that changes size, like the InfraPhysics site assistant (opening: width then
   height; closing: height down, then width). Tucked, a little chest: the drawer under the pointer slides out, a click opens that
-  drawer, a click anywhere else puts them away. They also come out when a dragged document reaches their corner. Up to four,
+  drawer, a click anywhere else puts them away. They also come out when a dragged document reaches their corner. Up to six,
   each with its colour (click its dot), rename (click its name), «⤢» puts all its documents on the plane.
 - **Panel** (right): tasks (pending / done / all) and ideas, grouped by the frame they are in; history with «Restaurar»,
   «Volver a como estaba» for documents, and «Ir» / «Abrir» for pieces that still exist.

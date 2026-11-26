@@ -342,7 +342,7 @@ function dockTarget(t) {
 }
 // ---- trays: documents waiting, at the bottom left. One is open at a time; the others fold to a coloured strip. -------
 const TRAY_COLORS = ['#f6c1d6', '#bfdcf7', '#c6ead2', '#f8dca8', '#d9ccf3', '#f3c9b8'];
-const MAX_TRAYS = 4;
+const MAX_TRAYS = 6;
 let traysShown = localStorage.getItem('meadow.trays') === 'shown';
 function showTrays(on) { traysShown = on; localStorage.setItem('meadow.trays', on ? 'shown' : 'tucked'); stash.classList.toggle('tucked', !on); sizeSkin(true); }
 // The shape takes the size of what it shows: the chest when tucked, the open drawers otherwise.
@@ -1242,7 +1242,7 @@ stash.addEventListener('pointerdown', (e) => {
   e.preventDefault(); startGhost(e, { kind: 'chip', id: c.dataset.id, label: c.innerHTML.replace(/<button[\s\S]*<\/button>/, '') });
 });
 stash.addEventListener('click', (e) => {
-  const dr = e.target.closest('.drw');
+  const dr = e.target.closest('.t-pill') ? nearestDrawer(e.clientY) : null;
   if (dr) { for (const o of S.trays) o.open = o.id === dr.dataset.tray; for (const el of stash.querySelectorAll('.tray')) el.classList.toggle('open', el.dataset.tray === dr.dataset.tray); save(); return showTrays(true); }
   if (e.target.closest('.t-pill')) return showTrays(true);
   if (e.target.closest('.t-hide')) return showTrays(false);
@@ -1293,6 +1293,17 @@ stash.addEventListener('dblclick', (e) => {
   editInline(nm, (v) => { if (v) { t.name = v; save(); renderStash(); } });
 });
 addEventListener('resize', () => renderStash());
+function nearestDrawer(y) {
+  let best = null, bd = Infinity;
+  for (const el of stash.querySelectorAll('.drw')) { const r = el.getBoundingClientRect(), d = Math.abs(y - (r.top + r.height / 2)); if (d < bd) { bd = d; best = el; } }
+  return best;
+}
+stash.addEventListener('pointermove', (e) => {
+  if (!e.target.closest('.st-chest')) return;
+  const near = nearestDrawer(e.clientY);
+  for (const el of stash.querySelectorAll('.drw')) el.classList.toggle('near', el === near);
+});
+stash.addEventListener('pointerleave', () => { for (const el of stash.querySelectorAll('.drw')) el.classList.remove('near'); });
 
 // ---- the panel: tasks, ideas, history ------------------------------------------------------------------------------
 let tab = localStorage.getItem('meadow.tab') || 'tareas';
