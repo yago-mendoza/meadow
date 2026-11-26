@@ -1041,3 +1041,17 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 /* ### sits a little in from ## (its band too), always */
 .cm-line.cm-h3 { margin-left: 1.4em; }
 .doc.near .rh3 { margin-left: 1.2em; }
+/* and on down: each deeper title a step further in, its band lighter */
+.cm-h4, .cm-h5, .cm-h6 { font-size: 1em !important; padding-top: 0 !important; font-weight: 700; }
+.cm-line.cm-h4 { margin-left: 2.8em; background: color-mix(in srgb, var(--tint, var(--accent)) 3%, #fff); border-radius: 5px; }
+.cm-line.cm-h5 { margin-left: 4.2em; background: color-mix(in srgb, var(--tint, var(--accent)) 2%, #fff); border-radius: 5px; }
+.cm-line.cm-h6 { margin-left: 5.6em; border-radius: 5px; }
+.tinted .cm-line.cm-h4 { background: color-mix(in srgb, var(--tint) 22%, #fff); }
+.tinted .cm-line.cm-h5 { background: color-mix(in srgb, var(--tint) 12%, #fff); }
+.doc.near .rh4 { margin-left: 2.4em; } .doc.near .rh5 { margin-left: 3.6em; } .doc.near .rh6 { margin-left: 4.8em; }
+/* the fold chevron: its own little tile in the title's band colour, set apart from the band */
+.mw-fold { width: 18px !important; height: 18px !important; border-radius: 6px !important; display: grid !important; place-items: center;
+  background: color-mix(in srgb, var(--tint, var(--accent)) 16%, #fff) !important; color: color-mix(in srgb, var(--tint, var(--accent)) 45%, #3b2a40) !important; opacity: 1 !important; }
+.tinted .mw-fold { background: color-mix(in srgb, var(--tint) 75%, #fff) !important; }
+.mw-fold:hover { background: color-mix(in srgb, var(--tint, var(--accent)) 35%, #fff) !important; }
+.mw-fold svg { width: 11px; height: 11px; }

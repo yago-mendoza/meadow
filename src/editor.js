@@ -86,7 +86,7 @@ function decorateLine(line, out) {
   let skip = 0;
   const tm = t.match(TAG_RE), hm = t.match(HEAD_RE);
   if (hm) {
-    const d = Math.min(3, hm[1].length);
+    const d = Math.min(6, hm[1].length);
     out.push(Decoration.line({ class: `cm-h cm-h${d}${line.number === 1 ? ' cm-hfirst' : ''}` }).range(base));
     out.push(Decoration.mark({ class: 'cm-hmark', attributes: { 'data-d': String(hm[1].length), title: 'Clic: dividir en secciones de este nivel' } })
       .range(base, base + hm[1].length));
