@@ -126,7 +126,7 @@ const INDENTS = [1, 2, 3, 4].map((k) => Decoration.line({ class: 'cm-ind' + k })
 function indentLevels(doc) {
   const ind = new Uint8Array(doc.lines + 1); let lv = 0;
   for (let n = 1; n <= doc.lines; n++) {
-    const t = doc.line(n).text, m = t.match(/^(#{1,6})s/);
+    const t = doc.line(n).text, m = t.match(/^(#{1,6})\s/);
     if (m) lv = Math.max(0, m[1].length - 2);
     else if (!t.trim()) lv = Math.max(0, lv - 1);
     else ind[n] = Math.min(4, lv);
@@ -263,6 +263,7 @@ class Blocks {
     for (const h of want) {
       let b = have.get(String(h.line)); have.delete(String(h.line));
       if (!b) { b = document.createElement('button'); b.className = 'mw-fold'; b.dataset.line = h.line; b.innerHTML = CHEVRON; this.folds.append(b); }
+      b.dataset.d = h.d;
       b.style.top = (h.y - 24) + 'px'; b.classList.toggle('shut', h.folded); b.title = h.folded ? 'Desplegar' : 'Plegar';
     }
     for (const b of have.values()) b.remove();
@@ -515,6 +516,15 @@ export function createEditor(parent, api) {
 
   const linkClicks = EditorView.domEventHandlers({
     mousedown(e, view) {
+      if (e.detail === 3 && e.button === 0) {
+        const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }); if (pos == null) return false;
+        const doc = view.state.doc, isEdge = (ln) => !ln.text.trim() || /^#{1,6}\s/.test(ln.text);
+        let a = doc.lineAt(pos).number, b = a;
+        if (!isEdge(doc.line(a))) { while (a > 1 && !isEdge(doc.line(a - 1))) a--; while (b < doc.lines && !isEdge(doc.line(b + 1))) b++; }
+        e.preventDefault();
+        view.dispatch({ selection: { anchor: doc.line(a).from, head: doc.line(b).to } });
+        return true;
+      }
       const h = e.target.closest?.('.cm-hmark');
       if (h) {                                    // a click splits into sections of this level; a drag moves this section
         e.preventDefault();
