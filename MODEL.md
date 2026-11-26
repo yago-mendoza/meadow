@@ -49,7 +49,9 @@ un cajón, y **lo pequeño nunca mueve ni cambia lo grande**.
 Acercarse a un documento lo convierte en el documento vivo: se lee y se escribe en la propia hoja, por páginas (la
 rueda pasa página; Ctrl+rueda acerca); abajo, «Volver al plano» (Esc) y «Pantalla completa». Un marco puede tener
 pestañas, como un archivador: cada una con su contenido, independientes. Borrar una pestaña se lleva lo suyo (avisa);
-el marco vive mientras le quede alguna. Borrar un marco avisa: todo, solo sus ideas y tareas, o solo el marco.
+el marco vive mientras le quede alguna. Una lengüeta más ancha que su marco lo ensancha.
+Un marco soltado con el centro sobre otro mayor entra en él: se coloca al lado de lo que ya hay y el de fuera (y los que
+lo contienen) se ensanchan. Agrandar un marco por encima del que lo contiene agranda también a ese. Borrar un marco avisa: todo, solo sus ideas y tareas, o solo el marco.
 
 En el vacío: arrastrar mueve la vista; Ctrl+arrastrar selecciona; la rueda acerca. Enter vuelve a donde estabas.
 

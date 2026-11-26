@@ -448,6 +448,7 @@ function renderItems() {
   if (inline && !inline.el.isConnected) { const rid = inline.id; try { inline.ed.view.destroy(); } catch {} inline = null; const ne = elOf(rid); if (ne) { ne.classList.add('near'); mountInline(ne, false); } else document.body.classList.remove('reading'); }
   nearDocs();
   assignTabs();                                    // what is in a frame with tabs belongs to its open tab
+  fitTabs();
   for (const f of S.frames) {
     const el = elOf(f.id); if (!el) continue;
     const holds = [...itemsEl.querySelectorAll('[data-k]')].some((x) => { const o = find(x.dataset.id)?.o; if (!o) return false; const [w, h] = sizeOf(x, o); const cx = o.x + w / 2, cy = o.y + h / 2; return cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.h; })
@@ -1018,6 +1019,35 @@ function askTabDelete(f, tid, anchor) {
     ...(circles.length ? [{ label: `Borrar solo sus ideas y tareas (${circles.length})`, run: () => removeIds(circles) }] : []),
   ]);
 }
+// Frames holding f (bigger, wholly around it), smallest first.
+const holdersOf = (f) => S.frames.filter((g) => g !== f && inside(f, g)).sort((p, q) => p.w * p.h - q.w * q.h);
+// Grow g (never shrink) so box fits in it with a margin; box includes the tab above a frame.
+function growToHold(g, box, m = 24) {
+  const x0 = Math.min(g.x, box.x0 - m), y0 = Math.min(g.y, box.y0 - m), x1 = Math.max(g.x + g.w, box.x1 + m), y1 = Math.max(g.y + g.h, box.y1 + m);
+  Object.assign(g, { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0) });
+}
+function growChain(f, chain) {
+  let box = { x0: f.x, y0: f.y - TAB_H, x1: f.x + f.w, y1: f.y + f.h };
+  for (const g of chain) { growToHold(g, box); box = { x0: g.x, y0: g.y - TAB_H, x1: g.x + g.w, y1: g.y + g.h }; }
+}
+// A tab label wider than its frame: the frame widens to show it whole, and so do the frames holding it (then they make room).
+function fitTabs() {
+  const grown = new Map();                                   // frame → its width before
+  for (const f of S.frames) {
+    const t = elOf(f.id)?.querySelector('.ftabs'); if (!t) continue;
+    const need = Math.ceil(t.scrollWidth + 16 + 24);
+    if (need > f.w) { grown.set(f, f.w); f.w = need; }
+  }
+  if (!grown.size) return;
+  for (const [f, w0] of [...grown]) {
+    const chain = S.frames.filter((g) => g !== f && f.x >= g.x && f.y >= g.y && f.x + w0 <= g.x + g.w && f.y + f.h <= g.y + g.h && w0 * f.h < g.w * g.h).sort((p, q) => p.w * p.h - q.w * q.h);
+    for (const g of chain) if (!grown.has(g)) grown.set(g, g.w);
+    growChain(f, chain);
+  }
+  pushApart([...grown.keys()]);
+  for (const f of S.frames) paintFrame(f);
+  layoutPins(); save();
+}
 // A frame inside a frame: first, which of the things in it go inside the new one (a menu with ticks).
 function frameInside(outer) {
   const holds = (o, el) => { const [w, h] = el ? sizeOf(el, o) : [0, 0]; const cx = o.x + w / 2, cy = o.y + h / 2; return cx > outer.x && cx < outer.x + outer.w && cy > outer.y && cy < outer.y + outer.h; };
@@ -1311,7 +1341,8 @@ vp.addEventListener('pointerdown', (e) => {
       }
       sel.clear(); for (const id of keep) sel.add(id);
     }
-    act = { k: 'resize', f, sx: e.clientX, sy: e.clientY, x: f.x, y: f.y, w: f.w, h: f.h, c: rs.dataset.c || 'br', el: rs.closest('.frame'), deps, hold }; return;
+    const chain = holdersOf(f), chainOrig = chain.map((g) => ({ g, x: g.x, y: g.y, w: g.w, h: g.h }));
+    act = { k: 'resize', f, sx: e.clientX, sy: e.clientY, x: f.x, y: f.y, w: f.w, h: f.h, c: rs.dataset.c || 'br', el: rs.closest('.frame'), deps, hold, chain, chainOrig }; return;
   }
   if (it) {
     const id = it.dataset.id, toggle = e.shiftKey || e.ctrlKey || e.metaKey, selBefore = new Set(sel);
@@ -1427,6 +1458,7 @@ addEventListener('pointermove', (e) => {
     f.w = W; f.h = H; f.x = c.includes('l') ? act.x + act.w - W : act.x; f.y = c.includes('t') ? act.y + act.h - H : act.y;
     Object.assign(act.el.style, { left: f.x + 'px', top: f.y + 'px', width: W + 'px', height: H + 'px' });
     if (act.deps.length) scaleDeps(act.deps, c.includes('l') ? act.x + act.w : act.x, c.includes('t') ? act.y + act.h : act.y, W / act.w, H / act.h);
+    if (act.chain?.length) { for (const o of act.chainOrig) Object.assign(o.g, { x: o.x, y: o.y, w: o.w, h: o.h }); growChain(f, act.chain); for (const g of act.chain) paintFrame(g); }
   }
 });
 // What a thing carries follows its scaling: positions stretch from the corner, sizes grow by the same factor.
@@ -1487,12 +1519,35 @@ addEventListener('pointerup', (e) => {
       const ds = a.moving.filter((m) => m.k === 'd');
       for (const m of a.moving) { m.o.x = m.x0; m.o.y = m.y0; }
       if (ds.length) { const t = putInTray(ds.map((m) => m.o), tray); toast(ds.length === 1 ? `«${ds[0].o.name}» en «${t.name}»` : `${ds.length} documentos en «${t.name}»`); }
-    } else if (a.moving.length === 1 && a.moving[0].k === 'f') {
-      const f = a.moving[0].o, before = { ...f };
-      if (fitFrame(f)) toast('Marco ajustado a lo que tiene cerca', [['Deshacer', () => { Object.assign(f, before); save(); render(); }]]);
     }
+    const movedF = a.moving.filter((m) => m.k === 'f').map((m) => m.o), movingSet = new Set(movedF), embedded = [];
+    for (const f of movedF) {
+      if (movedF.some((g) => g !== f && inside(f, g))) continue;            // it travels inside another moved frame
+      const cx = f.x + f.w / 2, cy = f.y + f.h / 2;
+      const host = S.frames.filter((g) => !movingSet.has(g) && g.w * g.h > f.w * f.h && cx > g.x && cx < g.x + g.w && cy > g.y && cy < g.y + g.h)
+        .sort((p, q) => p.w * p.h - q.w * q.h)[0];
+      if (!host) continue;
+      // it takes a free place in there: beside what the host already holds, never over it
+      const others = [];
+      for (const el of itemsEl.querySelectorAll('[data-k="d"], [data-k="p"], [data-k="x"], [data-k="g"]')) {
+        const o = find(el.dataset.id)?.o; if (!o || a.moving.some((m) => m.o === o)) continue;
+        const [w, h] = sizeOf(el, o), ox = o.x + w / 2, oy = o.y + h / 2;
+        if (ox > host.x && ox < host.x + host.w && oy > host.y && oy < host.y + host.h) others.push({ x0: o.x, y0: o.y, x1: o.x + w, y1: o.y + h });
+      }
+      for (const g of S.frames) if (g !== host && g !== f && !movingSet.has(g) && inside(g, host)) others.push({ x0: g.x, y0: g.y - TAB_H, x1: g.x + g.w, y1: g.y + g.h });
+      for (let k = 0; k < 12; k++) {
+        const fb = { x0: f.x, y0: f.y - TAB_H, x1: f.x + f.w, y1: f.y + f.h };
+        const hit = others.find((q) => q.x0 < fb.x1 + 12 && fb.x0 < q.x1 + 12 && q.y0 < fb.y1 + 12 && fb.y0 < q.y1 + 12);
+        if (!hit) break;
+        shiftFrame(f, hit.x1 + 24 - f.x, 0);
+      }
+      paintFrame(f, true);
+      const chain = [host, ...holdersOf(host)];
+      growChain(f, chain); embedded.push(...chain);
+    }
+    if (embedded.length) for (const g of embedded) paintFrame(g, true);
     for (const m of a.moving) if (m.k === 'f') shiftHidden(m.o, m.o.x - m.x0, m.o.y - m.y0);
-    pushApart([...a.moving.filter((m) => m.k === 'f').map((m) => m.o), ...(a.fitOrig ? a.fitOrig.keys() : [])]);
+    pushApart([...a.moving.filter((m) => m.k === 'f').map((m) => m.o), ...(a.fitOrig ? a.fitOrig.keys() : []), ...embedded]);
     enforceStack();
     assignTabs();
     save(); render();
@@ -1534,7 +1589,7 @@ addEventListener('pointerup', (e) => {
   } else if (a.k === 'box') {
     $('#selrect').style.display = 'none';
     if (!a.moved && !a.add) { sel.clear(); paintSel(); }
-  } else if (a.k === 'resize') { pushApart([a.f]); save(); render(); }
+  } else if (a.k === 'resize') { pushApart([a.f, ...(a.chain || [])]); save(); render(); }
   else if (a.k === 'scale' || a.k === 'tbox') save();
 });
 

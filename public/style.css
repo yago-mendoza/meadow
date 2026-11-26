@@ -1055,3 +1055,8 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 .tinted .mw-fold { background: color-mix(in srgb, var(--tint) 75%, #fff) !important; }
 .mw-fold:hover { background: color-mix(in srgb, var(--tint, var(--accent)) 35%, #fff) !important; }
 .mw-fold svg { width: 11px; height: 11px; }
+
+/* a tab shows its whole label (the frame widens for it) */
+.ftabs { max-width: none; }
+.ftabs .ftab { max-width: none; }
+.ftitle { overflow: visible; text-overflow: clip; }
