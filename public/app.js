@@ -290,25 +290,34 @@ function frameHTML(id, depth) {
   const kids = t.kids.map((k) => (nd(k).kind === 'frame' ? (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)) : docHTML(k))).join('');
   return `<section class="fr d${depth}" data-id="${id}" style="--bg:${f.color || PASTEL[4]}">
     <div class="fr-head">
-      <span class="fr-title" data-drag="${id}" title="Arrastra para moverlo · doble clic: renombrar">${esc(f.title)}</span>
-      <span class="fr-tabs" data-drop="tabs" data-id="${id}">${tabs.length > 1 ? tabs.map((x) => `<span class="ft${x.id === at ? ' on' : ''}" data-tab="${x.id}" data-drag="${x.id}" data-id="${x.id}">${esc(x.title)}${x.id === at ? '<button class="ft-x" title="Borrar esta pestaña">×</button>' : ''}</span>`).join('') : ''}<button class="ft-add" title="Nueva pestaña">＋</button></span>
+      <span class="fr-title" data-drag="${id}" title="Arrastra para moverlo · doble clic: renombrar">${esc(f.title)}</span>${nb(id)}
+      <span class="fr-tabs" data-drop="tabs" data-id="${id}">${tabs.length > 1 ? tabs.map((x) => `<span class="ft${x.id === at ? ' on' : ''}" data-tab="${x.id}" data-drag="${x.id}" data-id="${x.id}">${esc(x.title)}${nb(x.id)}${x.id === at ? '<button class="ft-x" title="Borrar esta pestaña">×</button>' : ''}</span>`).join('') : ''}<button class="ft-add" title="Nueva pestaña">＋</button></span>
       ${circles(id)}${tabs.length > 1 ? circles(at) : ''}${thumbs(id)}
       <span class="grow"></span>
       <span class="fr-pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</span>
-      <button class="fr-see" data-see="tarea" title="Ver sus tareas"><span class="ed-task-ico"></span></button><button class="fr-see" data-see="idea" title="Ver sus ideas">💡</button>${depth || S.focus !== id ? '<button class="fr-in" title="Entrar">⤢</button>' : '<button class="fr-out" title="Salir (Esc)">⤡ Salir</button>'}<button class="fr-x" title="Borrar o guardar en el cajón">×</button>
+      ${depth || S.focus !== id ? '<button class="fr-in" title="Entrar">⤢</button>' : '<button class="fr-out" title="Salir (Esc)">⤡ Salir</button>'}<button class="fr-x" title="Borrar o guardar en el cajón">×</button>
     </div>
     <div class="fr-body" data-drop="into" data-id="${at}">${kids || '<div class="hint">Vacío · arrastra aquí documentos o marcos</div>'}</div>
   </section>`;
 }
 const stubHTML = (id) => { const f = nd(id), n = countIn(id); return `<section class="fr stub" data-id="${id}" style="--bg:${f.color || PASTEL[4]}" data-drag="${id}"><div class="fr-head"><span class="fr-title">${esc(f.title)}</span><span class="grow"></span><button class="fr-in" title="Entrar">⤢</button></div><div class="stub-n">${n} dentro</div></section>`; };
+function nIn(id) {
+  const n = nd(id); if (!n) return 0;
+  const titles = (t) => ((t || '').match(/^#{1,6}\s/gm) || []).length;
+  if (n.kind === 'frame') return n.kids.length > 1 ? n.kids.length : (nd(n.kids[0])?.kids.length || 0);
+  if (n.kind === 'doc') return n.kids.length > 1 ? n.kids.length : titles(nd(n.kids[0])?.text);
+  if (n.kind === 'dtab') return titles(n.text);
+  return n.kids.length;
+}
+const nb = (id) => { const k = nIn(id); return k ? `<i class="nb" title="${k} dentro">${k}</i>` : ''; };
 const countIn = (id) => { let c = 0; const w = (x) => { for (const k of nd(x).kids) { if (['frame', 'doc'].includes(nd(k).kind)) c++; w(k); } }; w(id); return c; };
 function docHTML(id) {
   const d = nd(id), at = activeTab(d), text = nd(at).text || '';
   const prev = readable(text).split('\n').filter((l, i, a) => l.trim() || (i && a[i - 1].trim())).slice(0, 12).join('\n');
   const many = d.kids.length > 1;          // with tabs: its name, and its tabs right under it (what each holds stays inside)
   return `<article class="dc${many ? ' many' : ''}" data-id="${id}" data-drag="${id}" data-drop="doc">
-    <h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}</h3>
-    ${many ? `<div class="dc-tabs">${d.kids.map((k) => `<span data-pg="${k}" class="${k === at ? 'on' : ''}">${esc(nd(k).title)}</span>`).join('')}</div>`
+    <h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}${nb(id)}</h3>
+    ${many ? `<div class="dc-tabs">${d.kids.map((k) => `<span data-pg="${k}" class="${k === at ? 'on' : ''}">${esc(nd(k).title)}${nb(k)}</span>`).join('')}</div>`
       : `<div class="dc-prev">${prev ? esc(prev).replace(/^(#{1,6})\s+(.*)$/gm, '<b class="h$1">$2</b>') : '<span class="dc-empty">Página en blanco</span>'}</div>`}
     ${thumbs(id)}${circles(id)}<button class="dc-x" title="Borrar o guardar en el cajón">×</button>
   </article>`;
@@ -333,7 +342,7 @@ function renderAreas(peek) {
     cols.push({ pid, ids: nd(pid).kids.filter((k) => nd(k)?.kind === 'area') });
     const nx = chain[lv]; if (!nx || lv + 1 >= depth) break; pid = nx;   // always as many columns as levels: an area with none inside shows an empty one
   }
-  const btn = (k, i) => { const a = nd(k), g = isGroup(a); return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span><i>${a.kids.length || ''}</i><b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
+  const btn = (k, i) => { const a = nd(k), g = isGroup(a); return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
   const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b></span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; paintHov(); }   // unchanged: leave it (keeps hover, double clicks)
@@ -400,7 +409,13 @@ function renderDrawer() {
 }
 function nestPath(id) { return id ? pathOf(id).filter((n) => n.kind !== 'project' && !(n.kind === 'ftab' && parent(n.id)?.kids.length === 1) && !(n.kind === 'dtab' && parent(n.id)?.kids.length === 1)).map((n) => n.title).join(' › ') : ''; }
 // ---- the list of tasks or ideas: search, where (everything, here, one container or page), state, for whom; flat or nested
-let listTab = 'tareas', listWho = 'Todas', listScope = null, listQ = '', listNested = false;
+let listTab = 'tareas', listWho = 'Todas', listScope = null, listQ = '', listNested = false, listWQ = '';
+const PLACE_ICO = { area: '▤', frame: '⬚', ftab: '▭', doc: '📄', dtab: '▭' };
+function whereSug() {
+  const q = listWQ.trim().toLowerCase(); if (!q) return '';
+  const hits = Object.values(S.nodes).filter((n) => PLACE_ICO[n.kind] && PAR.has(n.id) && !((n.kind === 'ftab' || n.kind === 'dtab') && parent(n.id)?.kids.length === 1) && (n.title || '').toLowerCase().includes(q)).slice(0, 8);
+  return hits.length ? hits.map((n) => `<button data-wpick="${n.id}"><span>${PLACE_ICO[n.kind]}</span><b>${esc(n.title)}</b><small>${esc(nestPath(PAR.get(n.id)))}</small></button>`).join('') : '<p class="none">Nada con ese nombre.</p>';
+}
 const listSt = { tarea: null, idea: null };                                  // null: everything except finished / discarded
 const tabsUsing = (it) => Object.values(S.nodes).filter((n) => n.kind === 'dtab' && (n.text || '').includes(token(it))).map((n) => n.id);
 const placeOf = (it) => (it.at && nd(it.at) ? it.at : tabsUsing(it)[0] || null);
@@ -438,8 +453,8 @@ function renderList() {
   }
   const chip = (attr, label, sel, extra = '') => `<button ${attr} class="${sel ? 'on' : ''}"${extra}>${label}</button>`;
   $('#list-body').innerHTML = `<div class="lfil">
-      <input class="lq" placeholder="Buscar…" value="${esc(listQ)}">
-      <div class="lf-row"><span>Dónde</span>${chip('data-lscope=""', 'Todo', !listScope)}${chip('data-lscope="here"', 'Aquí · ' + esc(scopeName(hereId())), listScope === 'here')}${listScope && listScope !== 'here' ? chip(`data-lscope="${listScope}"`, esc(scopeName(listScope)) + ' <i data-lscope="">×</i>', true) : ''}</div>
+      <div class="lw">${listScope ? `<span class="lw-on">${PLACE_ICO[nd(scope)?.kind] || ''} ${esc(scopeName(scope))}<button data-lscope="" title="En todas partes">×</button></span>` : `<input class="lwq" placeholder="Dónde: un apartado, marco, documento…" value="${esc(listWQ)}">`}${listScope === 'here' ? '' : `<button class="lw-here" data-lscope="here" title="Lo que estás viendo">Aquí</button>`}<div class="lw-sug">${listScope ? '' : whereSug()}</div></div>
+      <input class="lq" placeholder="Buscar en el texto de las ${kind === 'idea' ? 'ideas' : 'tareas'}…" value="${esc(listQ)}">
       <div class="lf-row"><span>Estado</span>${states.map(([k, lab]) => chip(`data-lst="${k}"`, lab, on.has(k))).join('')}</div>
       <div class="lf-row"><span>Para</span>${['Todas', ...WHO].map((w) => chip(`data-lw="${w}"`, w, w === listWho)).join('')}<span class="lf-gap"></span>${chip('data-lnest', '⌥ Anidadas', listNested, ' title="Agruparlas bajo donde están"')}</div>
     </div>${body || `<p class="none">${all.length ? 'Nada con estos filtros.' : kind === 'tarea' ? 'Sin tareas todavía.' : 'Sin ideas todavía.'}</p>`}`;
@@ -481,6 +496,7 @@ let drag = null, justDragged = false;
 const ghost = $('#ghost'), bar = $('#drop-bar');
 addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
+  if (selMode) return;                       // selecting: nothing moves either
   const src = e.target.closest('[data-drag]'); if (!src) return;
   if (e.target.closest('button:not([data-drag]), input, [contenteditable="true"], .fr-pal')) return;
   drag = { key: src.dataset.drag, el: src, sx: e.clientX, sy: e.clientY, on: false };
@@ -718,6 +734,7 @@ addEventListener('click', (e) => {
   const drc = t.closest('.dr-chip'); if (drc) { const n = nd(drc.dataset.id); if (n.kind === 'doc') openDoc(n.id); return; }
   const lchk = t.closest('[data-chk]'); if (lchk) return toggleTask(S.tasks.find((x) => x.id === lchk.dataset.chk));
   const lw = t.closest('[data-lw]'); if (lw) { listWho = lw.dataset.lw; return renderList(); }
+  const wp = t.closest('[data-wpick]'); if (wp) { listScope = wp.dataset.wpick; listWQ = ''; return renderList(); }
   const lsc = t.closest('[data-lscope]'); if (lsc) { listScope = lsc.dataset.lscope || null; return renderList(); }
   const lgr = t.closest('.lgrp[data-scope]'); if (lgr) { listScope = lgr.dataset.scope; return renderList(); }
   const lst = t.closest('[data-lst]'); if (lst) { const k = listTab === 'ideas' ? 'idea' : 'tarea'; const on = listSt[k] || new Set(STATES[k].map((x) => x[0]).filter((x) => x !== 'hecha' && x !== 'descartada')); on.has(lst.dataset.lst) ? on.delete(lst.dataset.lst) : on.add(lst.dataset.lst); listSt[k] = on; return renderList(); }
@@ -836,7 +853,7 @@ $('#list-btn').onclick = () => $('#list').classList.toggle('closed');
 // a click anywhere else closes the side list
 addEventListener('pointerdown', (e) => { if (!$('#list').classList.contains('closed') && !e.target.closest('#list, #list-btn, #pick, #toasts, #ipeek, #task, .pop')) $('#list').classList.add('closed'); }, true);
 addEventListener('resize', () => renderMap());
-$('#list').addEventListener('input', (e) => { if (!e.target.matches('.lq')) return; listQ = e.target.value; const at = e.target.selectionStart; renderList(); const q = $('#list .lq'); q.focus(); q.setSelectionRange(at, at); });
+$('#list').addEventListener('input', (e) => { if (e.target.matches('.lwq')) { listWQ = e.target.value; $('#list .lw-sug').innerHTML = whereSug(); return; } if (!e.target.matches('.lq')) return; listQ = e.target.value; const at = e.target.selectionStart; renderList(); const q = $('#list .lq'); q.focus(); q.setSelectionRange(at, at); });
 
 // ---- what an idea or a task says, on hover --------------------------------------------------------------------------
 let peekT = null;
@@ -1055,6 +1072,7 @@ function setSelMode(on) {
 function selUnder(id) { for (const [k, m] of SEL) if (m === 'all' && k !== id && nd(k) && nd(id) && isIn(id, k)) return true; return false; }
 function paintSel() {
   for (const el of document.querySelectorAll('.sel-all, .sel-self, .sel-in')) el.classList.remove('sel-all', 'sel-self', 'sel-in');
+  if (!selMode) return paintSelPill();          // the marks show only while selecting
   const mark = (el, id) => { const m = SEL.get(id); if (m) el.classList.add(m === 'all' ? 'sel-all' : 'sel-self'); else if (selUnder(id)) el.classList.add('sel-in'); };
   for (const el of document.querySelectorAll('#stage .fr[data-id], #stage .dc[data-id], #areas .ar[data-area]')) mark(el, el.dataset.id || el.dataset.area);
   for (const el of document.querySelectorAll('#stage .ft[data-tab]')) mark(el, el.dataset.tab);
@@ -1117,15 +1135,19 @@ function buildContext() {
   return { text, stats, words: (text.match(/\S+/g) || []).length, bytes: new Blob([text]).size };
 }
 function paintSelPill() {
+  // only while selecting; what was chosen stays for the next time
   const pill = $('#selpill'); const any = SEL.size > 0;
-  pill.classList.toggle('on', any || selMode);
-  if (!any) { pill.innerHTML = '<span class="sp-hint">Toca marcos, documentos, páginas, ideas o tareas para elegir qué copiar.</span><button class="sp-done">Listo</button>'; return; }
+  pill.classList.toggle('on', selMode);
+  if (!selMode) return;
+  if (!any) { pill.innerHTML = '<span class="sp-hint">Toca marcos, documentos, páginas, ideas o tareas para elegir qué copiar</span><button class="sp-done">Listo</button>'; return; }
   const c = buildContext(), s = c.stats;
   const kb = c.bytes < 1024 ? c.bytes + ' B' : (c.bytes / 1024).toLocaleString('es', { maximumFractionDigits: 1 }) + ' KB';
-  const bits = [[s.frames, 'marco', 'marcos'], [s.docs, 'documento', 'documentos'], [s.pages, 'página', 'páginas'], [s.titles, 'título', 'títulos'], [s.tareas, 'tarea', 'tareas'], [s.ideas, 'idea', 'ideas']].filter((x) => x[0]).map(([n, a, b]) => `<b>${n}</b> ${n === 1 ? a : b}`);
-  pill.innerHTML = `<span class="sp-sum">${bits.join(' · ') || 'Nada con texto todavía'}<i>${c.words.toLocaleString('es')} palabras · ${kb}</i></span>
-    <span class="sp-inc"><button data-inc="texto" class="${selInc.texto ? 'on' : ''}" title="Incluir el texto de las páginas">¶ Texto</button><button data-inc="tareas" class="${selInc.tareas ? 'on' : ''}" title="Incluir las tareas">☐ Tareas</button><button data-inc="ideas" class="${selInc.ideas ? 'on' : ''}" title="Incluir las ideas">💡 Ideas</button></span>
-    <button class="sp-clear" title="Quitar toda la selección">Vaciar</button><button class="sp-copy">Copiar contexto</button>${selMode ? '<button class="sp-done" title="Salir de seleccionar (Esc)">Listo</button>' : '<button class="sp-more" title="Seguir seleccionando">◳</button>'}`;
+  const counts = [[s.frames, '⬚', 'marcos'], [s.docs, '📄', 'documentos'], [s.pages, '▭', 'páginas'], [s.titles, '#', 'títulos'], [s.tareas, '☐', 'tareas'], [s.ideas, '💡', 'ideas']]
+    .filter((x) => x[0]).map(([n, ico, what]) => `<span class="sp-c" title="${n} ${what}"><span>${ico}</span>${n}</span>`).join('');
+  pill.innerHTML = `<span class="sp-counts">${counts}</span>
+    <span class="sp-size"><b>${c.words.toLocaleString('es')}</b> palabras<small>${kb}</small></span>
+    <span class="sp-inc"><button data-inc="texto" class="${selInc.texto ? 'on' : ''}" title="${selInc.texto ? 'Con' : 'Sin'} el texto de las páginas">¶</button><button data-inc="tareas" class="${selInc.tareas ? 'on' : ''}" title="${selInc.tareas ? 'Con' : 'Sin'} las tareas"><span class="ed-task-ico"></span></button><button data-inc="ideas" class="${selInc.ideas ? 'on' : ''}" title="${selInc.ideas ? 'Con' : 'Sin'} las ideas">💡</button></span>
+    <button class="sp-clear" title="Quitar toda la selección">Vaciar</button><button class="sp-copy">Copiar contexto</button><button class="sp-done" title="Salir de seleccionar (Esc); lo elegido se queda para la próxima vez">Listo</button>`;
 }
 async function copyContext() {
   const { text, words } = buildContext();
@@ -1147,7 +1169,8 @@ $('#selpill').addEventListener('click', (e) => {
 addEventListener('click', (e) => {
   if (!selMode) return;
   const t = e.target;
-  if (t.closest('#selpill, #top, .fr-in, .fr-out, .fr-x, .ft-add, .fr-pal, .fr-see, #pick, #toasts')) return;
+  if (t.closest('.ar-x, .fr-x, .ft-x, .dc-x, .dr-x, .dr-empty, .tk-rm, .dw-rm, .bt-x')) { e.preventDefault(); e.stopPropagation(); return toast('Mientras seleccionas no se borra nada'); }
+  if (t.closest('#selpill, #top, .fr-in, .fr-out, .ft-add, .fr-pal, #pick, #toasts')) return;
   const arEl = t.closest('#areas .ar');   // an area: its box, or the left part of its button
   if (arEl && (t.closest('.ar-sel') || e.clientX - arEl.getBoundingClientRect().left < 36)) { e.preventDefault(); e.stopPropagation(); return selRotate(arEl.dataset.area); }
   if (!t.closest('#stage')) return;
@@ -1391,8 +1414,9 @@ function edItemMenu(kind, anchor) {
     : [{ label: `Ver las ${plural} de este documento`, run: () => openList(kind, cur) }];
   askChoice(anchor, kind === 'idea' ? 'Ideas' : 'Tareas', '', [insert, ...see]);
 }
-$('#ed-task').onclick = (e) => edItemMenu('tarea', e.currentTarget);
-$('#ed-idea').onclick = (e) => edItemMenu('idea', e.currentTarget);
+const edInsert = (kind) => { if (!ed || !cur) return; const it = newItem(kind, '', null); save(); ed.insertAtCursor('{' + kind + ' ' + it.n + '}'); openTask(it); };
+$('#ed-task').onclick = () => edInsert('tarea');
+$('#ed-idea').onclick = () => edInsert('idea');
 $('#dock').addEventListener('click', (e) => {
   const x = e.target.closest('.dk-x'), k = e.target.closest('.dk'); if (!k) return;
   const id = k.dataset.doc, m = mins.find((q) => q.id === id);
