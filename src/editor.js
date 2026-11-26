@@ -123,21 +123,32 @@ function decorateLine(line, out) {
 
 // The text under a deep title sits as far in as its title (### one step, #### two…); an empty line steps back one level.
 const INDENTS = [1, 2, 3, 4].map((k) => Decoration.line({ class: 'cm-ind' + k }));
+// «| text» under a title: its intro, a box in the title's colour, a little paler, set apart from the rest
+const INTRO_RE = /^\|\s?/;
+const introBar = Decoration.mark({ class: 'cm-intro-bar' });
 function indentLevels(doc) {
-  const ind = new Uint8Array(doc.lines + 1); let lv = 0;
+  const ind = new Uint8Array(doc.lines + 1), hd = new Uint8Array(doc.lines + 1); let lv = 0, h = 0;
   for (let n = 1; n <= doc.lines; n++) {
     const t = doc.line(n).text, m = t.match(/^(#{1,6})\s/);
-    if (m) lv = Math.max(0, m[1].length - 2);
+    hd[n] = h;
+    if (m) { lv = Math.max(0, m[1].length - 2); h = m[1].length; }
     else if (!t.trim()) lv = Math.max(0, lv - 1);
     else ind[n] = Math.min(4, lv);
   }
+  ind.hd = hd;
   return ind;
 }
 function buildDecos(view) {
   const out = [], doc = view.state.doc, ind = indentLevels(doc);
   for (const { from, to } of view.visibleRanges) {
     let pos = from;
-    while (pos <= to) { const line = doc.lineAt(pos); decorateLine(line, out); if (ind[line.number]) out.push(INDENTS[ind[line.number] - 1].range(line.from)); pos = line.to + 1; }
+    while (pos <= to) { const line = doc.lineAt(pos); decorateLine(line, out); if (ind[line.number]) out.push(INDENTS[ind[line.number] - 1].range(line.from));
+      const im = line.text.match(INTRO_RE);
+      if (im) {
+        const n = line.number, isI = (k) => k >= 1 && k <= doc.lines && INTRO_RE.test(doc.line(k).text);
+        out.push(Decoration.line({ class: 'cm-intro cm-intro-h' + Math.min(3, ind.hd[n] || 0) + (isI(n - 1) ? '' : ' cm-intro-first') + (isI(n + 1) ? '' : ' cm-intro-last') }).range(line.from));
+        out.push(introBar.range(line.from, line.from + im[0].length));
+      } pos = line.to + 1; }
   }
   return Decoration.set(out, true);
 }
@@ -264,7 +275,7 @@ class Blocks {
       let b = have.get(String(h.line)); have.delete(String(h.line));
       if (!b) { b = document.createElement('button'); b.className = 'mw-fold'; b.dataset.line = h.line; b.innerHTML = CHEVRON; this.folds.append(b); }
       b.dataset.d = h.d;
-      b.style.top = (h.y - 24) + 'px'; b.classList.toggle('shut', h.folded); b.title = h.folded ? 'Desplegar' : 'Plegar';
+      b.style.top = (h.y - 24 - (h.d === 1 ? 7 : 0)) + 'px';   // a master title keeps air below its band: the «v» sits on the band b.classList.toggle('shut', h.folded); b.title = h.folded ? 'Desplegar' : 'Plegar';
     }
     for (const b of have.values()) b.remove();
     this.allBtn.style.display = m.heads.some((h) => h.body) ? '' : 'none';
@@ -520,7 +531,8 @@ export function createEditor(parent, api) {
         const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }); if (pos == null) return false;
         const doc = view.state.doc, isEdge = (ln) => !ln.text.trim() || /^#{1,6}\s/.test(ln.text);
         let a = doc.lineAt(pos).number, b = a;
-        if (!isEdge(doc.line(a))) { while (a > 1 && !isEdge(doc.line(a - 1))) a--; while (b < doc.lines && !isEdge(doc.line(b + 1))) b++; }
+        const intro = (ln) => /^\|/.test(ln.text);   // an intro is its own paragraph
+        if (!isEdge(doc.line(a))) { const k = a; while (a > 1 && !isEdge(doc.line(a - 1)) && intro(doc.line(a - 1)) === intro(doc.line(k))) a--; while (b < doc.lines && !isEdge(doc.line(b + 1)) && intro(doc.line(b + 1)) === intro(doc.line(k))) b++; }
         e.preventDefault();
         view.dispatch({ selection: { anchor: doc.line(a).from, head: doc.line(b).to } });
         return true;
@@ -608,6 +620,7 @@ export function createEditor(parent, api) {
     focus() { view.focus(); },
     refresh() { view.dispatch({ effects: refreshEffect.of(null) }); },
     foldHeads(f) { blocksPlugin?.foldHeads(f); },
+    toggleFoldHeads() { const any = foldedRanges(view.state).size; blocksPlugin?.foldHeads(!any); return !any; },
     gotoLine(n) {
       const line = view.state.doc.line(Math.min(n, view.state.doc.lines));
       const eff = []; foldedRanges(view.state).between(line.from, line.to, (f, t) => { eff.push(unfoldEffect.of({ from: f, to: t })); });

@@ -675,6 +675,7 @@ $('#ed-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.pr
 $('#ed-close').onclick = closeDoc;
 $('.ed-back').onclick = closeDoc;
 for (const b of document.querySelectorAll('#ed-lv [data-l]')) b.onclick = () => ed?.setLevel(+b.dataset.l === level ? 0 : +b.dataset.l);
+$('#ed-foldall').onclick = () => { const folded = ed?.toggleFoldHeads(); $('#ed-foldall').classList.toggle('on', !!folded); };
 $('#ed-plain').onclick = () => { const on = $('#ed-plain').classList.toggle('on'); ed?.setPlain(!on); };
 $('#toc-list').addEventListener('click', (e) => { if (justDragged) return; const b = e.target.closest('.toc'); if (b) ed?.gotoLine(+b.dataset.line); });
 let level = 0;

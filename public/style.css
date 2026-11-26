@@ -313,4 +313,18 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 .mw-fold { height: 24px !important; width: 18px !important; border-radius: 5px !important; background: #eceaef !important; color: #8d8593 !important; }
 .tinted .mw-fold { background: #eceaef !important; }
 .mw-fold:hover { background: #dedae2 !important; color: #5a5260 !important; }
-.mw-fold[data-d="1"] { margin-top: -.45em; }
+/* an intro («| …» under a title): a box in the title's colour, a little paler, set apart */
+.cm-line.cm-intro { padding: 0 12px !important; background-clip: padding-box !important; border-left: 0; }
+.cm-line.cm-intro-first { border-top: 6px solid transparent; border-radius: 8px 8px 0 0; padding-top: 4px !important; }
+.cm-line.cm-intro-last { border-bottom: 6px solid transparent; border-radius: 0 0 8px 8px; padding-bottom: 4px !important; }
+.cm-line.cm-intro-first.cm-intro-last { border-radius: 8px; }
+.cm-line.cm-intro-h0 { background: #f6f3f7; }
+.cm-line.cm-intro-h1 { background: #edf4fc; }
+.cm-line.cm-intro-h2 { background: color-mix(in srgb, var(--accent) 5%, #fff); }
+.cm-line.cm-intro-h3 { background: color-mix(in srgb, var(--accent) 3%, #fff); }
+.tinted .cm-line.cm-intro-h2 { background: color-mix(in srgb, var(--tint) 38%, #fff); }
+.tinted .cm-line.cm-intro-h3 { background: color-mix(in srgb, var(--tint) 18%, #fff); }
+.cm-intro-bar { color: #c2b8c7; font-weight: 700; }
+
+/* fold-all lives in the editor's header (it used to cover the text when scrolling) */
+#ed-body .mw-foldall { display: none !important; }
