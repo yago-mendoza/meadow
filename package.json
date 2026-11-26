@@ -1,0 +1,22 @@
+{
+  "name": "meadow",
+  "version": "1.0.0",
+  "description": "Zoomable grid of documents, post-its and frames, with a Notepad-like editor",
+  "scripts": {
+    "build": "esbuild src/editor.js --bundle --format=esm --minify --outfile=public/editor.bundle.js",
+    "start": "node server.mjs --open"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
+    "@codemirror/commands": "^6.11.2",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "6.43.15",
+    "esbuild": "^0.28.2"
+  },
+  "private": true
+}

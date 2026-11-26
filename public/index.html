@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meadow</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="vp">
+  <canvas id="grid"></canvas>
+  <div id="world"><div id="frames"></div><div id="items"></div></div>
+  <div id="empty">Arrastra un tipo de la izquierda al plano, o haz clic en él</div>
+  <div id="selrect"></div>
+</div>
+
+<aside id="side">
+  <div class="brand"><span>🌿</span>Meadow</div>
+  <div id="types"></div>
+  <div class="sep"></div>
+  <div id="tools"></div>
+</aside>
+
+<section id="stash">
+  <header>Bandeja <span id="stash-n"></span></header>
+  <div id="stash-list"></div>
+  <div class="hint">Suelta aquí documentos para dejarlos en espera</div>
+</section>
+
+<div id="zoom">
+  <button id="z-fit" title="Encuadrar todo">⤢</button>
+  <button id="z-val" title="Volver a 100 %">100 %</button>
+</div>
+
+<div id="ed">
+  <div class="ed-back"></div>
+  <div class="ed-panel">
+    <header>
+      <button id="ed-prev" class="ib" title="Volver al anterior">←</button>
+      <span id="ed-ico"></span>
+      <input id="ed-name" spellcheck="false">
+      <span id="ed-n"></span>
+      <div class="grow"></div>
+      <div id="ed-lv">
+        <button class="ib" data-l="1" title="Bloques por línea en blanco">¶</button>
+        <button class="ib" data-l="2" title="Bloques por dos líneas en blanco">¶¶</button>
+        <button class="ib" data-l="3" title="Secciones (------)">§</button>
+        <span id="ed-fold">
+          <select id="ed-keep" title="Líneas que se ven al plegar">
+            <option value="1">1 línea</option><option value="2" selected>2 líneas</option>
+            <option value="3">3 líneas</option><option value="5">5 líneas</option>
+          </select>
+          <button class="ib" id="ed-foldall" title="Plegar todos">▾</button>
+          <button class="ib" id="ed-unfoldall" title="Expandir todos">▸</button>
+        </span>
+      </div>
+      <button id="ed-plain" class="pill" title="Ver como texto plano">Formato</button>
+      <button id="ed-close" class="ib" title="Cerrar (Esc)">×</button>
+    </header>
+    <div id="ed-body"></div>
+    <footer id="ed-foot"></footer>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<div id="ghost"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
