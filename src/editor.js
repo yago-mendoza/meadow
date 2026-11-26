@@ -15,6 +15,22 @@ const HEAD_RE = /^(#{1,6})(\s+)(?=\S)/;                         // # Title · ##
 const POSTIT_RE = /^(\s*)>(?!>)\s?/;                            // > a small note
 export const TOKEN_RE = /\{(idea|tarea) (\d+)\}/g;              // {idea 3} · {tarea 5}: the same idea or task wherever it is pasted
 
+// ---- smooth scrolling: the wheel eases toward where it is going; jumps glide -----------------------------------------
+const glide = new WeakMap();
+function smoothTo(sd, y, done) {
+  const max = sd.scrollHeight - sd.clientHeight; const g = glide.get(sd) || {}; g.to = Math.max(0, Math.min(max, y)); g.done = done;
+  if (!g.run) { g.run = true; glide.set(sd, g); const step = () => { const d = g.to - sd.scrollTop; if (Math.abs(d) < 0.6) { sd.scrollTop = g.to; g.run = false; const f = g.done; g.done = null; f && f(); return; } const before = sd.scrollTop; sd.scrollTop += d * 0.2; if (sd.scrollTop === before) { g.run = false; const f = g.done; g.done = null; f && f(); return; } requestAnimationFrame(step); }; requestAnimationFrame(step); }
+  else glide.set(sd, g);
+}
+function smoothWheel(sd) {
+  sd.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    e.preventDefault();
+    const dy = e.deltaMode === 1 ? e.deltaY * 20 : e.deltaMode === 2 ? e.deltaY * sd.clientHeight : e.deltaY;
+    const g = glide.get(sd); smoothTo(sd, (g?.run ? g.to : sd.scrollTop) + dy);
+  }, { passive: false });
+}
+
 export function hue(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360; }
 
 class LinkRefWidget extends WidgetType {
@@ -595,6 +611,7 @@ export function createEditor(parent, api) {
   });
 
   const view = new EditorView({ state: makeState(''), parent });
+  smoothWheel(view.scrollDOM);
   parent.classList.add('mw-rich');
 
   return {
@@ -631,8 +648,13 @@ export function createEditor(parent, api) {
     gotoLine(n) {
       const line = view.state.doc.line(Math.min(n, view.state.doc.lines));
       const eff = []; foldedRanges(view.state).between(line.from, line.to, (f, t) => { eff.push(unfoldEffect.of({ from: f, to: t })); });
-      view.dispatch({ selection: { anchor: line.to }, effects: [...eff, EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 30 })] });
+      view.dispatch({ selection: { anchor: line.to }, effects: eff });
       view.focus();
+      // glide there and land with the title exactly at the top (heights far away are estimates: correct once on arrival)
+      const sd = view.scrollDOM, where = () => view.lineBlockAt(line.from).top + (view.documentTop - sd.getBoundingClientRect().top + sd.scrollTop) - 14;
+      view.requestMeasure({ read: () => where(), write: (y) => {
+        smoothTo(sd, y, () => { const y2 = where(); if (Math.abs(y2 - sd.scrollTop) > 2) smoothTo(sd, y2); });
+      } });
     },
   };
 }
