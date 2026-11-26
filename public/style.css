@@ -328,3 +328,9 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 
 /* fold-all lives in the editor's header (it used to cover the text when scrolling) */
 #ed-body .mw-foldall { display: none !important; }
+
+/* an intro reads grey, like its bar */
+.cm-line.cm-intro, .cm-line.cm-intro * { color: #8f8596; }
+/* the master title's band starts where every band starts (the words stay a little in; the air above/below is a clear border) */
+.cm-line.cm-h1, .ied .cm-line.cm-h1 { padding: 0 0 0 .7em !important; border-top: .8em solid transparent; border-bottom: .45em solid transparent; background-clip: padding-box !important; }
+.cm-line.cm-h1.cm-hfirst { border-top: 0; }

@@ -295,16 +295,17 @@ function vtree(id) {
 const weight = (v) => (v.w ??= v.kids.length ? v.kids.reduce((a, k) => a + weight(k), 0) + 0.3 : 1);
 let mapZ = 1, mapX = 0, mapY = 0, mapBig = false;
 function renderMap() {
-  const box = $('#map'), W = box.clientWidth, H = box.clientHeight, out = [];
+  const box = $('#map'); if (box.classList.contains('mini')) { $('#map-in').innerHTML = ''; return; }
+  const W = box.clientWidth, H = box.clientHeight, out = [];
   const root = vtree(S.root); weight(root);
   const open = cur ? cur : S.focus;
   const lay = (v, x, y, w, h, depth) => {
     const cls = `mr k-${v.kind}${(v.id && (v.id === open || v.via === open)) ? ' cur' : ''}`;
-    const label = w > 26 && h > 11;
+    const label = w > 30 && h > 15;
     const attrs = v.head ? `data-head="${v.head.tab}:${v.head.line}" data-drag="head:${v.head.tab}:${v.head.line}"` : `data-id="${v.id}"${v.kind !== 'project' ? ` data-drag="${v.id}"` : ''}`;
     out.push(`<div class="${cls}" ${attrs} data-drop="map" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px${v.color ? ';--bg:' + v.color : ''}">${label ? `<b>${esc(v.title)}</b>` : ''}</div>`);
     if (!v.kids.length) return;
-    const pad = 2, top = label ? 12 : pad, ix = x + pad, iy = y + top, iw = w - pad * 2, ih = h - top - pad;
+    const pad = 3, top = label ? 15 : pad, ix = x + pad, iy = y + top, iw = w - pad * 2, ih = h - top - pad;
     if (iw < 4 || ih < 4) return;
     const horiz = iw >= ih, total = v.kids.reduce((a, k) => a + k.w, 0), gap = 2;
     let off = 0; const span = (horiz ? iw : ih) - gap * (v.kids.length - 1);
@@ -322,6 +323,7 @@ function renderDrawer() {
   const icon = { frame: '⬚', ftab: '▭', doc: '📄', dtab: '📄', project: '⬚' };
   $('#dr-list').innerHTML = S.drawer.length ? S.drawer.map((id) => { const n = nd(id); return n ? `<div class="dr-chip" data-drag="${id}" data-id="${id}"><span>${icon[n.kind]}</span>${esc(n.title)}<button class="dr-x" title="Borrar para siempre">×</button></div>` : ''; }).join('')
     : '<p class="dr-none">Arrastra aquí lo que quieras apartar del árbol.</p>';
+  if (S.drawer.length) $('#dr-list').insertAdjacentHTML('beforeend', '<button class="dr-empty">Vaciar el cajón</button>');
 }
 let listTab = 'tareas';
 function nestPath(id) { return id ? pathOf(id).filter((n) => n.kind !== 'project' && !(n.kind === 'ftab' && parent(n.id)?.kids.length === 1) && !(n.kind === 'dtab' && parent(n.id)?.kids.length === 1)).map((n) => n.title).join(' › ') : ''; }
@@ -337,7 +339,7 @@ function renderAll() { tidy(); renderTop(); renderStage(); renderMap(); renderDr
 function glideFrom(el, r0, ms = 420) {
   if (!el || !r0) return;
   const r1 = el.getBoundingClientRect(); if (!r1.width || !r1.height) return;
-  el.animate([{ transformOrigin: '0 0', transform: `translate(${r0.left - r1.left}px,${r0.top - r1.top}px) scale(${r0.width / r1.width},${r0.height / r1.height})`, opacity: .85 },
+  return el.animate([{ transformOrigin: '0 0', transform: `translate(${r0.left - r1.left}px,${r0.top - r1.top}px) scale(${r0.width / r1.width},${r0.height / r1.height})`, opacity: .85 },
     { transformOrigin: '0 0', transform: 'none', opacity: 1 }], { duration: ms, easing: EASE.smooth });
 }
 function focusTo(id) {
@@ -417,7 +419,7 @@ function targetAt(x, y) {
     const r = t.getBoundingClientRect(), fx = (x - r.left) / r.width, p = PAR.get(id), i = nd(p)?.kids.indexOf(id);
     spec = fx < 0.25 ? { kind: 'place', pid: p, idx: i, el: t, side: 'l' } : fx > 0.75 ? { kind: 'place', pid: p, idx: i + 1, el: t, side: 'r' } : { kind: 'place', pid: id, forced: 'dtab', el: t };
   } else if (mode === 'map') {
-    const r = t.getBoundingClientRect(), labelZone = y - r.top < 12 * mapZ;
+    const r = t.getBoundingClientRect(), labelZone = y - r.top < 15 * mapZ;
     if (t.dataset.head) { const [tab, line] = t.dataset.head.split(':'); spec = { kind: 'head', tab, line: +line, el: t }; }
     else {
       const n = nd(id);
@@ -542,7 +544,11 @@ addEventListener('click', (e) => {
   const pg = t.closest('.dc-tabs span[data-pg]'); if (pg) { const dc2 = pg.closest('.dc'); return openDoc(dc2.dataset.id, pg.dataset.pg, dc2); }   // a tab of a document opens it there
   const dc = t.closest('.dc'); if (dc && !t.closest('.its')) return openDoc(dc.dataset.id, null, dc);
   const stub = t.closest('.fr.stub'); if (stub) return focusTo(stub.dataset.id);
-  const mr = t.closest('.mr'); if (mr) { if (mr.dataset.head) { const [tab, line] = mr.dataset.head.split(':'); const d = parent(tab); openDoc(d.id, tab); setTimeout(() => ed?.gotoLine(+line), 60); } else focusTo(mr.dataset.id); return; }
+  const mr = t.closest('.mr'); if (mr && !mr.classList.contains('k-project')) mapOpen(false);
+  if (mr) { if (mr.dataset.head) { const [tab, line] = mr.dataset.head.split(':'); const d = parent(tab); openDoc(d.id, tab); setTimeout(() => ed?.gotoLine(+line), 60); } else focusTo(mr.dataset.id); return; }
+  if (t.closest('.dr-pull')) return $('#drawer').classList.toggle('open');
+  if (!t.closest('#drawer')) $('#drawer').classList.remove('open');
+  const dre = t.closest('.dr-empty'); if (dre) return askChoice(dre, '¿Vaciar el cajón?', `Se borra lo que hay dentro (${S.drawer.length}). Se puede deshacer.`, [{ label: 'Vaciar', danger: true, run: () => { snap(); for (const id of [...S.drawer]) { detach(id); removeTree(id); } S.drawer = []; tidy(); save(); renderAll(); toast('Cajón vacío', [['Deshacer', doUndo]]); } }]);
   const drx = t.closest('.dr-x'); if (drx) { const id = drx.closest('.dr-chip').dataset.id; return askChoice(drx, `¿Borrar «${esc(nd(id).title)}» para siempre?`, 'Sale del cajón y no vuelve (salvo con Deshacer).', [{ label: 'Borrar', danger: true, run: () => { snap(); detach(id); removeTree(id); save(); renderAll(); } }]); }
   const drc = t.closest('.dr-chip'); if (drc) { const n = nd(drc.dataset.id); if (n.kind === 'doc') openDoc(n.id); return; }
   const lchk = t.closest('[data-chk]'); if (lchk) return toggleTask(S.tasks.find((x) => x.id === lchk.dataset.chk));
@@ -601,7 +607,22 @@ $('#map').addEventListener('pointerdown', (e) => {
   const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); };
   addEventListener('pointermove', mv); addEventListener('pointerup', up);
 });
-$('#map-size').onclick = () => { mapBig = !mapBig; $('#map').classList.toggle('big', mapBig); mapZ = 1; mapX = 0; mapY = 0; setTimeout(renderMap, 260); };
+function mapOpen(on) {
+  const m = $('#map'); if (on === !m.classList.contains('mini')) return;
+  m.classList.toggle('mini', !on); mapZ = 1; mapX = 0; mapY = 0;
+  if (on) { renderMap(); m.animate([{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: EASE.smooth }); }
+  else renderMap();
+}
+$('#map-pill').onclick = () => mapOpen(true);
+$('#map-size').onclick = () => mapOpen(false);
+// carrying something over the closed map opens it, to drop it anywhere in the tree
+let mapHoverT = null;
+addEventListener('pointermove', (e) => {
+  if (!drag?.on) return;
+  const over = e.target.closest?.('#map-pill');
+  if (over && !mapHoverT) mapHoverT = setTimeout(() => { mapOpen(true); mapHoverT = null; }, 350);
+  if (!over && mapHoverT) { clearTimeout(mapHoverT); mapHoverT = null; }
+});
 $('#list-btn').onclick = () => $('#list').classList.toggle('closed');
 addEventListener('resize', () => renderMap());
 
@@ -631,7 +652,9 @@ function openDoc(id, tabId, fromEl) {
   $ed.classList.add('open');
   ed.setDoc(nd(curTab).text || '');
   renderEdHead(); renderMap();
-  if (fromEl) glideFrom($('.ed-panel'), fromEl.getBoundingClientRect(), 360);
+  const an = fromEl && glideFrom($('.ed-panel'), fromEl.getBoundingClientRect(), 360);
+  const settle = () => { ed.view.requestMeasure(); ed.refresh?.(); };
+  if (an) an.finished.then(settle, settle); else requestAnimationFrame(settle);
   ed.focus();
 }
 function showTab(tabId) { if (!cur) return; const d = nd(cur); curTab = tabId; d.active = tabId; ed.setDoc(nd(tabId).text || ''); renderEdHead(); renderMap(); }
@@ -764,11 +787,12 @@ addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if ($('#pick').classList.contains('on')) return $('#pick').classList.remove('on');
     if (document.querySelector('.pop')) return;
+    if (!$('#map').classList.contains('mini')) return mapOpen(false);
     if (cur) { e.preventDefault(); return closeDoc(); }
     if (!typing) return zoomOut();
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing && !cur) { e.preventDefault(); doUndo(); }
 });
 
-window.meadow = { get S() { return S; } };   // for tests and the console
+window.meadow = { get S() { return S; }, render: () => renderAll() };   // for tests and the console
 load();
