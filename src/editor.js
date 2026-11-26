@@ -115,6 +115,10 @@ class Blocks {
       e.preventDefault(); this.setLevel(this.level === +c.dataset.l ? 0 : +c.dataset.l);
     });
     this.layer.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
+    this.layer.addEventListener('pointerdown', (e) => {
+      const g = e.target.closest('.mw-grip'); if (!g || e.button !== 0) return;
+      e.preventDefault(); this.startDrag(e, +g.dataset.i);
+    });
     this.layer.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-act]'); if (!b) return;
       this.act(b.dataset.act, +b.closest('.mw-bar-tools').dataset.i);
@@ -123,7 +127,7 @@ class Blocks {
   }
   setLevel(l) {
     this.level = l; this.naming = -1;
-    this.view.dom.classList.toggle('mw-active', l > 0);
+    this.view.dom.parentNode?.classList.toggle('mw-active', l > 0);
     this.api.onLevel?.(l);
     this.schedule();
   }
@@ -144,6 +148,8 @@ class Blocks {
     return { levels: this.blocks.map((L) => L.map(geo)), h: Math.max(v.contentHeight, v.scrollDOM.clientHeight) };
   }
   write(m) {
+    this.last = m;
+    if (this.drag) return;                          // the layout holds still while a block is being dragged
     this.cols.style.height = m.h + 'px'; this.layer.style.height = m.h + 'px';
     let html = '';
     m.levels.forEach((L, li) => {
@@ -156,7 +162,14 @@ class Blocks {
     const L = m.levels[this.level - 1];
     let lay = '';
     L.forEach((b, i) => {
-      if (i > 0) lay += `<div class="mw-sep" style="top:${Math.round((L[i - 1].bot + b.top) / 2)}px"></div>`;
+      if (i > 0) {
+        // the wider the gap in the text, the thicker the band: 1 blank line · 2 blank lines · 3 or more · a ------ rule
+        const doc = this.view.state.doc; let blanks = 0, rule = false;
+        for (let n = L[i - 1].to + 1; n < b.from; n++) RULE_RE.test(doc.line(n).text) ? (rule = true) : blanks++;
+        const w = rule ? 4 : Math.min(3, Math.max(1, blanks)), h = [0, 2, 5, 9, 14][w];
+        lay += `<div class="mw-sep w${w}" style="top:${Math.round((L[i - 1].bot + b.top) / 2 - h / 2)}px;height:${h}px"></div>`;
+      }
+      if (L.length > 1) lay += `<div class="mw-grip" data-i="${i}" style="top:${b.top}px;height:${Math.max(22, b.bot - b.top)}px" title="Arrastra para mover el bloque">⠿</div>`;
       if (this.naming === i) {
         lay += `<div class="mw-bar-tools naming" data-i="${i}" style="top:${b.top}px"><input class="mw-name" placeholder="Nombre del documento…"></div>`;
       } else {
@@ -164,9 +177,7 @@ class Blocks {
           <button data-act="copy" title="Copiar el bloque">⧉</button>
           <button data-act="paste" title="Pegar encima (reemplaza el bloque)">⎘</button>
           <button data-act="note" title="Guardar como documento">📄</button>
-          <button data-act="fold" title="${b.folded ? 'Expandir' : 'Plegar'}">${b.folded ? '▸' : '▾'}</button>
-          <button data-act="up" title="Subir" ${i === 0 ? 'disabled' : ''}>↑</button>
-          <button data-act="down" title="Bajar" ${i === L.length - 1 ? 'disabled' : ''}>↓</button></div>`;
+          <button data-act="fold" title="${b.folded ? 'Expandir' : 'Plegar'}">${b.folded ? '▸' : '▾'}</button></div>`;
       }
     });
     this.layer.innerHTML = lay;
@@ -207,14 +218,85 @@ class Blocks {
       const eff = this.unfoldIn(r.from, r.to);
       if (!eff.length) this.foldOne(b, eff);
       if (eff.length) v.dispatch({ effects: eff });
-    } else if (name === 'up' || name === 'down') {
-      const j = name === 'up' ? i - 1 : i + 1; if (j < 0 || j >= L.length) return;
-      const [A, B] = j < i ? [L[j], b] : [b, L[j]];
-      const ra = this.range(A), rb = this.range(B);
-      const ta = v.state.sliceDoc(ra.from, ra.to), tb = v.state.sliceDoc(rb.from, rb.to), gap = v.state.sliceDoc(ra.to, rb.from);
-      v.dispatch({ effects: this.unfoldIn(ra.from, rb.to) });
-      v.dispatch({ changes: { from: ra.from, to: rb.to, insert: tb + gap + ta }, userEvent: 'move.block' });
     }
+  }
+
+  // ---- dragging a block by its grip, and moving blocks with an animation that keeps the eye on them ----------------
+  startDrag(e, i) {
+    const m = this.last; if (!m || !this.level) return;
+    const L = m.levels[this.level - 1], b = L[i]; if (!b) return;
+    const sd = this.view.scrollDOM;
+    const ghost = document.createElement('div'); ghost.className = 'mw-ghost';
+    ghost.style.cssText = `top:${b.top - 4}px;left:36px;right:220px`;
+    for (let n = b.from; n <= b.to; n++) { const el = this.lineEl(n); if (el) ghost.append(el.cloneNode(true)); }
+    const hole = document.createElement('div'); hole.className = 'mw-hole';
+    hole.style.cssText = `top:${b.top - 2}px;height:${b.bot - b.top + 4}px`;
+    const mark = document.createElement('div'); mark.className = 'mw-drop';
+    this.layer.append(hole, ghost, mark);
+    this.layer.classList.add('dragging');
+    const docY = (cy) => cy - sd.getBoundingClientRect().top + sd.scrollTop;
+    const y0 = docY(e.clientY);
+    let target = i, scrollV = 0, lastY = e.clientY;
+    const place = () => {
+      const y = docY(lastY);
+      ghost.style.transform = `translateY(${y - y0}px)`;
+      target = L.length;
+      for (let k = 0; k < L.length; k++) if (y < (L[k].top + L[k].bot) / 2) { target = k; break; }
+      const my = target === 0 ? L[0].top - 6 : target === L.length ? L[L.length - 1].bot + 6 : (L[target - 1].bot + L[target].top) / 2;
+      mark.style.top = Math.round(my) + 'px';
+      mark.style.display = target === i || target === i + 1 ? 'none' : 'block';
+    };
+    const tick = () => { if (!this.drag) return; if (scrollV) { sd.scrollTop += scrollV; place(); } requestAnimationFrame(tick); };
+    const move = (ev) => {
+      lastY = ev.clientY;
+      const r = sd.getBoundingClientRect();
+      scrollV = ev.clientY < r.top + 40 ? -12 : ev.clientY > r.bottom - 40 ? 12 : 0;
+      place();
+    };
+    const up = () => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      this.drag = null; ghost.remove(); hole.remove(); mark.remove(); this.layer.classList.remove('dragging');
+      if (target !== i && target !== i + 1) {
+        const order = L.map((_, k) => k).filter((k) => k !== i);
+        order.splice(target > i ? target - 1 : target, 0, i);
+        this.reorder(order, i);
+      } else this.schedule();
+    };
+    this.drag = { i };
+    addEventListener('pointermove', move); addEventListener('pointerup', up);
+    place(); tick();
+  }
+  lineEl(n) {
+    const v = this.view, pos = v.state.doc.line(n).from;
+    if (pos < v.viewport.from || pos > v.viewport.to) return null;
+    const { node } = v.domAtPos(pos);
+    return (node.nodeType === 1 ? node : node.parentElement)?.closest('.cm-line') || null;
+  }
+  // order[p] = which old block goes to place p. The gaps between blocks (blank lines, rules) stay where they are.
+  reorder(order, moved) {
+    const v = this.view, lv = this.level, L0 = this.blocks[lv - 1];
+    const R0 = L0.map((b) => this.range(b));
+    v.dispatch({ effects: this.unfoldIn(R0[0].from, R0[R0.length - 1].to) });
+    const L = this.blocks[lv - 1], R = L.map((b) => this.range(b));
+    const tops = L.map((b) => { const t = []; for (let n = b.from; n <= b.to; n++) t.push(this.lineEl(n)?.getBoundingClientRect().top ?? null); return t; });
+    const texts = R.map((r) => v.state.sliceDoc(r.from, r.to));
+    let ins = '';
+    order.forEach((k, p) => { ins += texts[k]; if (p < order.length - 1) ins += v.state.sliceDoc(R[p].to, R[p + 1].from); });
+    v.dispatch({ changes: { from: R[0].from, to: R[R.length - 1].to, insert: ins }, userEvent: 'move.block' });
+    const NL = this.blocks[lv - 1], pos = order.indexOf(moved);
+    if (NL[pos]) v.dispatch({ effects: EditorView.scrollIntoView(v.state.doc.line(NL[pos].from).from, { y: 'nearest', yMargin: 60 }) });
+    const ease = 'cubic-bezier(.2,.8,.2,1)';
+    order.forEach((k, p) => {
+      const b = NL[p]; if (!b) return;
+      for (let n = b.from; n <= b.to; n++) {
+        const el = this.lineEl(n); if (!el) continue;
+        const old = tops[k][n - b.from];
+        const frames = [];
+        if (old != null) { const d = old - el.getBoundingClientRect().top; if (Math.abs(d) > 1) frames.push({ transform: `translateY(${d}px)` }, { transform: 'translateY(0)' }); }
+        if (frames.length) el.animate(frames, { duration: 380, easing: ease });
+        if (k === moved) el.animate([{ backgroundColor: 'rgba(113,75,103,.18)' }, { backgroundColor: 'rgba(113,75,103,0)' }], { duration: 1200, easing: 'ease-out' });
+      }
+    });
   }
   foldAll(fold) {
     if (!this.level) return;
@@ -225,7 +307,7 @@ class Blocks {
     if (effects.length) this.view.dispatch({ effects });
     if (fold) { const e2 = []; for (const b of this.blocks[this.level - 1]) this.foldOne(b, e2); if (e2.length) this.view.dispatch({ effects: e2 }); }
   }
-  destroy() { this.layer.remove(); this.cols.remove(); this.view.dom.classList.remove('mw-active'); }
+  destroy() { this.layer.remove(); this.cols.remove(); this.view.dom.parentNode?.classList.remove('mw-active'); }
 }
 
 // ---- the editor ----------------------------------------------------------------------------------------------------
@@ -320,11 +402,11 @@ export function createEditor(parent, api) {
   });
 
   const view = new EditorView({ state: makeState(''), parent });
-  view.dom.classList.add('mw-rich');
+  parent.classList.add('mw-rich');
 
   return {
     view,
-    setDoc(text) { blocksPlugin = null; view.setState(makeState(text)); view.dom.classList.toggle('mw-rich', !plain); view.dom.classList.remove('mw-active'); api.onLevel?.(0); },
+    setDoc(text) { blocksPlugin = null; view.setState(makeState(text)); parent.classList.toggle('mw-rich', !plain); parent.classList.remove('mw-active'); api.onLevel?.(0); },
     replaceText(text) {
       if (text === view.state.doc.toString()) return;
       const sel = view.state.selection.main.head;
@@ -337,8 +419,8 @@ export function createEditor(parent, api) {
       if (eff.length) view.dispatch({ effects: eff });
       if (p) blocksPlugin = null;
       view.dispatch({ effects: rich.reconfigure(p ? [] : richExt()) });
-      view.dom.classList.toggle('mw-rich', !p);
-      if (p) { view.dom.classList.remove('mw-active'); api.onLevel?.(0); }
+      parent.classList.toggle('mw-rich', !p);
+      if (p) { parent.classList.remove('mw-active'); api.onLevel?.(0); }
     },
     setLevel(l) { blocksPlugin?.setLevel(l); },
     setKeep(k) { if (blocksPlugin) { blocksPlugin.keep = k; } },
