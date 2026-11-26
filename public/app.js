@@ -124,13 +124,16 @@ $('#z-fit').onclick = () => {
 const palHTML = () => `<div class="pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</div>`;
 function cardHTML(d, n) {
   const t = T(d.type);
-  const preview = (d.text || '').split('\n').slice(0, 10).join('\n');
-  return `<div class="card${sel.has(d.id) ? ' sel' : ''}" data-id="${d.id}" data-k="d" style="left:${d.x}px;top:${d.y}px;--c:${t.color}">
-    <div class="tab"><span class="ico">${t.icon}</span><span class="name">${esc(d.name)}</span><span class="num">*${n}</span></div>
-    <div class="body">${d.text ? esc(preview) : '<em>vacío</em>'}</div>
+  const preview = (d.text || '').split('\n').slice(0, 9).join('\n');
+  const len = (d.text || '').length, stack = len > 600 ? ' s2' : len > 0 ? ' s1' : '';
+  return `<div class="card${stack}${sel.has(d.id) ? ' sel' : ''}" data-id="${d.id}" data-k="d" style="left:${d.x}px;top:${d.y}px;--c:${t.color}">
+    <div class="sheet">
+      <div class="tab"><span class="ico">${t.icon}</span><span class="name">${esc(d.name)}</span><span class="num">${n}</span></div>
+      <div class="body">${d.text ? esc(preview) : '<em>en blanco</em>'}</div>
+    </div>
     <button class="x" title="Borrar">×</button>
     <div class="acts">
-      <button data-a="open">↗<b>Abrir</b></button><button data-a="copy">⧉<b>Copiar</b></button>
+      <button data-a="copy">⧉<b>Copiar</b></button>
       <button data-a="add">＋<b>Añadir lo copiado</b></button><button data-a="replace">⇄<b>Reemplazar</b></button>
     </div></div>`;
 }
@@ -272,7 +275,7 @@ vp.addEventListener('pointerdown', (e) => {
     if (e.shiftKey) { sel.has(id) ? sel.delete(id) : sel.add(id); }
     else if (!sel.has(id)) { sel.clear(); sel.add(id); }
     paintSel();
-    act = { k: 'move', sx: e.clientX, sy: e.clientY, moving: collectMoving(e.altKey), moved: false };
+    act = { k: 'move', sx: e.clientX, sy: e.clientY, moving: collectMoving(e.altKey), moved: false, id, kind: it.dataset.k, shift: e.shiftKey };
     return;
   }
   act = { k: 'box', sx: e.clientX, sy: e.clientY, add: e.shiftKey, base: new Set(sel), moved: false };
@@ -344,6 +347,8 @@ addEventListener('pointerup', (e) => {
       if (ds.length) toast(ds.length === 1 ? `«${ds[0].o.name}» en la bandeja` : `${ds.length} documentos en la bandeja`);
     }
     save(); render();
+  } else if (a.k === 'move' && a.kind === 'd' && !a.shift) {
+    sel.clear(); paintSel(); openEditor(a.id);          // a click on a document opens it
   } else if (a.k === 'box') {
     $('#selrect').style.display = 'none';
     if (!a.moved && !a.add) { sel.clear(); paintSel(); }
@@ -359,10 +364,6 @@ vp.addEventListener('click', (e) => {
   if (dot) { const f = find(dot.closest('[data-k]').dataset.id); snap(); f.o.color = dot.dataset.c; save(); render(); }
 });
 vp.addEventListener('dblclick', (e) => {
-  const name = e.target.closest('.card .name');
-  if (name) { const d = docById(name.closest('.card').dataset.id); return editInline(name, (v) => { if (v) { d.name = v; save(); render(); } }); }
-  const card = e.target.closest('.card');
-  if (card) return openEditor(card.dataset.id);
   const pt = e.target.closest('.postit');
   if (pt) return editPostit(find(pt.dataset.id).o);
   const ft = e.target.closest('.ftab');

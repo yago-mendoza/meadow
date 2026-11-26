@@ -20,20 +20,35 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 #empty.on { display: block; }
 
 /* ---- document cards ---- */
-.card { position: absolute; width: 230px; background: #fff; border-radius: 12px; box-shadow: var(--shadow); cursor: grab;
-  transition: box-shadow .2s; }
-.card:hover { box-shadow: var(--shadow-up); }
-.card.sel, .postit.sel { outline: 2px solid var(--accent); outline-offset: 3px; }
-.card .tab { display: flex; align-items: center; gap: 7px; padding: 9px 12px 8px; background: var(--c); border-radius: 12px 12px 0 0; }
-.card .ico { font-size: 15px; }
-.card .name { flex: 1; font-weight: 650; font-size: 14.5px; letter-spacing: .1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  outline: none; border-radius: 4px; }
+/* a document is a sheet of paper; with text, more sheets show underneath (s1: one, s2: two) */
+.card { position: absolute; width: 220px; cursor: pointer; isolation: isolate; transition: transform .28s var(--spring); }
+.card:hover { transform: translateY(-3px) rotate(-.5deg); }
+.card::before, .card::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 2px; display: none;
+  background: color-mix(in srgb, var(--c) 45%, #fffdf8); box-shadow: 0 1px 2px rgba(70, 50, 30, .10), 0 4px 10px rgba(70, 50, 30, .06); }
+.card::before { transform: translate(5px, 4px) rotate(2.4deg); }
+.card::after { transform: translate(-4px, 7px) rotate(-2deg); background: color-mix(in srgb, var(--c) 65%, #fffdf8); }
+.card.s1::before, .card.s2::before, .card.s2::after { display: block; }
+.card:hover::before { transform: translate(8px, 5px) rotate(3.6deg); transition: transform .3s var(--spring); }
+.card:hover::after { transform: translate(-7px, 9px) rotate(-3deg); transition: transform .3s var(--spring); }
+.sheet { position: relative; min-height: 118px; border-radius: 2px; background: color-mix(in srgb, var(--c) 22%, #fffdf8);
+  box-shadow: 0 1px 1px rgba(70, 50, 30, .08), 0 8px 18px rgba(70, 50, 30, .11);
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%); }
+.sheet::after { content: ""; position: absolute; top: 0; right: 0; width: 20px; height: 20px;            /* dog-ear */
+  background: linear-gradient(225deg, transparent 50%, color-mix(in srgb, var(--c) 70%, #d9cfc0) 50%); border-radius: 0 0 0 3px; }
+.card .tab { display: flex; align-items: baseline; gap: 7px; padding: 13px 24px 5px 14px; }
+.card .ico { font-size: 13px; }
+.card .name { flex: 1; font: 700 15.5px/1.25 Georgia, "Times New Roman", serif; color: #3a2f3f; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; outline: none; border-radius: 4px; }
 .card .name[contenteditable="true"] { background: #fff; padding: 0 4px; cursor: text; user-select: text; overflow: visible; }
-.card .num { font: 600 11px Consolas, monospace; color: var(--accent); background: rgba(255, 255, 255, .7); border-radius: 6px; padding: 1px 6px; }
-.card .body { padding: 10px 12px 12px; font: 11.5px/1.5 Consolas, "Cascadia Mono", monospace; color: #625a68; white-space: pre-wrap;
-  word-break: break-word; max-height: 150px; overflow: hidden;
-  -webkit-mask-image: linear-gradient(#000 75%, transparent); mask-image: linear-gradient(#000 75%, transparent); }
-.card .body em { color: #b5aebb; font: italic 12px "Segoe UI", sans-serif; }
+.card .num { font: 600 10.5px Consolas, monospace; color: color-mix(in srgb, var(--accent) 80%, #fff); }
+.card .num { min-width: 19px; height: 19px; border-radius: 50%; display: inline-grid; place-items: center; border: 1.2px solid color-mix(in srgb, var(--accent) 45%, transparent); font-size: 10px; transform: rotate(-8deg); }
+.card .body { margin: 0 14px 14px; padding-top: 1px; font: 11.5px/20px Consolas, "Cascadia Mono", monospace; color: #5d5463; white-space: pre-wrap;
+  word-break: break-word; max-height: 160px; overflow: hidden;
+  background: repeating-linear-gradient(transparent 0 19px, rgba(110, 120, 170, .16) 19px 20px);
+  -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.card .body em { color: #b5aebb; font: italic 12.5px Georgia, serif; }
+.card.sel .sheet { outline: 2px solid var(--accent); outline-offset: 4px; clip-path: none; }
+.postit.sel { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 .x { position: absolute; top: -9px; right: -9px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: var(--shadow);
   font-size: 15px; line-height: 20px; color: #9a8ea3; opacity: 0; transform: scale(.6); transition: .18s var(--spring); z-index: 3; }
