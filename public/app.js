@@ -366,8 +366,25 @@ $('#areas').addEventListener('pointermove', (e) => {
 $('#areas').addEventListener('pointerleave', () => { arHov = -1; arShut = -1; paintHov(); });
 function renderTop() {
   const p = pathOf(S.focus);
-  $('#crumbs').innerHTML = p.map((n, i) => `${i ? '<span class="sep">›</span>' : ''}<button class="cr${i === p.length - 1 ? ' on' : ''}" data-go="${n.id}" data-drop="into" data-id="${n.kind === 'frame' ? activeTab(n) : n.id}" title="${i === 0 ? 'Doble clic: renombrar el proyecto' : ''}">${esc(n.title)}</button>`).join('');
+  $('#crumbs').innerHTML = p.map((n, i) => {
+    if (i === 0) return `<span class="cr proj" data-drop="into" data-id="${n.id}" title="Doble clic: renombrar el proyecto">${esc(n.title)}</span>`;   // the project: a name, not a place to go
+    const many = n.kind === 'area' && parent(n.id).kids.filter((k) => nd(k)?.kind === 'area').length > 1;
+    return `<span class="sep">›</span><button class="cr${i === p.length - 1 ? ' on' : ''}${many ? ' alt' : ''}" data-go="${n.id}" data-drop="into" data-id="${n.kind === 'frame' ? activeTab(n) : n.id}">${esc(n.title)}</button>`;
+  }).join('');
 }
+// on a crumb of a column: its sister areas, to change there
+let crT = null;
+function crMenu(btn) {
+  const id = btn.dataset.go, sibs = parent(id).kids.filter((k) => nd(k)?.kind === 'area');
+  let m = $('#crmenu'); if (!m) { m = document.createElement('div'); m.id = 'crmenu'; document.body.append(m);
+    m.onpointerenter = () => clearTimeout(crT); m.onpointerleave = () => { crT = setTimeout(crHide, 160); };
+    m.onclick = (e) => { const b = e.target.closest('[data-go]'); if (!b) return; crHide(); focusTo(b.dataset.go); }; }
+  m.innerHTML = sibs.map((k) => `<button data-go="${k}" class="${k === id ? 'on' : ''}"><span>${esc(nd(k).title)}</span>${nb(k)}</button>`).join('');
+  const r = btn.getBoundingClientRect(); m.style.left = r.left + 'px'; m.style.top = r.bottom + 4 + 'px'; m.classList.add('on');
+}
+function crHide() { $('#crmenu')?.classList.remove('on'); }
+$('#crumbs').addEventListener('pointerover', (e) => { const b = e.target.closest('.cr.alt'); if (!b) return; clearTimeout(crT); crMenu(b); });
+$('#crumbs').addEventListener('pointerout', (e) => { if (e.target.closest('.cr.alt')) { clearTimeout(crT); crT = setTimeout(crHide, 160); } });
 const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo']];
 $('#tools').innerHTML = TOOLS.map(([k, ico, name]) => `<button class="tool t-${k}" data-drag="new:${k}" title="${k === 'tarea' || k === 'idea' ? DEF[k].replace(/'/g, '') + ' ' : ''}Clic: crear aquí · arrastra: crear donde lo sueltes"><span class="ico">${ico}</span>${name}</button>`).join('');
 
@@ -798,7 +815,7 @@ addEventListener('dblclick', (e) => {
   const ttl = t.closest('.fr-title, .dc-title'); if (ttl) { const id = ttl.closest('[data-id]').dataset.id; return editInline(ttl, (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
   const arn = t.closest('.ar'); if (arn) { const id = arn.dataset.area, el = $(`.ar[data-area="${id}"] .ar-t`); if (!el) return; return editInline(el, (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
   const ft = t.closest('.ft'); if (ft) { const id = ft.dataset.tab; return editInline(wrapText(ft), (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
-  const cr = t.closest('.cr[data-go="' + S.root + '"]'); if (cr) return editInline(cr, (v) => { if (v) { snap(); nd(S.root).title = v; save(); } renderAll(); });
+  const cr = t.closest('#crumbs .cr.proj'); if (cr) return editInline(cr, (v) => { if (v) { snap(); nd(S.root).title = v; save(); } renderAll(); });
   const it = t.closest('.it'); if (it) { const x = [...S.ideas, ...S.tasks].find((y) => y.id === it.dataset.it); return popEdit(it, x.text, (v) => setItemText(x, v)); }
 });
 function itemClick(id, el) {

@@ -974,3 +974,15 @@ body.no-pics .fr.has-pic { margin-top: 0; } body.no-pics .fr.has-pic::before { d
 .hd-card.danger .hd-ok { background: #c0566a; }
 .hd-ok:disabled { opacity: .35; cursor: default; }
 #plants { z-index: 400; }
+
+/* the crumbs: the project is a quiet pill; a column's crumb shows its sister areas on hover */
+#crumbs .cr.proj { cursor: default; background: #f1ecf2; color: #6a5f6d; font-size: 13px; padding: 4px 11px; border-radius: 20px; }
+#crumbs .cr.proj:hover { background: #f1ecf2; color: #6a5f6d; }
+#crumbs .cr.alt::after { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 0 3px 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); opacity: .45; }
+#crmenu { position: fixed; z-index: 250; min-width: 170px; padding: 6px; border-radius: 13px; background: #fff; box-shadow: 0 0 0 1px #ece4ee, 0 10px 30px rgba(60, 40, 70, .16);
+  display: flex; flex-direction: column; gap: 2px; opacity: 0; pointer-events: none; transform: translateY(-4px); transition: opacity .14s, transform .2s cubic-bezier(.22, 1, .36, 1); }
+#crmenu.on { opacity: 1; pointer-events: auto; transform: none; }
+#crmenu button { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; font: 600 13.5px "Segoe UI", sans-serif; color: #5a4f5d; text-align: left; }
+#crmenu button span { flex: 1; }
+#crmenu button:hover { background: #f4eef5; color: var(--accent); }
+#crmenu button.on { background: color-mix(in srgb, var(--accent) 12%, #fff); color: var(--accent); }
