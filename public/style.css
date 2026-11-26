@@ -1038,3 +1038,6 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 .mw-band, .mw-band.odd { background: none !important; mix-blend-mode: normal; }
 .mw-band + .mw-grip + .mw-bar-tools ~ .mw-band::before, .mw-band ~ .mw-band::before { content: ""; position: absolute; left: 24px; right: 140px; top: -1px; height: 0;
   border-top: 1.5px dashed color-mix(in srgb, var(--tint, var(--accent)) 60%, #6a5a70); opacity: .7; }
+/* ### sits a little in from ## (its band too), always */
+.cm-line.cm-h3 { margin-left: 1.4em; }
+.doc.near .rh3 { margin-left: 1.2em; }
