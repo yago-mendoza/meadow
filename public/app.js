@@ -1314,7 +1314,7 @@ const DW_COLORS = {
   left: ['#2f2735', '#3d5a80', '#7a2e3a', '#2e6b4a', '#8a5a2b', '#6b6670'],
   right: ['#e0607e', '#f0954a', '#e8c547', '#56b37f', '#4a9fd8', '#8f78d6'],
 };
-const DW_SHAPES = [['select', 'Elegir y mover: clic en una figura o una caja alrededor; arrástralas; Ctrl+C / Ctrl+V; Supr'], ['rect', 'Rectángulo'], ['ellipse', 'Círculo'], ['tri', 'Triángulo'], ['diamond', 'Rombo'], ['line', 'Línea']];
+const DW_SHAPES = [['select', 'Elegir y mover: clic en una figura o una caja alrededor; arrástralas; Ctrl+C / Ctrl+V; Supr'], ['erase', 'Goma: borra cada figura por la que pases'], ['rect', 'Rectángulo'], ['ellipse', 'Círculo'], ['tri', 'Triángulo'], ['diamond', 'Rombo'], ['line', 'Línea']];
 const drawsAt = (id) => (S.drawings || []).filter((d) => d.at === id);
 const darker = (hex, k = 0.72) => { const n = parseInt(hex.slice(1), 16); const c = (v) => Math.round(v * k).toString(16).padStart(2, '0'); return '#' + c(n >> 16) + c((n >> 8) & 255) + c(n & 255); };
 // is a point inside a figure (in sheet units)
@@ -1359,7 +1359,8 @@ const thumbs = (id) => drawsAt(id).map((d) => `<img class="dw-th" data-draw="${d
 // the sheet
 let dwOpen = null, dwColor = DW_COLORS.top[4], dwShape = 'rect', dwSnapped = false, dwHollow = false;
 const dwNow = () => (S.drawings || []).find((d) => d.id === dwOpen);
-const shapeIco = (t) => `<svg viewBox="0 0 20 20" width="18" height="18">${{ rect: '<rect x="3" y="5" width="14" height="10"/>', ellipse: '<circle cx="10" cy="10" r="7"/>', tri: '<path d="M10 3 L17 16 L3 16 Z"/>', diamond: '<path d="M10 2 L18 10 L10 18 L2 10 Z"/>', line: '<path d="M3 17 L17 3" stroke-width="2.4" fill="none"/>', select: '<path d="M5 3 L15 11 L10.5 11.6 L13 17 L11 18 L8.6 12.6 L5 15.5 Z" stroke-width="1"/>' }[t]}</svg>`;
+const shapeIco = (t) => `<svg viewBox="0 0 20 20" width="18" height="18">${{ rect: '<rect x="3" y="5" width="14" height="10"/>', ellipse: '<circle cx="10" cy="10" r="7"/>', tri: '<path d="M10 3 L17 16 L3 16 Z"/>', diamond: '<path d="M10 2 L18 10 L10 18 L2 10 Z"/>', line: '<path d="M3 17 L17 3" stroke-width="2.4" fill="none"/>', select: '<path d="M5 3 L15 11 L10.5 11.6 L13 17 L11 18 L8.6 12.6 L5 15.5 Z" stroke-width="1"/>', erase: '<path d="M11.5 3.5 L17 9 L10 16 L5.5 16 L3 13.5 Z" fill="#f3b6c4" stroke="#8a6070" stroke-width="1.2" stroke-linejoin="round"/><path d="M7 8 L12.5 13.5" stroke="#8a6070" stroke-width="1.2" fill="none"/><path d="M10 16 L17 16" stroke="#8a6070" stroke-width="1.2" fill="none"/>' }[t]}</svg>`;
+const dwTool = (t) => t === 'select' || t === 'erase';   // tools, not figures: no colour of their own
 function openDrawing(d) {
   if (!d) return;
   dwOpen = d.id; dwSnapped = false; dwHist = []; dwSel = new Set();
@@ -1385,17 +1386,17 @@ function dwPaint(preview) {
 }
 function dwPickColor(c) {
   dwColor = c; for (const el of document.querySelectorAll('#draw [data-col]')) el.classList.toggle('on', el.dataset.col === c); dwBrush();
-  for (const el of document.querySelectorAll('#draw [data-shape]')) el.style.color = el.dataset.shape === 'select' ? '' : c;
+  for (const el of document.querySelectorAll('#draw [data-shape]')) el.style.color = dwTool(el.dataset.shape) ? '' : c;
   const d = dwNow(); if (d && dwShape === 'select' && dwSel.size) dwEdit(() => dwSel.forEach((i) => { if (d.shapes[i]) d.shapes[i].c = c; }));   // recolour what is chosen
 }
-function dwBrush() { const b = $('#draw .dw-cur'); b.innerHTML = shapeIco(dwShape); b.style.color = dwShape === 'select' ? '#4a3f4d' : dwColor; b.classList.toggle('hollow', dwHollow && dwShape !== 'select'); }
+function dwBrush() { const b = $('#draw .dw-cur'); b.innerHTML = shapeIco(dwShape); b.style.color = dwTool(dwShape) ? '#4a3f4d' : dwColor; b.classList.toggle('hollow', dwHollow && !dwTool(dwShape)); }
 function dwPickFill(h) {
   dwHollow = h; for (const el of document.querySelectorAll('#draw [data-fill]')) el.classList.toggle('on', (el.dataset.fill === '0') === h); dwBrush();
   const d = dwNow(); if (d && dwShape === 'select' && dwSel.size) dwEdit(() => dwSel.forEach((i) => { const s = d.shapes[i]; if (s && s.t !== 'line' && s.t !== 'path') s.hollow = h || undefined; }));
 }
 function dwPickShape(t) {
   dwShape = t; for (const el of document.querySelectorAll('#draw [data-shape]')) el.classList.toggle('on', el.dataset.shape === t); dwBrush();
-  $('#dw-c').classList.toggle('picking', t === 'select'); if (t !== 'select') { dwSel.clear(); dwPaintSel(); }
+  $('#dw-c').classList.toggle('picking', t === 'select'); $('#dw-c').classList.toggle('erasing', t === 'erase'); if (t !== 'select') { dwSel.clear(); dwPaintSel(); }
 }
 // every change is kept, so «Deshacer» / Ctrl+Z goes back one step (adding, moving, pasting, deleting…)
 let dwHist = [];
@@ -1442,6 +1443,17 @@ function hitShape(d, x, y, k) {
   }
   return -1;
 }
+function eraseHit(d, x, y, k) {
+  const r = 1.5 * k;
+  for (let i = d.shapes.length - 1; i >= 0; i--) {
+    const s = d.shapes[i];
+    if (s.t === 'line') { if (segDist(x, y, s.x1, s.y1, s.x2, s.y2) <= r + k) return i; continue; }
+    if (s.t === 'path') { if (s.pts.slice(1).some((p, j) => segDist(x, y, s.pts[j][0], s.pts[j][1], p[0], p[1]) <= r + k)) return i; continue; }
+    const pts = []; for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) pts.push(inside(s, x + dx * r / 2, y + dy * r / 2));
+    if (s.hollow ? pts.some(Boolean) && !pts.every(Boolean) : pts.some(Boolean)) return i;
+  }
+  return -1;
+}
 function dwPaintSel(box) {   // dashed boxes over what is chosen (and the box being dragged), drawn above the pixels
   const d = dwNow(), host = $('#draw .dw-sels'); if (!d || !host) return;
   const r = $('#dw-c').getBoundingClientRect(), cw = r.width / DW_W, k = (d.base || 192) / DW_W;
@@ -1450,18 +1462,30 @@ function dwPaintSel(box) {   // dashed boxes over what is chosen (and the box be
 }
 $('#dw-c').addEventListener('pointermove', (e) => {
   const r = e.currentTarget.getBoundingClientRect(), px = $('#draw .dw-px'), cw = r.width / DW_W;
+  if (dwShape === 'erase') {   // the figure the eraser is over shows itself
+    px.hidden = true; const d = dwNow(); if (!d || e.buttons) return; const k = (d.base || 192) / DW_W;
+    const i = eraseHit(d, (e.clientX - r.left) / cw * k, (e.clientY - r.top) / cw * k, k);
+    const host = $('#draw .dw-sels'); if (i < 0) { host.innerHTML = ''; return; }
+    const b = sBox(d.shapes[i]); host.innerHTML = `<i class="dw-erab" style="left:${b.x / k * cw - 3}px;top:${b.y / k * cw - 3}px;width:${b.w / k * cw + 6}px;height:${b.h / k * cw + 6}px"></i>`; return;
+  }
   if (dwShape === 'select') { px.hidden = true; return; }
   const gx = Math.floor((e.clientX - r.left) / cw), gy = Math.floor((e.clientY - r.top) / cw);
   Object.assign(px.style, { left: gx * cw + 'px', top: gy * cw + 'px', width: cw + 'px', height: cw + 'px', background: dwColor }); px.hidden = false;
 });
-$('#dw-c').addEventListener('pointerleave', () => { $('#draw .dw-px').hidden = true; });
+$('#dw-c').addEventListener('pointerleave', () => { $('#draw .dw-px').hidden = true; if (dwShape === 'erase') $('#draw .dw-sels').innerHTML = ''; });
 $('#dw-c').addEventListener('pointerdown', (e) => {
   const d = dwNow(); if (!d) return;
   const c = e.currentTarget, r = c.getBoundingClientRect(), k = (d.base || 192) / DW_W;   // figures are kept in the drawing's own units
   const at = (ev) => [Math.max(0, Math.min(DW_W, Math.round((ev.clientX - r.left) * DW_W / r.width))), Math.max(0, Math.min(DW_H, Math.round((ev.clientY - r.top) * DW_H / r.height)))];
   const p0 = at(e); c.setPointerCapture(e.pointerId);
   let mv, up;
-  if (dwShape === 'select') {
+  if (dwShape === 'erase') {   // press and pass over figures: each one touched goes; the whole stroke is one step back
+    const before = JSON.stringify(d.shapes); let gone = 0;
+    const rub = (ev) => { const x = (ev.clientX - r.left) * DW_W / r.width * k, y = (ev.clientY - r.top) * DW_H / r.height * k; const i = eraseHit(d, x, y, k);
+      if (i >= 0) { d.shapes.splice(i, 1); gone++; dwPaint(); } $('#draw .dw-sels').innerHTML = ''; };
+    rub(e); mv = rub;
+    up = () => { if (!gone) return; const after = d.shapes; d.shapes = JSON.parse(before); dwEdit(() => { d.shapes = after; }); };
+  } else if (dwShape === 'select') {
     const i = hitShape(d, p0[0] * k, p0[1] * k, k), add = e.shiftKey || e.ctrlKey || e.metaKey;
     if (i >= 0) {                                       // on a figure: choose it and drag what is chosen
       if (!dwSel.has(i)) { if (!add) dwSel.clear(); dwSel.add(i); } else if (add) { dwSel.delete(i); return dwPaint(); }
