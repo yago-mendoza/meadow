@@ -11,7 +11,7 @@
 <div id="vp">
   <canvas id="grid"></canvas>
   <div id="world"><div id="frames"></div><div id="items"></div></div>
-  <div id="empty">Arrastra un tipo de la izquierda al plano, o haz clic en él</div>
+  <div id="empty">Arrastra algo de la barra de arriba al plano, o haz clic en ello</div>
   <div id="selrect"></div>
 </div>
 
@@ -22,7 +22,12 @@
 
 <section id="stash"></section>
 
-<div id="selbar"><span id="selbar-n"></span><button id="selbar-copy">⧉ Copiar todo</button><button id="selbar-del">🗑 Borrar</button></div>
+<div id="selbar"><span id="selbar-n"></span><span class="sb-sep"></span>
+  <button id="sb-left" class="sb-i" title="Alinear a la izquierda"><svg viewBox="0 0 16 16" width="15" height="15"><path d="M2 1.5v13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="4" y="3" width="9" height="3.5" rx="1" fill="currentColor"/><rect x="4" y="9.5" width="6" height="3.5" rx="1" fill="currentColor"/></svg></button>
+  <button id="sb-top" class="sb-i" title="Alinear arriba"><svg viewBox="0 0 16 16" width="15" height="15"><path d="M1.5 2h13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="3" y="4" width="3.5" height="9" rx="1" fill="currentColor"/><rect x="9.5" y="4" width="3.5" height="6" rx="1" fill="currentColor"/></svg></button>
+  <button id="sb-h" class="sb-i" title="Repartir en horizontal"><svg viewBox="0 0 16 16" width="15" height="15"><rect x="1" y="4" width="3" height="8" rx="1" fill="currentColor"/><rect x="6.5" y="4" width="3" height="8" rx="1" fill="currentColor"/><rect x="12" y="4" width="3" height="8" rx="1" fill="currentColor"/></svg></button>
+  <button id="sb-v" class="sb-i" title="Repartir en vertical"><svg viewBox="0 0 16 16" width="15" height="15"><rect x="4" y="1" width="8" height="3" rx="1" fill="currentColor"/><rect x="4" y="6.5" width="8" height="3" rx="1" fill="currentColor"/><rect x="4" y="12" width="8" height="3" rx="1" fill="currentColor"/></svg></button>
+  <span class="sb-sep"></span><button id="selbar-copy">⧉ Copiar todo</button><button id="selbar-del">🗑 Borrar</button></div>
 
 <aside id="panel">
   <button id="panel-tab" title="Mostrar u ocultar el panel">☰</button>
@@ -76,6 +81,7 @@
 <div id="viewer"></div>
 <div id="dlist"></div>
 <div id="pinhint"></div>
+<div id="editpill"><button id="ep-back">↩ Volver al plano <kbd>Esc</kbd></button><span class="ep-pages"><button id="ep-prev" title="Página anterior">‹</button><span id="ep-page"></span><button id="ep-next" title="Página siguiente">›</button></span><button id="ep-edit">✎ Pantalla completa · <b></b></button></div>
 <div id="toasts"></div>
 <div id="ghost"></div>
 <script type="module" src="app.js"></script>

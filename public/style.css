@@ -692,3 +692,104 @@ button.cr:hover { background: #fff; color: var(--accent); box-shadow: var(--shad
 .acts button { flex: none; width: 36px; height: 36px; aspect-ratio: 1; padding: 0; display: grid; place-items: center; }
 /* measured at their real size (no entry animation) while the free side is chosen */
 .acts.measuring button { transform: none !important; transition: none !important; }
+
+/* tabs like a filing cabinet: in a row on the frame's top edge; the open one joins the frame, the others sit back */
+.ftabs { position: absolute; bottom: 100%; left: 16px; display: flex; align-items: flex-end; gap: 3px; pointer-events: auto; max-width: calc(100% - 16px); }
+.ftabs .ftab { position: relative; bottom: auto; left: auto; margin-bottom: -1px; max-width: 220px; }
+.ftabs .ftab:not(.on) { padding: 4px 12px 3px; background: color-mix(in srgb, var(--bg) 45%, #fff); border-color: color-mix(in srgb, var(--bg) 60%, #4a3550 12%);
+  color: #7a6e7c; cursor: pointer; margin-bottom: 0; transform-origin: bottom; transition: background .15s, transform .2s cubic-bezier(.34, 1.56, .64, 1); }
+.ftabs .ftab:not(.on):hover { background: color-mix(in srgb, var(--bg) 75%, #fff); transform: translateY(-2px); }
+.ftabs .ftab:not(.on) .ftitle { font-weight: 600; font-size: 12.5px; }
+.ftabs .ftab:not(.on) .ftitle:empty::before { content: "Pestaña"; }
+.tn { font: 600 10px Consolas, monospace; font-style: normal; background: rgba(255, 255, 255, .7); border-radius: 7px; padding: 0 5px; color: #6a5e6c; }
+.tab-add { align-self: flex-end; width: 24px; height: 22px; margin-bottom: 1px; border-radius: 7px 7px 0 0; font-size: 14px; color: #8f8296;
+  background: color-mix(in srgb, var(--bg) 30%, #fff); border: 1px dashed color-mix(in srgb, var(--bg) 60%, #4a3550 20%); border-bottom: 0;
+  opacity: 0; transition: opacity .15s; }
+.frame:hover .tab-add, .frame.sel .tab-add { opacity: 1; }
+.tab-add:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.ftabs .pal { position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
+.frame:hover .ftabs .pal, .frame.sel .ftabs .pal { opacity: 1; pointer-events: auto; }
+.f-add { font-size: 12px !important; }
+
+/* nothing here (yet): a little drawing in the last empty frame and on a blank page */
+.nothing { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; flex-direction: column; align-items: center; gap: 4px;
+  pointer-events: none; color: #a99cab; font: italic 13px Georgia, serif; white-space: nowrap; }
+.frame.void .nothing { display: flex; animation: fade .4s ease; }
+.doc .doc-nothing { position: static; transform: none; display: flex; margin-top: 34px; font-size: 12px; }
+/* the group bar's arrange buttons */
+.sb-sep { width: 1px; align-self: stretch; margin: 4px 2px; background: rgba(255, 255, 255, .18); }
+#selbar .sb-i { width: 30px; height: 28px; padding: 0; display: grid; place-items: center; }
+
+/* close to a page: the whole text, set small so a lot fits; titles read as titles */
+.doc.near .dbody { max-height: none; font: 6.2px/1.55 Georgia, serif; color: #3d3442; -webkit-mask-image: none; mask-image: none; overflow: hidden; }
+.doc.near .page { min-height: 252px; }
+.doc.near .rl { white-space: pre-wrap; word-break: break-word; min-height: 1.55em; }
+.doc.near .rh { font-weight: 700; color: #2f2735; margin: .7em 0 .2em; }
+.doc.near .rh1 { font-size: 8px; text-transform: uppercase; letter-spacing: .04em; } .doc.near .rh2 { font-size: 7.2px; } .doc.near .rh3 { font-size: 6.6px; }
+#editpill { position: fixed; left: 50%; bottom: 22px; z-index: 56; transform: translate(-50%, 90px); display: flex; align-items: center; gap: 6px; padding: 9px 16px;
+  border-radius: 22px; background: var(--accent); color: #fff; font-weight: 600; font-size: 13.5px; box-shadow: var(--shadow-up);
+  transition: transform .35s cubic-bezier(.34, 1.56, .64, 1); }
+#editpill.on { transform: translate(-50%, 0); }
+#editpill b { font: 700 13.5px Georgia, serif; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#editpill kbd { margin-left: 4px; padding: 1px 7px; border-radius: 6px; background: rgba(255, 255, 255, .2); font: 600 10.5px "Segoe UI", sans-serif; }
+#editpill.on ~ #viewer.on { bottom: 74px; }
+
+/* a frame's description unfolds softly instead of popping */
+.fdesc.empty { display: block; max-height: 0; opacity: 0; padding: 0 14px; border-bottom: 0; overflow: hidden;
+  transition: max-height .28s cubic-bezier(.22, 1, .36, 1), opacity .2s ease, padding .28s cubic-bezier(.22, 1, .36, 1); }
+.frame:hover .fdesc.empty, .frame.sel .fdesc.empty, .fdesc.empty[contenteditable="true"] { height: auto; max-height: 40px; opacity: 1; padding: 6px 14px; }
+
+/* a ribbon is easy to pick: a generous invisible area around it */
+.sign.ribbon::before { content: ""; position: absolute; inset: -10px -6px; }
+
+/* a pinned circle: never a size handle */
+.item.circle[data-pinned] .prs { display: none; }
+/* a page's title sits a little further in, clear of the corner circles */
+.page { padding: 22px 20px 34px; }
+/* the delete cross on a page sits just inside its corner, clear of a circle on the top-right anchor */
+.doc > .x { top: 6px; right: 26px; }
+/* the folded ideas circle is green like ideas everywhere (no gold) */
+.dgroup.idea { background: #dff3e7; color: #2f6e48; border-color: #a9dcbd; }
+/* post-its keep their own tilt (from their id), apart from any transform an animation uses */
+.postit { transform: none; rotate: var(--tilt, -1deg); }
+.postit:nth-child(even) { transform: none; }
+#selbar.no-arrange .sb-i, #selbar.no-arrange .sb-sep { display: none; }
+
+/* the live page: the document itself, in the notepad's font and colours, small enough (in plane units) to read a lot */
+.doc.live .dtitle { display: none; }
+.doc.live .page { padding: 10px 6px 18px 4px; }
+.doc.live .dbody { max-height: none; height: 226px; overflow: hidden; -webkit-mask-image: none; mask-image: none; }
+.ied { height: 100%; cursor: text; }
+.ied .cm-editor { height: 100%; outline: none !important; background: transparent; }
+.ied .cm-scroller { font: 6.6px/1.6 Consolas, "Cascadia Mono", monospace; overflow: auto; scrollbar-width: thin; }
+.ied .cm-content { padding: 2px 6px 40px 8px; caret-color: #2b2230; user-select: text; }
+.ied .cm-line { padding: 0; }
+.ied .cm-cursor { border-left: 1px solid #2b2230 !important; }
+.ied .mw-folds, .ied .mw-foldall, .ied .mw-layer { display: none; }
+.ied .cm-h1 { padding-top: .8em !important; } .ied .cm-h2 { padding-top: .5em !important; } .ied .cm-h3 { padding-top: .3em !important; }
+.ied .cm-hfirst { padding-top: 0 !important; }
+.ied .cm-chip { font-size: 6.2px; padding: 0 4px 0 3px; border-radius: 6px; }
+.ied .cm-tooltip-autocomplete ul li { font-size: 7px; padding: 2px 6px !important; }
+.ied, .ied * { user-select: text; -webkit-user-select: text; }
+#items .ied, #items .ied * { user-select: text; -webkit-user-select: text; }
+
+/* the live page: pages, not an endless strip (the wheel turns them) */
+.ied .cm-scroller { overflow: hidden; scroll-behavior: smooth; }
+/* its bottom bar: back to the plane, its pages, full screen — big and easy */
+#editpill { display: flex; align-items: center; gap: 8px; padding: 6px; background: #3b3341; border-radius: 26px; }
+#editpill button { color: #fff; border-radius: 20px; padding: 10px 18px; font-weight: 650; font-size: 14px; }
+#ep-back { background: rgba(255, 255, 255, .12); }
+#ep-back:hover { background: rgba(255, 255, 255, .22); }
+#ep-edit { background: var(--accent); }
+#ep-edit:hover { filter: brightness(1.12); }
+#ep-edit b { font: 700 14px Georgia, serif; }
+.ep-pages { display: none; align-items: center; gap: 2px; color: #fff; font: 600 12.5px Consolas, monospace; }
+#editpill.paged .ep-pages { display: flex; }
+.ep-pages button { padding: 6px 12px !important; font-size: 18px !important; background: rgba(255, 255, 255, .08); }
+.ep-pages button:hover { background: rgba(255, 255, 255, .2); }
+#editpill kbd { margin-left: 6px; padding: 1px 7px; border-radius: 6px; background: rgba(255, 255, 255, .2); font: 600 10.5px "Segoe UI", sans-serif; }
+/* a live page shows only its text: no footer, no buttons, no handles; the page ends cleanly (no half line) */
+.doc.live .dfoot, .doc.live > .x, .doc.live > .acts, .doc.live > .prs, .doc.live .page::after { display: none !important; }
+.doc.live { transform: none !important; }
+.doc.live .page { padding: 12px 6px 12px 4px; clip-path: none; }
+.doc.live .dbody { height: 236px; -webkit-mask-image: linear-gradient(#000 calc(100% - 9px), transparent); mask-image: linear-gradient(#000 calc(100% - 9px), transparent); }

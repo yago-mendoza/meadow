@@ -44,6 +44,7 @@ async function load() {
   else S.view = { x: Math.round(innerWidth / 2 - 100), y: Math.round(innerHeight / 2 - 140), z: 1 };
   for (const k of ['postits', 'frames', 'ideas', 'tasks', 'history', 'signs', 'texts']) S[k] ||= [];
   S.seq ||= { idea: 0, tarea: 0 };
+  for (const t of [...(S.ideas || []), ...(S.tasks || [])]) if (t.pin?.side === 'tab') t.pin.side = 't';
   for (const d of S.docs) { const t = titleOf(d.text); if (t) d.name = t; else d.text = withTitle(d.text, d.name); }
   if (!S.trays?.length) S.trays = [{ id: 'b1', name: 'Cajón', color: TRAY_COLORS[0], open: true }];
   for (const t of S.trays) t.name = t.name.replace(/^Bandeja\b/, 'Cajón');
@@ -82,7 +83,7 @@ function log(kind, msg, extra = {}) {
   S.history.unshift({ t: Date.now(), kind, msg, ...extra });
   if (S.history.length > 400) S.history.length = 400;
 }
-const ICON = { crear: '＋', borrar: '🗑', editar: '✎', hecha: '✔', reabrir: '↺', restaurar: '⟲', renombrar: '✎', bandeja: '📥' };
+const ICON = { crear: '＋', borrar: '🗑', editar: '✎', hecha: '✔', reabrir: '↺', restaurar: '⟲', renombrar: '✎' };
 
 // ---- view, zoom and grid -------------------------------------------------------------------------------------------
 function applyView() {
@@ -90,7 +91,99 @@ function applyView() {
   world.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
   $('#z-val').textContent = Math.round(z * 100) + ' %';
   drawGrid();
+  if (!inline && ![...itemsEl.querySelectorAll('.doc')].some((el) => el.getBoundingClientRect().width >= NEAR_W * 0.9)) gridView = { ...S.view };
+  nearDocs();
 }
+let gridView = null;
+const NEAR_W = 420;                     // a page this wide on screen (px) reads in place
+let nearT = null;
+function nearDocs() {
+  clearTimeout(nearT);
+  nearT = setTimeout(() => {
+    let best = null, bestD = Infinity;
+    const cx = innerWidth / 2, cy = innerHeight / 2;
+    for (const el of itemsEl.querySelectorAll('.doc')) {
+      const r = el.getBoundingClientRect(), near = r.width >= NEAR_W;
+      if (near !== el.classList.contains('near')) {
+        el.classList.toggle('near', near);
+        const d = docById(el.dataset.id), body = el.querySelector('.dbody');
+        if (d && body && !near) { if (inline?.id === d.id) unmountInline(); body.innerHTML = previewHTML(d); }
+        else if (d && body) body.innerHTML = readingHTML(d);
+      }
+      if (near) { const dd = Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy); if (dd < bestD && r.left < cx && r.right > cx) { bestD = dd; best = el; } }
+    }
+    // the closest page in the middle of the screen is the live document; the others just read
+    if (!edOpen()) { if (best) mountInline(best); else unmountInline(); }
+    const pill = $('#editpill');
+    if (best && !edOpen()) { const d = docById(best.dataset.id); pill.dataset.id = d.id; pill.querySelector('b').textContent = d.name; pill.classList.add('on'); setTimeout(paintPage, 80); }
+    else pill.classList.remove('on');
+  }, 60);
+}
+let inline = null;                      // { id, ed, el }: the page being edited in place
+function mountInline(el) {
+  const d = docById(el.dataset.id); if (!d) return;
+  if (inline?.id === d.id && inline.el.isConnected) return;
+  unmountInline();
+  const body = el.querySelector('.dbody'); if (!body) return;
+  body.innerHTML = '<div class="ied"></div>';
+  const host = body.firstChild;
+  const api = { ...edApi, onOutline() {}, onLevel() {},
+    onChange(text) {
+      if (d.text === text) return;
+      d.text = text; d.updated = Date.now();
+      const t = titleOf(text); if (t && t !== d.name) { d.name = t; const ti = el.querySelector('.dtitle'); if (ti) ti.textContent = t; }
+      save();
+    } };
+  const e2 = createEditor(host, api);
+  e2.setDoc(d.text || '');
+  inline = { id: d.id, ed: e2, el };
+  el.classList.add('live');
+}
+function unmountInline() {
+  if (!inline) return;
+  try { inline.ed.view.destroy(); } catch {}
+  inline.el.classList.remove('live');
+  inline = null;
+}
+// the whole text, lightly read: titles as titles, ideas/tasks/links as words
+function readingHTML(d) {
+  const lines = (d.text || '').split('\n');
+  const out = lines.map((l, i) => {
+    if (i === 0 && /^#{1,6}\s/.test(l)) return '';
+    const m = l.match(/^(#{1,6})\s+(.*)$/);
+    if (m) return `<div class="rh rh${Math.min(3, m[1].length)}">${esc(readable(m[2]))}</div>`;
+    return `<div class="rl">${esc(readable(l)) || '&nbsp;'}</div>`;
+  }).join('');
+  return out.replace(/^(<div class="rl">&nbsp;<\/div>)+/, '') || NOTHING_DOC;
+}
+function previewHTML(d) {
+  const text = readable((d.text || '').replace(/^\s*#{1,6}\s+.*(\n|$)/, '').replace(/^\n+/, ''));
+  return text ? esc(text.split('\n').slice(0, 14).join('\n')) : NOTHING_DOC;
+}
+// pages instead of an endless strip: the live page turns one screenful at a time
+const liveScroller = () => inline?.ed.view.scrollDOM;
+function pageInfo() { const sc = liveScroller(); if (!sc) return null; const h = sc.clientHeight || 1; return { sc, h, n: Math.max(1, Math.ceil((sc.scrollHeight - 2) / h)), i: Math.round(sc.scrollTop / h) }; }
+function paintPage() { const p = pageInfo(); $('#ep-page').textContent = p && p.n > 1 ? `${p.i + 1} / ${p.n}` : ''; $('#editpill').classList.toggle('paged', !!p && p.n > 1); }
+function turnPage(dir) {
+  const p = pageInfo(); if (!p) return;
+  const i = Math.min(p.n - 1, Math.max(0, p.i + dir)); if (i === p.i) return;
+  p.sc.scrollTo({ top: i * p.h, behavior: 'smooth' }); setTimeout(paintPage, 320);
+}
+let wheelAcc = 0, wheelT = 0;
+vp.addEventListener('wheel', (e) => {
+  if (e.ctrlKey || !e.target.closest?.('.ied')) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const now = performance.now(); if (now - wheelT < 380) return;
+  wheelAcc += e.deltaY;
+  if (Math.abs(wheelAcc) > 40) { turnPage(wheelAcc > 0 ? 1 : -1); wheelAcc = 0; wheelT = now; }
+}, { passive: false, capture: true });
+$('#ep-prev').onclick = () => turnPage(-1);
+$('#ep-next').onclick = () => turnPage(1);
+$('#ep-edit').onclick = () => { const id = $('#editpill').dataset.id; if (id) { $('#editpill').classList.remove('on'); openEditor(id); } };
+$('#ep-back').onclick = () => {
+  unmountInline(); $('#editpill').classList.remove('on');
+  animateView(gridView && gridView.z < S.view.z ? gridView : { ...S.view, z: 1, x: innerWidth / 2 - (innerWidth / 2 - S.view.x) / S.view.z, y: innerHeight / 2 - (innerHeight / 2 - S.view.y) / S.view.z }, 480);
+};
 const SHOW_GRID = false;               // Yago, 26.11: «quita la grid, sin grid»
 function drawGrid() {
   const dpr = devicePixelRatio || 1, w = vp.clientWidth, h = vp.clientHeight;
@@ -121,13 +214,14 @@ function zoomAt(mx, my, f) {
   applyView(); saveView();
 }
 vp.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey && e.target.closest?.('.ied')) return;     // scroll the page being read
   e.preventDefault();
   const dy = e.deltaY * (e.deltaMode === 1 ? 16 : 1);
   if (e.shiftKey) { S.view.x -= dy; applyView(); saveView(); return; }
   zoomAt(e.clientX, e.clientY, Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0018)));
 }, { passive: false });
 const toWorld = (cx, cy) => ({ x: (cx - S.view.x) / S.view.z, y: (cy - S.view.y) / S.view.z });
-const centerWorld = () => toWorld(innerWidth / 2 - 100, innerHeight / 2 - 60);
+const centerWorld = () => { const a = visibleArea(); return toWorld((a.l + a.r) / 2, (a.t + a.b) / 2); };
 addEventListener('resize', drawGrid);
 let mouse = { x: innerWidth / 2, y: innerHeight / 2 };
 addEventListener('pointermove', (e) => { mouse = { x: e.clientX, y: e.clientY }; }, true);
@@ -160,7 +254,7 @@ function docHTML(d, n) {
   return `<div class="doc${sel.has(d.id) ? ' sel' : ''}" data-id="${d.id}" data-k="d" style="left:${d.x}px;top:${d.y}px;z-index:${d.z || 0};--s:${d.s || 1}">
     <div class="page">
       <div class="dtitle">${esc(d.name)}</div>
-      <div class="dbody">${text ? esc(text.split('\n').slice(0, 14).join('\n')) : '<em>en blanco</em>'}</div>
+      <div class="dbody">${text ? esc(text.split('\n').slice(0, 14).join('\n')) : NOTHING_DOC}</div>
       <div class="dfoot"><span>📄</span><span>${words ? words + (words === 1 ? ' palabra' : ' palabras') : ''}</span></div>
     </div>
     <button class="x" title="Borrar">×</button>
@@ -169,8 +263,10 @@ function docHTML(d, n) {
     </div>${PRS}</div>`;
 }
 const PRS = '<div class="prs" title="Arrastra: más grande o más pequeño (con lo que lleva encima; Alt: solo esto)"></div>';
+// each post-it keeps its own small tilt, from its id (not from its place in the page)
+const tiltOf = (id) => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ((h % 25) - 12) / 10; };
 const ZB = '<button data-a="front">⤒<b>Al frente</b></button><button data-a="back">⤓<b>Al fondo</b></button>';
-const postitHTML = (p) => `<div class="postit${sel.has(p.id) ? ' sel' : ''}" data-id="${p.id}" data-k="p" style="left:${p.x}px;top:${p.y}px;z-index:${p.z || 0};--bg:${p.color};--s:${p.s || 1}">
+const postitHTML = (p) => `<div class="postit${sel.has(p.id) ? ' sel' : ''}" data-id="${p.id}" data-k="p" style="left:${p.x}px;top:${p.y}px;z-index:${p.z || 0};--bg:${p.color};--s:${p.s || 1};--tilt:${tiltOf(p.id)}deg">
   <div class="ptext">${esc(p.text)}</div><button class="x" title="Borrar">×</button>${palHTML()}<div class="acts">${ZB}</div>${PRS}</div>`;
 // Free text: words straight on the plane, no document.
 const textHTML = (x) => `<div class="ftext${sel.has(x.id) ? ' sel' : ''}" data-id="${x.id}" data-k="x" style="left:${x.x}px;top:${x.y}px;z-index:${x.z || 0};--s:${x.s || 1}">
@@ -188,10 +284,48 @@ function writeText(x, fresh = false) {
   el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); } if (e.key === 'Escape') { e.stopPropagation(); el.blur(); } e.stopPropagation(); });
   el.addEventListener('blur', () => end(true), { once: true });
 }
+const NOTHING_FRAME = `<div class="nothing"><svg viewBox="0 0 120 70" width="120" height="70" aria-hidden="true">
+  <path d="M8 58 H112" stroke="#c9bfcc" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 5"/>
+  <g transform="translate(62 38)"><circle r="17" fill="none" stroke="#b6a48c" stroke-width="1.4"/>
+    <path d="M-14 -6 C-4 -16 8 -14 14 -4 M-15 5 C-6 14 9 14 15 3 M-8 -14 C-2 -2 2 4 -6 15 M6 -15 C1 -3 -3 6 7 15 M-16 -1 C-5 -4 6 2 16 0" fill="none" stroke="#c7b598" stroke-width="1.1"/></g>
+  <path d="M24 34 H36 M18 42 H34 M26 50 H38" stroke="#d9cfda" stroke-width="1.6" stroke-linecap="round"/>
+</svg><span>Aquí no hay nada… todavía</span></div>`;
+const NOTHING_DOC = `<div class="nothing doc-nothing"><svg viewBox="0 0 80 50" width="70" height="44" aria-hidden="true">
+  <g transform="rotate(-28 40 25)"><rect x="12" y="20" width="46" height="9" rx="2" fill="#fbe7a6" stroke="#d9b75c" stroke-width="1"/>
+    <path d="M58 20 L68 24.5 L58 29 Z" fill="#f3dcc0" stroke="#c9a679" stroke-width="1"/><path d="M65 23.2 L68 24.5 L65 25.8 Z" fill="#6b5b50"/>
+    <rect x="6" y="20" width="7" height="9" rx="2" fill="#f2b6c1" stroke="#d98c9b" stroke-width="1"/></g>
+  <path d="M14 42 C22 38 28 46 36 42 S50 38 58 42" fill="none" stroke="#cdc3cf" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="1 4"/>
+</svg><span>Página en blanco</span></div>`;
 const frameHTML = (f) => `<div class="frame${sel.has(f.id) ? ' sel' : ''}" data-id="${f.id}" data-k="f" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;--bg:${f.color}">
-  <div class="fdesc${f.desc ? '' : ' empty'}" title="Clic para escribir la descripción">${esc(f.desc || '')}</div>
-  <div class="ftab"><span class="ftitle">${esc(f.title)}</span><button class="f-add" title="Crear un marco dentro">＋</button><button class="x" title="Borrar el marco (no lo de dentro)">×</button>${palHTML()}</div>
+  <div class="fdesc${f.desc ? '' : ' empty'}" title="Clic para escribir la descripción">${esc(f.desc || '')}</div>${NOTHING_FRAME}
+  <div class="ftabs">${tabsOf(f).map((t, i) => { const on = t.id === activeTab(f); const n = on ? 0 : tabCount(f, t.id);
+    return `<div class="ftab${on ? ' on' : ''}" data-tab="${t.id}"><span class="ftitle">${esc(t.title)}</span>${n ? `<i class="tn">${n}</i>` : ''}${on ? `<button class="f-add" title="Crear un marco dentro">⊞</button><button class="x" title="${i ? 'Quitar esta pestaña (su contenido pasa a la primera)' : 'Borrar el marco (no lo de dentro)'}">×</button>` : ''}</div>`; }).join('')}<button class="tab-add" title="Nueva pestaña">＋</button>${palHTML()}</div>
   <div class="edge e-t"></div><div class="edge e-b"></div><div class="edge e-l"></div><div class="edge e-r"></div><div class="rs c-tl" data-c="tl"></div><div class="rs c-tr" data-c="tr"></div><div class="rs c-bl" data-c="bl"></div><div class="rs c-br" data-c="br"></div></div>`;
+// A frame's tabs: the first is its title; the active one decides what is shown inside.
+function tabsOf(f) { if (!f.tabs?.length) f.tabs = [{ id: 'tab-' + f.id, title: f.title || '' }]; f.tabs[0].title = f.title || ''; return f.tabs; }
+const activeTab = (f) => (tabsOf(f).some((t) => t.id === f.active) ? f.active : tabsOf(f)[0].id);
+const things = () => [...S.docs.filter((d) => d.place === 'canvas'), ...S.postits, ...S.texts, ...S.ideas, ...S.tasks];
+const tabCount = (f, tid) => things().filter((o) => o.ftab?.f === f.id && o.ftab.t === tid).length;
+// hidden behind another tab: itself, or the host it is pinned or docked to
+function inOtherTab(o) {
+  if (!o) return false;
+  const t = o.ftab, f = t && S.frames.find((x) => x.id === t.f);
+  if (f && tabsOf(f).length > 1 && t.t !== activeTab(f)) return true;
+  if (o.pin) return inOtherTab(find(o.pin.host)?.o);
+  if (o.dock) return inOtherTab(docById(o.dock));
+  return false;
+}
+// After a drop or a creation: what lies in a frame with tabs belongs to its open tab; what left it, to none.
+function assignTabs() {
+  for (const el of itemsEl.querySelectorAll('[data-k]')) {
+    const o = find(el.dataset.id)?.o; if (!o || o.pin || o.dock) continue;
+    const [w, h] = sizeOf(el, o), cx = o.x + w / 2, cy = o.y + h / 2;
+    const f = S.frames.filter((g) => cx > g.x && cx < g.x + g.w && cy > g.y && cy < g.y + g.h).sort((p, q) => p.w * p.h - q.w * q.h)[0];
+    if (f && tabsOf(f).length > 1) o.ftab = { f: f.id, t: activeTab(f) }; else delete o.ftab;
+  }
+}
+// What is hidden in a frame's other tabs moves with the frame.
+function shiftHidden(f, dx, dy) { for (const o of things()) if (o.ftab?.f === f.id && inOtherTab(o)) { o.x = Math.round(o.x + dx); o.y = Math.round(o.y + dy); } }
 function itemHTML(it) {
   const k = it.kind === 'idea' ? 'i' : 't', uses = docsUsing(it).length;
   if (!it.dock) {                                   // loose: a small circle with its icon; a click reads it
@@ -208,18 +342,6 @@ function itemHTML(it) {
 }
 // ---- signs: a tab standing out of an edge of a document, post-it, idea, task or frame; a click reads it -------------
 const signsOf = (id) => (S.signs || []).filter((g) => g.host === id);
-// A tag tied to the edge with a string: a paper tag with a hole and a scribble that means nothing (the same for one tag).
-function scribble(seed) {
-  let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  const rnd = () => ((h = (h * 1103515245 + 12345) >>> 0) / 4294967296);
-  let d = '';
-  for (let row = 0; row < 2; row++) {
-    const y = 15 + row * 7; let x = 29; d += `M${x} ${y}`;
-    const end = 54 - row * 7 - rnd() * 4;
-    while (x < end) { const nx = Math.min(end, x + 2.2 + rnd() * 2.4); d += ` Q${((x + nx) / 2).toFixed(1)} ${(y - 1.6 - rnd() * 2).toFixed(1)} ${nx.toFixed(1)} ${(y + (rnd() - .5) * 1.2).toFixed(1)}`; x = nx; }
-  }
-  return d;
-}
 const ribbonSVG = (g) => { const c = g.color || RIBBON_RED; return `<svg class="tag" viewBox="0 0 46 18" width="46" height="18" aria-hidden="true">
   <defs><linearGradient id="rb-${g.id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".82"/><stop offset=".5" stop-color="${c}"/><stop offset="1" stop-color="${c}" stop-opacity=".9"/></linearGradient></defs>
   <path d="M0 2 H44 L37 9 L44 16 H0 Z" fill="url(#rb-${g.id})"/>
@@ -248,10 +370,10 @@ function renderItems() {
   const before = firstRender ? null : measure(world);
   peeked = []; clearTimeout(peekT);
   framesEl.innerHTML = [...S.frames].sort((a, b) => b.w * b.h - a.w * a.h).map(frameHTML).join('');
-  itemsEl.innerHTML = S.docs.map((d, i) => (d.place === 'canvas' ? docHTML(d, i + 1) : '')).join('')
-    + S.postits.filter((p) => !p.riding).map(postitHTML).join('')
-    + (S.texts || []).filter((x) => !x.riding).map(textHTML).join('')
-    + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas && !it.riding && !hiddenInFold(it)).map(itemHTML).join('')
+  itemsEl.innerHTML = S.docs.map((d, i) => (d.place === 'canvas' && !inOtherTab(d) ? docHTML(d, i + 1) : '')).join('')
+    + S.postits.filter((p) => !p.riding && !inOtherTab(p)).map(postitHTML).join('')
+    + (S.texts || []).filter((x) => !x.riding && !inOtherTab(x)).map(textHTML).join('')
+    + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas && !it.riding && !hiddenInFold(it) && !inOtherTab(it)).map(itemHTML).join('')
     + groupsHTML();
   $('#empty').classList.toggle('on', !itemsEl.children.length && !S.frames.length);
   S.signs = (S.signs || []).filter((g) => find(g.host));
@@ -260,6 +382,16 @@ function renderItems() {
   layoutPins();
   flip(world, before, (el) => S.view.z * (find(el.dataset.id)?.o.s || 1));
   firstRender = false;
+  for (const el of itemsEl.querySelectorAll('.doc.near')) el.classList.remove('near');   // re-read after a redraw
+  if (inline && !inline.el.isConnected) { try { inline.ed.view.destroy(); } catch {} inline = null; }
+  nearDocs();
+  assignTabs();                                    // what is in a frame with tabs belongs to its open tab
+  for (const f of S.frames) {
+    const el = elOf(f.id); if (!el) continue;
+    const holds = [...itemsEl.querySelectorAll('[data-k]')].some((x) => { const o = find(x.dataset.id)?.o; if (!o) return false; const [w, h] = sizeOf(x, o); const cx = o.x + w / 2, cy = o.y + h / 2; return cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.h; })
+      || S.frames.some((g) => g !== f && g.x >= f.x && g.y >= f.y && g.x + g.w <= f.x + f.w && g.y + g.h <= f.y + f.h);
+    el.classList.toggle('void', !holds);
+  }
 }
 // ---- tasks docked under a document: stacked in order, as wide as the document, moving and scaling with it ----------
 const docked = (d) => [...S.ideas, ...S.tasks].filter((t) => t.onCanvas && t.dock === d.id).sort((a, b) => (a.dockAt ?? 0) - (b.dockAt ?? 0));
@@ -306,17 +438,18 @@ function layoutDocks() {
 // ---- circles pinned to a thing: on a document's or post-it's left or right edge (centred on the line, spread around
 // its middle), or in a row right of a frame's tab. They move and scale with it; dragged away, they come loose. ------
 const pinnedTo = (id) => [...S.ideas, ...S.tasks].filter((t) => t.onCanvas && !t.dock && t.pin?.host === id);
-// The eight anchors of a document or post-it: corners tl tr bl br and side middles t r b l. Several circles on one anchor
-// spread along its side (the middles) or along the top/bottom edge, inwards (the corners).
+// The eight anchors of a document, post-it or frame: corners tl tr bl br and side middles t r b l, each ON the border
+// line (it runs through the circle's centre). Several circles on one anchor spread along the side.
 const ANCHORS = ['tl', 't', 'tr', 'r', 'br', 'b', 'bl', 'l'];
-function anchorAt(h, hel, side, i, n, sc) {
-  const [w, hh] = sizeOf(hel, h), gap = 44 * sc, off = (i - (n - 1) / 2) * gap;
-  const o = 21 * sc;                               // radius plus a hair: the circle touches the edge from outside
-  const L = h.x - o, R = h.x + w + o, T = h.y - o, B = h.y + hh + o, CX = h.x + w / 2, CY = h.y + hh / 2;
+const hostRect = (f, hel) => f.k === 'f' ? [f.o.w, f.o.h] : sizeOf(hel, f.o);
+function anchorAt(f, hel, side, i, n, sc) {
+  const h = f.o, [w, hh] = hostRect(f, hel), gap = 44 * sc, off = (i - (n - 1) / 2) * gap;
+  const col = f.k === 'd' ? docked(h).filter((x) => !hiddenInFold(x)).reduce((a, x) => { const xe = elOf(x.id); return a + (xe ? xe.offsetHeight * (x.s || 1) + 6 * sc : 0); }, 0) + (itemsEl.querySelector('.dgroup[data-doc="' + h.id + '"]') ? 46 * sc : 0) : 0;
+  const L = h.x, R = h.x + w, T = h.y, B = h.y + hh + (col ? col + 8 * sc : 0), CX = h.x + w / 2, CY = h.y + hh / 2;
   switch (side) {
     case 'tl': return [L + i * gap, T]; case 'tr': return [R - i * gap, T];
     case 'bl': return [L + i * gap, B]; case 'br': return [R - i * gap, B];
-    case 't': return [CX + off, T]; case 'b': return [CX + off, B];
+    case 't': case 'tab': return [CX + off, T]; case 'b': return [CX + off, B];
     case 'l': case 'left': return [L, CY + off]; default: return [R, CY + off];
   }
 }
@@ -326,63 +459,49 @@ function layoutPins() {
   for (const id of hosts) {
     const f = find(id), hel = elOf(id); if (!f || !hel) continue;
     const h = f.o, sc = f.k === 'f' ? 1 : h.s || 1;
-    const sides = new Set(pinnedTo(id).map((t) => t.pin.side));
-    for (const side of sides) {
+    for (const side of new Set(pinnedTo(id).map((t) => t.pin.side))) {
       const list = pinnedTo(id).filter((t) => t.pin.side === side).sort((a, b) => (a.pin.at ?? 0) - (b.pin.at ?? 0));
       list.forEach((t, i) => {
         t.s = sc; const r = 19 * sc;
-        let cx, cy;
-        if (side === 'tab') {
-          const tab = hel.querySelector('.ftab'), tw = tab ? tab.offsetWidth : 90, th = tab ? tab.offsetHeight : 30;
-          cx = h.x + 16 + tw + 10 + i * 44 + 19; cy = h.y - th / 2;
-        } else [cx, cy] = anchorAt(h, hel, side, i, list.length, sc);
+        const [cx, cy] = anchorAt(f, hel, side, i, list.length, sc);
         t.x = Math.round(cx - r); t.y = Math.round(cy - r);
-        t.z = Math.max(t.z || 0, (h.z || 0) + 1);
+        t.z = (h.z || 0) + 1;                       // an edge thing has its host's height, just above it
         const el = elOf(t.id); if (!el) return;
         Object.assign(el.style, { left: t.x + 'px', top: t.y + 'px', zIndex: t.z }); el.style.setProperty('--s', t.s);
       });
     }
   }
 }
-// What a dropped circle pins to. A frame: only its tab row. A document or post-it: near an edge, the nearest of its eight
-// anchors; dropped well inside it, nothing (it just lies on top, and goes with it).
-const EDGE_NEAR = 34;
-function pinTarget(it, e) {
-  const me = elOf(it.id);
-  for (const f of S.frames) {
-    const fel = elOf(f.id), tab = fel?.querySelector('.ftab'); if (!tab) continue;
-    const r = tab.getBoundingClientRect(), n = pinnedTo(f.id).filter((x) => x !== it && x.pin.side === 'tab').length;
-    const right = r.right + (10 + (n + 1) * 44) * S.view.z;
-    if (e.clientX > r.left && e.clientX < right && e.clientY > r.top - 8 * S.view.z && e.clientY < r.bottom + 6 * S.view.z) return { host: f.id, side: 'tab', at: 99 };
-  }
-  const near = EDGE_NEAR;
-  const under = [...itemsEl.querySelectorAll('[data-k="d"], [data-k="p"]')].filter((el) => el !== me).reverse().find((el) => {
-    const r = el.getBoundingClientRect();
-    return e.clientX > r.left - near && e.clientX < r.right + near && e.clientY > r.top - near && e.clientY < r.bottom + near;
-  });
-  if (!under) return null;
-  const r = under.getBoundingClientRect();
-  const dl = Math.abs(e.clientX - r.left), dr = Math.abs(e.clientX - r.right), dt = Math.abs(e.clientY - r.top), db = Math.abs(e.clientY - r.bottom);
-  const nearX = Math.min(dl, dr) < near, nearY = Math.min(dt, db) < near;
-  if (!nearX && !nearY) {                                                     // inside: to the nearest anchor, never inside
-    const dmin = Math.min(dl, dr, dt, db);
-    const side0 = dmin === dl ? 'l' : dmin === dr ? 'r' : dmin === dt ? 't' : 'b';
-    const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
-    const side = side0 === 'l' || side0 === 'r' ? (fy < .2 ? 't' + side0 : fy > .8 ? 'b' + side0 : side0) : (fx < .2 ? side0 + 'l' : fx > .8 ? side0 + 'r' : side0);
-    return { host: under.dataset.id, side, at: side === 't' || side === 'b' ? e.clientX : e.clientY };
-  }
-  const v = dt < db ? 't' : 'b', hside = dl < dr ? 'l' : 'r';
-  const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
-  let side;
-  if (nearX && nearY) side = v + hside;                                       // a corner
-  else if (nearX) side = fy < .2 ? 't' + hside : fy > .8 ? 'b' + hside : hside;
-  else side = fx < .2 ? v + 'l' : fx > .8 ? v + 'r' : v;
-  return { host: under.dataset.id, side, at: side === 't' || side === 'b' ? e.clientX : e.clientY };
+// What a circle pins to, from the circle itself (its rectangle, or one around the pointer for a new one): as soon as it
+// reaches a document, post-it or frame (documents first), it goes to the anchor of the side it comes to; inside, to the
+// nearest anchor. Under a document it docks instead (see dockAt).
+const EDGE_NEAR = 22;
+function probeOf(it, e) {
+  const me = it && elOf(it.id), z = S.view.z;
+  if (me) { const r = me.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; }
+  return { l: e.clientX - 19 * z, t: e.clientY - 19 * z, r: e.clientX + 19 * z, b: e.clientY + 19 * z };
 }
-// The dotted slot: where a circle being dragged would be pinned if dropped now.
+function pinTarget(it, e) {
+  const me = it && elOf(it.id), p = probeOf(it, e), cx = (p.l + p.r) / 2, cy = (p.t + p.b) / 2, rad = (p.r - p.l) / 2, near = EDGE_NEAR + rad;
+  const touches = (r) => cx > r.left - near && cx < r.right + near && cy > r.top - near && cy < r.bottom + near;
+  const cands = [...itemsEl.querySelectorAll('[data-k="d"], [data-k="p"]')].filter((el) => el !== me).reverse()
+    .concat([...framesEl.querySelectorAll('.frame')].reverse());
+  const host = cands.find((el) => touches(el.getBoundingClientRect()));
+  if (!host) return null;
+  const r = host.getBoundingClientRect();
+  const fx = Math.min(1, Math.max(0, (cx - r.left) / r.width)), fy = Math.min(1, Math.max(0, (cy - r.top) / r.height));
+  const dl = Math.abs(cx - r.left), dr = Math.abs(cx - r.right), dt = Math.abs(cy - r.top), db = Math.abs(cy - r.bottom);
+  const dmin = Math.min(dl, dr, dt, db);
+  const edge = dmin === dl ? 'l' : dmin === dr ? 'r' : dmin === dt ? 't' : 'b';
+  const corner = (k) => k < 0.18 ? 0 : k > 0.82 ? 1 : null;
+  let side;
+  if (edge === 'l' || edge === 'r') { const c = corner(fy); side = c === null ? edge : (c ? 'b' : 't') + edge; }
+  else { const c = corner(fx); side = c === null ? edge : edge + (c ? 'r' : 'l'); }
+  return { host: host.dataset.id, side, at: side === 't' || side === 'b' ? cx : cy };
+}
+// The dotted slot: where a circle being dragged would land if dropped now (a dock slot under a page, or an anchor).
 function pinHint(it, e) {
   const hint = $('#pinhint');
-  // under a document, where it would dock: a horizontal dotted slot as wide as the page, at its place in the column
   const w = toWorld(e.clientX, e.clientY), dk = it && dockAt(w.x, w.y, it);
   if (dk) {
     const de = elOf(dk.d.id), [dw, dh] = sizeOf(de, dk.d), sc = dk.d.s || 1, z = S.view.z;
@@ -395,15 +514,9 @@ function pinHint(it, e) {
   const pt = it && pinTarget(it, e);
   if (!pt) { hint.classList.remove('on'); return; }
   const f = find(pt.host), hel = elOf(pt.host); if (!f || !hel) return hint.classList.remove('on');
-  const z = S.view.z, h = f.o; let wx, wy, sc = 1;
-  if (pt.side === 'tab') {
-    const tab = hel.querySelector('.ftab'), n = pinnedTo(h.id).filter((x) => x !== it && x.pin.side === 'tab').length;
-    wx = h.x + 16 + tab.offsetWidth + 10 + n * 44 + 19; wy = h.y - tab.offsetHeight / 2;
-  } else {
-    sc = h.s || 1;
-    const n = pinnedTo(h.id).filter((x) => x !== it && x.pin.side === pt.side).length;
-    [wx, wy] = anchorAt(h, hel, pt.side, /^[tb][lr]$/.test(pt.side) ? n : n, /^[tb][lr]$/.test(pt.side) ? n + 1 : n + 1, sc);
-  }
+  const z = S.view.z, sc = f.k === 'f' ? 1 : f.o.s || 1;
+  const n = pinnedTo(f.o.id).filter((x) => x !== it && x.pin.side === pt.side).length;
+  const [wx, wy] = anchorAt(f, hel, pt.side, n, n + 1, sc);
   const d = 38 * sc * z;
   Object.assign(hint.style, { left: S.view.x + wx * z - d / 2 + 'px', top: S.view.y + wy * z - d / 2 + 'px', width: d + 'px', height: d + 'px' });
   hint.classList.add('on');
@@ -416,11 +529,11 @@ function dockTarget(t) {
 }
 function dockAt(cx, cy, t) {
   for (const d of S.docs) {
-    if (d.place !== 'canvas' || d.id === t.dock && false) continue;
+    if (d.place !== 'canvas' || inOtherTab(d)) continue;
     const de = elOf(d.id); if (!de) continue;
     const [dw, dh] = sizeOf(de, d);
     const stack = docked(d).filter((x) => x !== t).reduce((acc, x) => { const xe = elOf(x.id); return acc + (xe ? xe.offsetHeight * (x.s || 1) + 6 : 0); }, 0);
-    if (cx > d.x && cx < d.x + dw && cy > d.y + dh + 50 * (d.s || 1) && cy < d.y + dh + stack + 130) {   // below the bottom anchors
+    if (cx > d.x && cx < d.x + dw && cy > d.y + dh + 22 * (d.s || 1) && cy < d.y + dh + stack + 130) {   // under the page: a column
       const others = docked(d).filter((x) => x !== t);
       const at = others.filter((x) => x.y + 10 < cy - 18).length;           // its place in the stack, by where it was dropped
       return { d, at, others };
@@ -528,7 +641,7 @@ function putInTray(docs, trayId) {
   return t;
 }
 function render() { renderItems(); renderStash(); renderPanel(); paintSelBar(); applyView(); }
-function changed() { save(); render(); ed?.refresh(); }
+function changed() { save(); render(); assignTabs(); ed?.refresh(); }
 function paintSel() { for (const el of world.querySelectorAll('[data-k]')) el.classList.toggle('sel', sel.has(el.dataset.id)); paintSelBar(); }
 
 // ---- selection bar: copy all of a group at once -------------------------------------------------------------------
@@ -536,6 +649,7 @@ function paintSelBar() {
   const bar = $('#selbar'), n = [...sel].filter((id) => find(id)).length;
   bar.classList.toggle('on', n >= 2);
   if (n >= 2) $('#selbar-n').textContent = `${n} seleccionados`;
+  bar.classList.toggle('no-arrange', !arrangeKind());
 }
 function groupText() {
   const parts = [];
@@ -548,6 +662,42 @@ function groupText() {
   }
   return parts.filter((p) => p.trim()).join('\n\n');
 }
+function moveWith(o, dx, dy) {
+  if (!dx && !dy) return;
+  const keep = new Set(sel); sel.clear(); sel.add(o.id);
+  const group = collectMoving(false); sel.clear(); for (const id of keep) sel.add(id);
+  for (const m of group) { m.o.x = Math.round(m.o.x + dx); m.o.y = Math.round(m.o.y + dy); }
+}
+// The kind the group bar arranges: the most common among the selected (documents, post-its, texts), if two or more.
+function arrangeKind() {
+  const n = {}; for (const id of sel) { const f = find(id); if (f && !['f', 'i', 't'].includes(f.k) && !f.o.pin && !f.o.dock) n[f.k] = (n[f.k] || 0) + 1; }
+  const best = Object.entries(n).sort((a, b) => b[1] - a[1])[0];
+  return best && best[1] >= 2 ? best[0] : null;
+}
+function arrange(how) {
+  const pool = [...sel].map(find).filter((x) => x && !['f', 'i', 't'].includes(x.k) && !x.o.pin && !x.o.dock);
+  const kind = arrangeKind(); if (!kind) return;
+  const list = pool.filter((x) => x.k === kind).map((x) => {
+    const el = elOf(x.o.id), [w, h] = el ? sizeOf(el, x.o) : [0, 0]; return { o: x.o, w, h };
+  });
+  // only the top-level ones (not those inside another selected thing)
+  const { ownerOf } = owners(), ids = new Set(list.map((x) => x.o.id));
+  const top = list.filter((x) => { let own = ownerOf.get(x.o.id); while (own) { if (ids.has(own)) return false; own = ownerOf.get(own); } return true; });
+  if (top.length < 2) return toast('Selecciona al menos dos cosas sueltas');
+  snap();
+  if (how === 'left') { const x0 = Math.min(...top.map((t) => t.o.x)); for (const t of top) moveWith(t.o, x0 - t.o.x, 0); }
+  if (how === 'top') { const y0 = Math.min(...top.map((t) => t.o.y)); for (const t of top) moveWith(t.o, 0, y0 - t.o.y); }
+  if (how === 'h' || how === 'v') {
+    const X = how === 'h' ? 'x' : 'y', W = how === 'h' ? 'w' : 'h';
+    const sorted = [...top].sort((a, b) => a.o[X] - b.o[X]);
+    const span = sorted.at(-1).o[X] + sorted.at(-1)[W] - sorted[0].o[X], used = sorted.reduce((a, t) => a + t[W], 0);
+    const gap = Math.max(16, (span - used) / (sorted.length - 1));
+    let at = sorted[0].o[X];
+    for (const t of sorted) { moveWith(t.o, X === 'x' ? at - t.o.x : 0, X === 'y' ? at - t.o.y : 0); at += t[W] + gap; }
+  }
+  enforceStack(); save(); render(); paintSel();
+}
+for (const [id, how] of [['sb-left', 'left'], ['sb-top', 'top'], ['sb-h', 'h'], ['sb-v', 'v']]) $('#' + id).onclick = () => arrange(how);
 $('#selbar-copy').onclick = async () => { await navigator.clipboard.writeText(groupText()); toast('Copiado todo el grupo'); };
 $('#selbar-del').onclick = () => removeIds([...sel]);
 
@@ -653,7 +803,7 @@ function editPostit(p) {
   }, { once: true });
 }
 // Stacking: what is on the plane has a z; new things and «Al frente» go on top, «Al fondo» under everything.
-const stackable = () => [...S.docs.filter((d) => d.place === 'canvas'), ...S.postits, ...S.ideas, ...S.tasks];
+const stackable = () => [...S.docs.filter((d) => d.place === 'canvas'), ...S.postits, ...S.texts, ...S.ideas, ...S.tasks];
 const topZ = () => Math.max(0, ...stackable().map((o) => o.z || 0)) + 1;
 // Interior: who owns whom. A thing belongs to the smallest bigger thing (not of a lower kind) whose rectangle holds its
 // centre; ties go to the one on top. Edge things (pinned, docked) belong to their host and are left out here.
@@ -711,7 +861,7 @@ function fitFrame(f, near) {
     if (o.x + w > R.x && o.x < R.x + R.w && o.y + h > R.y && o.y < R.y + R.h) boxes.push([o.x, o.y, w, h]);
   }
   if (!boxes.length) return false;
-  const pad = 28;
+  const pad = FIT_PAD;
   const x0 = Math.min(...boxes.map((b) => b[0])), y0 = Math.min(...boxes.map((b) => b[1]));
   const x1 = Math.max(...boxes.map((b) => b[0] + b[2])), y1 = Math.max(...boxes.map((b) => b[1] + b[3]));
   f.x = Math.round(x0 - pad); f.y = Math.round(y0 - pad); f.w = Math.round(x1 - x0 + pad * 2); f.h = Math.round(y1 - y0 + pad * 2);
@@ -726,13 +876,12 @@ function frameInside(outer) {
   editInline(elOf(f.id).querySelector('.ftitle'), (v) => { f.title = v || ''; save(); render(); }, true);
 }
 const RIBBON_RED = '#d9534f';
-const SIGN_COLORS = [RIBBON_RED, RIBBON_RED];          // new ribbons are red; the reader offers the others
 const RIBBON_COLORS = [RIBBON_RED, '#e8973a', '#e5c33f', '#5cae6b', '#4a90d9', '#8e6bd1', '#d96aa6', '#6b6470'];
 function dropSign(e) {
   const sp = signSpot(e);
   if (!sp) return toast('Suéltalo junto al borde de un documento, post-it, idea, tarea o marco');
   snap();
-  const g = { id: uid(), host: sp.hostEl.dataset.id, edge: sp.edge, t: sp.t, text: '', color: SIGN_COLORS[S.signs.length % SIGN_COLORS.length] };
+  const g = { id: uid(), host: sp.hostEl.dataset.id, edge: sp.edge, t: sp.t, text: '', color: RIBBON_RED };
   S.signs.push(g); save(); renderItems(); paintSel();
   openSign(g, true);
 }
@@ -870,6 +1019,7 @@ function removeIds(ids) {
   S.signs = (S.signs || []).filter((g) => !set.has(g.host));
   S.texts = (S.texts || []).filter((x) => !set.has(x.id));
   S.postits = S.postits.filter((p) => !set.has(p.id));
+  for (const o of things()) if (o.ftab && set.has(o.ftab.f)) delete o.ftab;
   S.frames = S.frames.filter((f) => !set.has(f.id));
   for (const it of [...S.ideas, ...S.tasks].filter((x) => set.has(x.id))) {
     if (docsUsing(it).length) { it.onCanvas = false; left++; continue; }
@@ -883,6 +1033,7 @@ function removeIds(ids) {
 }
 function restoreFrom(h) {
   const { k, o } = h.restore;
+  snap();
   if (k === 'd') { S.docs.push({ ...o }); }
   else if (k === 'p') S.postits.push({ ...o });
   else if (k === 'f') S.frames.push({ ...o });
@@ -899,7 +1050,7 @@ async function docAction(a, d) {
   snap();
   const before = d.text;
   d.text = a === 'add' ? (d.text ? d.text.replace(/\n*$/, '\n') + clip : clip) : clip;
-  d.updated = Date.now();
+  d.updated = Date.now(); d.name = titleOf(d.text) || d.name;
   log('editar', `${a === 'add' ? 'Añadiste a' : 'Reemplazaste'} «${d.name}»`, { docId: d.id, before });
   changed();
   toast(a === 'add' ? `Añadido al final de «${d.name}»` : `«${d.name}» reemplazado`, [['Deshacer', doUndo]]);
@@ -909,6 +1060,9 @@ async function docAction(a, d) {
 let act = null, space = false;
 vp.addEventListener('contextmenu', (e) => e.preventDefault());
 vp.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.ied')) return;                       // writing in a live page
+  const ae = document.activeElement;
+  if (ae?.isContentEditable && !e.target.closest('[contenteditable="true"]')) ae.blur();   // a click elsewhere = Enter
   if (e.target.closest('.dgroup')) return;
   const sgEl = e.target.closest('.sign');
   if (sgEl) {
@@ -917,7 +1071,7 @@ vp.addEventListener('pointerdown', (e) => {
     act = { k: 'sign', g: S.signs.find((x) => x.id === sgEl.dataset.sign), el: sgEl, sx: e.clientX, sy: e.clientY, moved: false };
     return;
   }
-  if (e.target.closest('.acts, .x, .pal, .chk, .f-add, .wtext, [contenteditable="true"]')) return;
+  if (e.target.closest('.acts, .x, .pal, .chk, .f-add, .tab-add, .wtext, [contenteditable="true"]')) return;
   const it = e.target.closest('[data-k]');
   // pan: dragging the empty grid (the common thing), or middle/right button, or Space + drag; Ctrl + drag selects a group
   if (e.button === 1 || e.button === 2 || (e.button === 0 && (space || (!it && !e.ctrlKey && !e.metaKey)))) {
@@ -930,10 +1084,19 @@ vp.addEventListener('pointerdown', (e) => {
   const prs = e.target.closest('.prs');
   if (prs) {
     const host = prs.closest('[data-k]'), p = find(host.dataset.id).o;
+    if (p.pin || p.dock) return;                   // an edge thing has its host's size
     const keep = new Set(sel); sel.clear(); sel.add(p.id);
     const deps = collectMoving(e.altKey).filter((m) => m.o !== p).map((m) => ({ ...m, s0: m.o.s || 1, w0: m.o.w, h0: m.o.h }));
     sel.clear(); for (const id of keep) sel.add(id); sel.add(p.id); paintSel();
-    act = { k: 'scale', p, sx: e.clientX, s0: p.s || 1, w0: host.offsetWidth, el: host, deps }; return;
+    // the other selected things (not frames, not on an edge) scale along, each from its own corner, with what they hold
+    const co = [...sel].map(find).filter((x) => x && x.o !== p && x.k !== 'f' && !x.o.pin && !x.o.dock).map((x) => {
+      const el = elOf(x.o.id); if (!el) return null;
+      const keep2 = new Set(sel); sel.clear(); sel.add(x.o.id);
+      const d2 = collectMoving(false).filter((m) => m.o !== x.o).map((m) => ({ ...m, s0: m.o.s || 1, w0: m.o.w, h0: m.o.h }));
+      sel.clear(); for (const id of keep2) sel.add(id);
+      return { o: x.o, el, s0: x.o.s || 1, deps: d2 };
+    }).filter(Boolean);
+    act = { k: 'scale', p, sx: e.clientX, s0: p.s || 1, w0: host.offsetWidth, el: host, deps, co }; return;
   }
   if (rs) {
     const f = find(rs.closest('.frame').dataset.id).o;
@@ -945,7 +1108,7 @@ vp.addEventListener('pointerdown', (e) => {
     if (!e.shiftKey) {
       sel.clear(); sel.add(f.id);
       for (const m of collectMoving(false)) {
-        if (m.o === f) continue;
+        if (m.o === f || m.o.pin?.host === f.id) continue;        // its own edge things are not contents
         const [w, h] = m.k === 'f' ? [m.o.w, m.o.h] : sizeOf(m.el, m.o), y0 = m.k === 'f' ? m.o.y - 34 : m.o.y;
         hold = hold ? { x0: Math.min(hold.x0, m.o.x), y0: Math.min(hold.y0, y0), x1: Math.max(hold.x1, m.o.x + w), y1: Math.max(hold.y1, m.o.y + h) }
           : { x0: m.o.x, y0, x1: m.o.x + w, y1: m.o.y + h };
@@ -959,7 +1122,7 @@ vp.addEventListener('pointerdown', (e) => {
     if (toggle) { sel.has(id) ? sel.delete(id) : sel.add(id); }
     else if (!sel.has(id)) { sel.clear(); sel.add(id); }
     paintSel();
-    act = { k: 'move', sx: e.clientX, sy: e.clientY, moving: collectMoving(e.altKey), moved: false, id, kind: it.dataset.k, toggle, selBefore, title: e.target.closest('.ftitle, .dtitle, .fdesc') };
+    act = { k: 'move', sx: e.clientX, sy: e.clientY, moving: collectMoving(e.altKey), moved: false, id, kind: it.dataset.k, toggle, selBefore, tabEl: e.target.closest('.ftab'), title: e.target.closest('.ftitle, .dtitle, .fdesc') };
     return;
   }
   act = { k: 'box', sx: e.clientX, sy: e.clientY, add: e.shiftKey, base: new Set(sel), moved: false };   // Ctrl + drag on empty grid (Shift adds)
@@ -1049,6 +1212,7 @@ addEventListener('pointermove', (e) => {
     const f = ns / act.s0, p = act.p;
     p.s = ns; act.el.style.setProperty('--s', ns);
     scaleDeps(act.deps, p.x, p.y, f, f);
+    for (const c of act.co || []) { c.o.s = Math.round(c.s0 * f * 100) / 100; c.el.style.setProperty('--s', c.o.s); scaleDeps(c.deps, c.o.x, c.o.y, f, f); }
   } else if (act.k === 'resize') {
     if (!act.snapped) { act.snapped = true; snap(); document.body.classList.add('dragging'); }
     const dx = (e.clientX - act.sx) / z, dy = (e.clientY - act.sy) / z, c = act.c, f = act.f;
@@ -1093,7 +1257,7 @@ addEventListener('pointerup', (e) => {
     for (const m of a.moving) {
       // only the circle you grabbed is re-placed by where the pointer is; everything carried keeps its edge
       if ((m.k !== 't' && m.k !== 'i') || m.o.id !== a.id || (m.o.dock && movedDocs.has(m.o.dock))) continue;
-      const tg = dockTarget(m.o);
+      const wp = toWorld(e.clientX, e.clientY), tg = dockAt(wp.x, wp.y, m.o);
       if (tg) { delete m.o.pin; tg.others.splice(tg.at, 0, m.o); tg.others.forEach((x, i) => { x.dock = tg.d.id; x.dockAt = i; }); continue; }
       if (m.o.dock) { delete m.o.dock; delete m.o.dockAt; m.o.s = 1; }
       const pt = pinTarget(m.o, e);
@@ -1116,16 +1280,23 @@ addEventListener('pointerup', (e) => {
       const f = a.moving[0].o, before = { ...f };
       if (fitFrame(f)) toast('Marco ajustado a lo que tiene cerca', [['Deshacer', () => { Object.assign(f, before); save(); render(); }]]);
     }
+    for (const m of a.moving) if (m.k === 'f') shiftHidden(m.o, m.o.x - m.x0, m.o.y - m.y0);
     pushApart([...a.moving.filter((m) => m.k === 'f').map((m) => m.o), ...(a.fitOrig ? a.fitOrig.keys() : [])]);
     enforceStack();
+    assignTabs();
     save(); render();
+  } else if (a.k === 'move' && a.kind === 'f' && !a.toggle && a.tabEl && !a.tabEl.classList.contains('on')) {
+    const f = find(a.id).o; f.active = a.tabEl.dataset.tab; save(); renderItems(); paintSel();       // open that tab
   } else if (a.k === 'move' && a.title && !a.toggle) {
     const f = find(a.id).o;                              // one click on a frame's or a document's title edits it
     if (a.kind === 'd') editInline(a.title, (v) => { if (v) { renameDoc(f, v); render(); } });
     else if (a.title.classList.contains('fdesc')) editInline(a.title, (v) => { if (v !== null) { snap(); f.desc = v; save(); render(); } }, true);
-    else editInline(a.title, (v) => { if (v !== null && v !== f.title) { snap(); f.title = v; save(); render(); } }, true);
+    else {
+      const tid = a.title.closest('.ftab')?.dataset.tab, t = tabsOf(f).find((x) => x.id === tid) || tabsOf(f)[0];
+      editInline(a.title, (v) => { if (v !== null && v !== t.title) { snap(); t.title = v; if (t === tabsOf(f)[0]) f.title = v; save(); render(); } }, true);
+    }
   } else if (a.k === 'move' && !a.toggle && (a.kind === 'i' || a.kind === 't')) {
-    openItem(find(a.id).o);                             // a click on an idea or a task reads it
+    clearTimeout(clickT); clickT = setTimeout(() => openItem(find(a.id).o), 240);   // a click reads it (a double click writes)
   } else if (a.k === 'move' && !a.toggle && a.kind === 'f') {
     const f = find(a.id).o, keep = new Set([f.id]);
     sel.clear(); sel.add(f.id);
@@ -1162,6 +1333,26 @@ vp.addEventListener('click', (e) => {
   }
   const chk = e.target.closest('.chk');
   if (chk) return toggleTask(find(chk.closest('[data-k]').dataset.id).o);
+  const ta = e.target.closest('.tab-add');
+  if (ta) {
+    const f = find(ta.closest('.frame').dataset.id).o; snap();
+    assignTabs();                                          // what is there now stays in the tab it was in
+    for (const o of things()) if (!o.ftab && o.pin == null && o.dock == null) {
+      const el = elOf(o.id); if (!el) continue; const [w, h] = sizeOf(el, o), cx = o.x + w / 2, cy = o.y + h / 2;
+      if (cx > f.x && cx < f.x + f.w && cy > f.y && cy < f.y + f.h) o.ftab = { f: f.id, t: activeTab(f) };
+    }
+    const t = { id: 'tab-' + uid(), title: '' }; tabsOf(f).push(t); f.active = t.id; save(); render();
+    const nt = elOf(f.id)?.querySelector(`.ftab[data-tab="${t.id}"] .ftitle`);
+    if (nt) editInline(nt, (v) => { t.title = v || `Pestaña ${tabsOf(f).length}`; save(); render(); }, true);
+    return;
+  }
+  const tx = e.target.closest('.ftab:not(:first-child) .x');
+  if (tx) {
+    const f = find(tx.closest('.frame').dataset.id).o, tid = tx.closest('.ftab').dataset.tab; snap();
+    for (const o of things()) if (o.ftab?.f === f.id && o.ftab.t === tid) o.ftab.t = tabsOf(f)[0].id;
+    f.tabs = tabsOf(f).filter((t) => t.id !== tid); f.active = tabsOf(f)[0].id; save(); render();
+    return toast('Pestaña quitada; lo suyo pasa a la primera', [['Deshacer', doUndo]]);
+  }
   const fa = e.target.closest('.f-add');
   if (fa) return frameInside(find(fa.closest('.frame').dataset.id).o);
   const x = e.target.closest('.x');
@@ -1178,8 +1369,6 @@ vp.addEventListener('dblclick', (e) => {
   if (pt) return editPostit(find(pt.dataset.id).o);
   const itx = e.target.closest('.item');
   if (itx) { const it = find(itx.dataset.id).o; return it.dock ? openItem(it, true) : writeInline(it); }
-  const ft = e.target.closest('.ftab');
-  if (ft) { const f = find(ft.closest('.frame').dataset.id).o; return editInline(ft.querySelector('.ftitle'), (v) => { if (v !== null) { f.title = v; save(); render(); } }, true); }
 });
 
 // Ctrl+V on the plane: a copied idea or task appears here; any other text becomes a post-it.
@@ -1193,7 +1382,7 @@ addEventListener('paste', (e) => {
   snap();
   if (m) {
     const it = getItem(m[1], +m[2]); if (!it) return toast('Esa ya no existe');
-    it.onCanvas = true; it.x = Math.round(w.x - 90); it.y = Math.round(w.y - 18); it.z = topZ();
+    it.onCanvas = true; it.x = Math.round(w.x - 19); it.y = Math.round(w.y - 19); it.z = topZ(); delete it.pin; delete it.dock;
     sel.clear(); sel.add(it.id); changed(); return;
   }
   const p = { id: uid(), x: Math.round(w.x - 85), y: Math.round(w.y - 75), z: topZ(), text: t, color: PASTEL[0] };
@@ -1299,6 +1488,7 @@ function shiftFrame(f, dx, dy) {
   const keep = new Set(sel); sel.clear(); sel.add(f.id);
   const group = collectMoving(false); sel.clear(); for (const id of keep) sel.add(id);
   for (const m of group) { m.o.x = Math.round(m.o.x + dx); m.o.y = Math.round(m.o.y + dy); }
+  shiftHidden(f, dx, dy);
 }
 function pushApart(changed) {
   const queue = [...new Set(changed)].filter((f) => S.frames.includes(f));
@@ -1435,7 +1625,7 @@ function moveGhost(e) {
     world.querySelector('.sign.preview')?.remove();
     const sp = signSpot(e);
     ghost.style.display = sp ? 'none' : 'flex';
-    if (sp) sp.hostEl.insertAdjacentHTML('beforeend', signHTML({ id: 'preview', edge: sp.edge, t: sp.t, color: SIGN_COLORS[S.signs.length % SIGN_COLORS.length] }, ' preview'));
+    if (sp) sp.hostEl.insertAdjacentHTML('beforeend', signHTML({ id: 'preview', edge: sp.edge, t: sp.t, color: RIBBON_RED }, ' preview'));
     return;
   }
   hotTray(e, gh.kind === 'doc' || gh.kind === 'chip');
@@ -1453,7 +1643,7 @@ function dropGhost(e) {
     if (tray) { if (tray !== trayOf(d).id) { snap(); putInTray([d], tray); save(); render(); } return; }
     if (overCanvas(e)) {
       snap(); const w = toWorld(e.clientX, e.clientY);
-      d.place = 'canvas'; d.x = Math.round(w.x - DOC_W / 2); d.y = Math.round(w.y - 20); releaseRiders(d);
+      d.place = 'canvas'; d.x = Math.round(w.x - DOC_W / 2); d.y = Math.round(w.y - 20); d.z = topZ(); releaseRiders(d);
       sel.clear(); sel.add(d.id); save(); render();
     }
     return;
@@ -1534,11 +1724,6 @@ stash.addEventListener('click', (e) => {
     save();
   }
 });
-stash.addEventListener('dblclick', (e) => {
-  const nm = e.target.closest('.t-name'); if (!nm) return;
-  const t = S.trays.find((o) => o.id === nm.closest('.tray').dataset.tray);
-  editInline(nm, (v) => { if (v) { t.name = v; save(); renderStash(); } });
-});
 addEventListener('resize', () => renderStash());
 function nearestDrawer(y) {
   let best = null, bd = Infinity;
@@ -1598,7 +1783,7 @@ function groupedRows(list) {
 let taskFilter = localStorage.getItem('meadow.taskFilter') || 'pend';
 function goTo(id) {
   const f = find(id); if (!f) return toast('Ya no existe');
-  if (f.k === 'd') { if (f.o.place === 'canvas') { /* documents open */ } return openEditor(f.o.id); }
+  if (f.k === 'd') return openEditor(f.o.id);
   if (f.k === 'i' || f.k === 't') return locate(f.o);
   if (edOpen()) closeEditor();
   const el = elOf(id); centerOn(f.o, el); sel.clear(); sel.add(id); paintSel();
@@ -1665,7 +1850,7 @@ function locate(it) {
 }
 
 // ---- keyboard ------------------------------------------------------------------------------------------------------
-const typing = (e) => e.target.closest?.('input, textarea, select, [contenteditable="true"], .cm-editor');
+const typing = (e) => e.target.closest?.('input, textarea, select, [contenteditable="true"], .cm-editor, .ied');
 addEventListener('keydown', (e) => {
   document.body.classList.toggle('ctrl', e.ctrlKey || e.metaKey);
   if ($('#reader').classList.contains('open')) { if (e.key === 'Escape') closeReader(); return; }
@@ -1681,7 +1866,7 @@ addEventListener('keydown', (e) => {
     e.preventDefault();
     if (sel.size === 1) { const f = find([...sel][0]); if (f && (f.k === 'i' || f.k === 't')) { navigator.clipboard.writeText(token(f.o)); return toast('Copiada para pegar'); } }
     navigator.clipboard.writeText(groupText()); toast(sel.size === 1 ? 'Copiado' : 'Copiado todo el grupo');
-  } else if (e.key === 'Escape') { sel.clear(); paintSel(); if (traysShown) showTrays(false); }
+  } else if (e.key === 'Escape') { if ($('#editpill').classList.contains('on')) return $('#ep-back').click(); sel.clear(); paintSel(); if (traysShown) showTrays(false); }
 });
 addEventListener('keyup', (e) => {
   document.body.classList.toggle('ctrl', e.ctrlKey || e.metaKey);
@@ -1770,6 +1955,7 @@ function closeSession() {
 }
 function openEditor(id, push = true) {
   const d = docById(id); if (!d) return;
+  unmountInline();
   if (curId && push && curId !== id && ed) hist.push({ id: curId, pos: ed.view.state.selection.main.head, top: ed.view.scrollDOM.scrollTop });
   closeSession(); session = { id, before: d.text || '' };
   curId = id;
@@ -1794,7 +1980,7 @@ function backlinks() {
     ? '<span>Enlazado desde</span>' + from.map((o) => `<button data-id="${o.id}">📄 ${esc(o.name)}</button>`).join('')
     : '<span><b>[</b> busca documentos, ideas y tareas, o crea una nueva · <b>[nombre*]</b> crea un documento · Ctrl+clic abre un enlace · <b># Título</b> hace secciones</span>';
 }
-function closeEditor() { closeSession(); $('#ed').classList.remove('open'); curId = null; hist = []; render(); }
+function closeEditor() { closeSession(); $('#ed').classList.remove('open'); curId = null; hist = []; render(); nearDocs(); }
 $('#ed-close').onclick = closeEditor;
 $('.ed-back').onclick = closeEditor;
 $('#ed-prev').onclick = () => backTo(hist.length - 1);

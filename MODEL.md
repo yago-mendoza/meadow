@@ -23,10 +23,11 @@ Yago, 26.11: «relación de interior o de borde, no hay más».
 - **Interior.** Cada cosa pertenece a lo más pequeño, de género igual o mayor, cuyo rectángulo contiene su centro (si
   empatan, lo de arriba). Un marco contiene además los marcos que caben enteros en él. *Un marco nunca es más pequeño que
   lo que contiene, y nunca se solapa con un marco que no esté dentro de él: si lo pisa, lo empuja.*
-- **Borde.** Fichas clavadas en uno de los 8 anclajes de una hoja o post-it (4 esquinas y el centro de cada lado; en un
-  marco, junto a su lengüeta), fichas enganchadas debajo de una hoja (en columna, del ancho de la hoja, 3 líneas; más de
-  5, el tipo mayoritario se pliega en un circulito con número) y ribetes atados a un borde. Lo de borde hereda el tamaño
-  y la altura de su anfitrión: no se escala ni va al frente o al fondo por su cuenta.
+- **Borde.** Ideas y tareas viven solo aquí, nunca dentro de nada: en uno de los 8 atractores de un documento, post-it o
+  marco (4 esquinas y el centro de cada lado, con la línea del borde pasando por su centro), o enganchadas debajo de un
+  documento (en columna, del ancho de la hoja, 3 líneas; más de 5, el tipo mayoritario se pliega en un circulito con
+  número). Soltadas dentro de algo, van a su atractor más cercano. Los ribetes también son de borde. Lo de borde hereda el
+  tamaño y la altura de su anfitrión: no se escala ni va al frente o al fondo por su cuenta.
 
 Con las dos pasa lo mismo: **lo de dentro y lo del borde viajan con su anfitrión** al moverlo, escalarlo o guardarlo en
 un cajón, y **lo pequeño nunca mueve ni cambia lo grande**.
@@ -43,6 +44,10 @@ un cajón, y **lo pequeño nunca mueve ni cambia lo grande**.
 | **Esquina** | estira (Shift: escala lo de dentro) | escala con lo que lleva | escala | escala (no si está clavada o enganchada) | — |
 | **Supr** | borra lo seleccionado | | | | |
 | **Ctrl+Z** | deshace cualquier operación | | | | |
+
+Acercarse a un documento lo convierte en el documento vivo: se lee y se escribe en la propia hoja, por páginas (la
+rueda pasa página; Ctrl+rueda acerca); abajo, «Volver al plano» (Esc) y «Pantalla completa». Un marco puede tener
+pestañas, como un archivador: cada una con su contenido.
 
 En el vacío: arrastrar mueve la vista; Ctrl+arrastrar selecciona; la rueda acerca. Enter vuelve a donde estabas.
 
