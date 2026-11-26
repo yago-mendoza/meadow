@@ -23,7 +23,7 @@ Soltar algo en otro peldaño lo convierte, y todo lo que lleva dentro baja o sub
 - Un marco soltado en un texto → títulos; sus pestañas → subtítulos; y así hacia abajo.
 - Nada escrito se pierde: el texto que no tiene página donde vivir se guarda en un documento.
 
-Qué hijo admite cada uno: proyecto → apartado · apartado → apartados o marcos · marco → pestaña · pestaña de marco → marco o documento · documento →
+Qué hijo admite cada uno: proyecto → apartado · apartado → apartados, o marcos y documentos sueltos · marco → pestaña · pestaña de marco → marco o documento · documento →
 pestaña · pestaña de documento → títulos en el texto.
 
 ## Pantalla

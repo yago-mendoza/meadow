@@ -510,3 +510,14 @@ body.drag-hang #stage .ft { outline-offset: 1px; }
 #areas .ar-col:not(.last) > :not(.ar-strip) { transition: opacity .2s .06s; }
 #areas .ar-col:not(.last).hov > .ar-strip { opacity: 0; transition: opacity .16s; }
 #areas .ar-col:not(.last) > .ar-strip { transition: opacity .2s .1s; }
+
+/* removing a column */
+.ar-dis { margin-top: auto; padding: 6px 10px; border-radius: 9px; text-align: left; font: 600 11.5px "Segoe UI", sans-serif; color: #b3a5b8; }
+.ar-dis:hover { background: #fbe0dc; color: #b8443f; }
+/* a loose document in an area sits in the grid like a frame */
+.grid > .dc { flex: none; }
+
+/* the task button in the editor's header: the task's own little box */
+.ed-task-ico { display: inline-block; width: 13px; height: 13px; border: 1.6px solid #8fb3df; border-radius: 4px; background: #fff; vertical-align: -2px; }
+#ed-task:hover .ed-task-ico { border-color: var(--accent); }
+.cm-chip-text.empty { font-style: italic; color: #a397a5; }

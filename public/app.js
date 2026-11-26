@@ -200,7 +200,7 @@ const colsDepth = () => Math.max(1, ...nd(S.root).kids.filter((k) => nd(k)?.kind
 // What a thing becomes inside a parent of each kind
 function childKind(pk, g) {
   if (pk === 'project') return 'area';
-  if (pk === 'area') return 'frame';
+  if (pk === 'area') return g.kind === 'doc' || g.kind === 'dtab' || g.kind === 'h' ? 'doc' : 'frame';
   if (pk === 'frame') return 'ftab';
   if (pk === 'ftab') return g.kind === 'frame' || g.kind === 'project' || g.kind === 'area' ? 'frame' : 'doc';
   if (pk === 'doc') return 'dtab';
@@ -262,6 +262,11 @@ function placeUnderHead(g, tabId, line) {
 }
 function tidy() {
   reindex();
+  for (const a of Object.values(S.nodes)) if (a.kind === 'area' && isGroup(a) && a.kids.some((k) => nd(k)?.kind !== 'area')) {
+    const loose = a.kids.filter((k) => nd(k)?.kind !== 'area'), g = mk('area', 'General'); g.kids = loose;
+    a.kids = [g.id, ...a.kids.filter((k) => nd(k)?.kind === 'area')];
+  }
+  reindex();
   if (S.nodes[S.root] && !nd(S.root).kids.length) { const g = mk('area', 'General'); nd(S.root).kids.push(g.id); reindex(); }
   for (const n of Object.values(S.nodes)) if (n.kind === 'frame' || n.kind === 'doc') ensureTab(n);
   for (const it of [...S.ideas, ...S.tasks]) if (it.at && !nd(it.at)) it.at = null;
@@ -310,7 +315,7 @@ function renderStage() {
   const f = nd(S.focus);
   const before = measure(stage, '.fr[data-id], .dc[data-id]');
   stage.innerHTML = f.kind === 'project' || f.kind === 'area'
-    ? `<div class="grid">${f.kids.map((k) => frameHTML(k, 0)).join('')}<div class="fr-new" data-drop="into" data-id="${f.id}"><button class="new-frame">＋ Marco</button></div></div>`
+    ? `<div class="grid" data-drop="into" data-id="${f.id}">${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}<div class="fr-new" data-drop="into" data-id="${f.id}"><button class="new-frame">＋ Marco</button></div></div>`
     : `<div class="solo">${frameHTML(f.id, 0)}</div>`;
   if (!skipFlip) flip(stage, before, () => 1, { sel: '.dc[data-id]', appear: false });
 }
@@ -328,7 +333,7 @@ function renderAreas(peek) {
   }
   const btn = (k, i) => { const a = nd(k), g = isGroup(a); return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><span class="ar-t">${esc(a.title)}</span><i>${a.kids.length || ''}</i><b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
-  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b></span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button></div>`).join('');
+  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b></span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; paintHov(); }   // unchanged: leave it (keeps hover, double clicks)
   arPids = cols.map((c) => c.pid);
   if (!peek) document.documentElement.style.setProperty('--areas-w', $('#areas').offsetWidth + 'px');
@@ -484,7 +489,9 @@ function targetAt(x, y) {
   else if (mode === 'into') spec = { kind: 'place', pid: id, idx: indexInFlow(t, x, y), el: t };
   else if (mode === 'area') {
     const r = t.getBoundingClientRect(), fy = (y - r.top) / r.height, pp = PAR.get(id), i = nd(pp).kids.indexOf(id);
-    spec = src.node && nd(src.node)?.kind === 'area' ? { kind: 'place', pid: pp, idx: fy < .5 ? i : i + 1, forced: 'area', el: t, side: fy < .5 ? 't' : 'b' } : { kind: 'place', pid: leafOf(id), el: t };
+    spec = src.node && nd(src.node)?.kind === 'area'
+      ? (fy < .3 || fy > .7 ? { kind: 'place', pid: pp, idx: fy < .5 ? i : i + 1, forced: 'area', el: t, side: fy < .5 ? 't' : 'b' } : { kind: 'place', pid: id, forced: 'area', into: true, el: t })
+      : { kind: 'place', pid: leafOf(id), el: t };
   } else if (mode === 'doc') {
     const r = t.getBoundingClientRect(), fx = (x - r.left) / r.width, p = PAR.get(id), i = nd(p)?.kids.indexOf(id);
     spec = fx < 0.25 ? { kind: 'place', pid: p, idx: i, el: t, side: 'l' } : fx > 0.75 ? { kind: 'place', pid: p, idx: i + 1, el: t, side: 'r' } : { kind: 'place', pid: id, forced: 'dtab', el: t };
@@ -503,6 +510,7 @@ function targetAt(x, y) {
   return spec;
 }
 function valid(src, t) {
+  if (t.into && src.node && (src.node === t.pid || pathOf(t.pid).filter((n) => n.kind === 'area').length + areaDepth(src.node) > MAXCOLS)) return false;   // no more than 4 columns
   if (src.make) return t.kind !== 'drawer' && t.kind !== 'head' || src.make === 'doc' || src.make === 'frame';
   const own = src.node || (src.head && src.head.tab);
   if (t.kind === 'place' && src.node && (t.pid === src.node || isIn(t.pid, src.node))) return false;
@@ -563,7 +571,7 @@ function makeAt(kind, t) {
   if (kind === 'idea' || kind === 'tarea') {
     const at = t?.kind === 'place' ? (nd(t.pid).kind === 'ftab' ? parent(t.pid).id : t.pid) : t?.kind === 'head' ? t.tab : (cur || S.focus);
     const it = newItem(kind, '', at); save(); renderAll();
-    if (kind === 'tarea') return openTask(it);              // a task is born as its card
+    if (kind === 'tarea') { it.fresh = true; return openTask(it); }   // a task is born as its card
     const el = document.querySelector(`[data-it="${it.id}"]`) || $('#tools .t-' + kind);
     popEdit(el, '', (v) => { if (!v) { listOf(kind).splice(listOf(kind).indexOf(it), 1); } else it.text = v; save(); renderAll(); });
     return;
@@ -582,6 +590,7 @@ function defaultHome(kind) {
   const f = nd(S.focus);
   if (kind === 'frame') return f.kind === 'project' || f.kind === 'area' ? (f.kind === 'area' ? f.id : S.area) : activeTab(f);
   if (f.kind === 'frame') return activeTab(f);
+  if (f.kind === 'area' && kind === 'doc') return f.id;
   let first = f.kids.map(nd).find((x) => x.kind === 'frame');
   if (!first) { first = mk('frame', 'General'); f.kids.push(first.id); reindex(); }
   return activeTab(first);
@@ -614,6 +623,16 @@ addEventListener('click', (e) => {
     if (P.kind === 'area' && loose.length) { P.kids = P.kids.filter((k) => nd(k)?.kind === 'area'); x.kids.push(...loose); }
     reindex(); S.area = x.id; S.focus = x.id; save(); renderAll();
     const el = $(`.ar[data-area="${a.id}"] .ar-t`); if (el) editInline(el, (v) => { if (v) { a.title = v; save(); } renderAll(); }); return;
+  }
+  const dis = t.closest('.ar-dis'); if (dis) {
+    const lv = +dis.dataset.lv, at = [];
+    const walk = (id, d) => { for (const k of nd(id).kids) if (nd(k)?.kind === 'area') { if (d === lv) { if (isGroup(nd(k))) at.push(k); } else walk(k, d + 1); } };
+    walk(S.root, 0);
+    return askChoice(dis, '¿Quitar esta columna?', `${at.length === 1 ? 'Su apartado desaparece' : `Sus ${at.length} apartados desaparecen`} y lo que tiene${at.length === 1 ? '' : 'n'} dentro sube a su sitio. No se borra nada más.`, [{ label: 'Quitar la columna', run: () => {
+      snap(); reindex();
+      for (const id of at) { const p = nd(PAR.get(id)), i = p.kids.indexOf(id); p.kids.splice(i, 1, ...nd(id).kids); delete S.nodes[id]; }
+      tidy(); save(); renderAll(); toast('Columna quitada', [['Deshacer', doUndo]]);
+    } }]);
   }
   if (t.closest('.ar-wrap')) {
     if (colsDepth() >= MAXCOLS) return toast('Como mucho, 4 columnas');
@@ -695,7 +714,7 @@ function lift(id) {
     if (p.kind === 'ftab') put = n.kids.flatMap((t) => nd(t).kids);
     else for (const t of n.kids) {                       // in an area: each tab becomes a frame; a lone tab lets its frames out as they are
       const T = nd(t);
-      if (n.kids.length === 1) { put.push(...T.kids.filter((k) => nd(k)?.kind === 'frame')); T.kids = T.kids.filter((k) => nd(k)?.kind !== 'frame'); if (!T.kids.length) { delete S.nodes[t]; continue; } }
+      if (n.kids.length === 1) { put.push(...T.kids); delete S.nodes[t]; continue; }
       const f = mk('frame', T.title, n.color ? { color: n.color } : {}); f.kids = [t]; f.active = t; put.push(f.id);
     }
   } else if (n.kind === 'ftab') { const near = p.kids[i - 1] ?? p.kids[i + 1]; nd(near).kids.push(...n.kids); p.active = near; }
@@ -828,7 +847,8 @@ function closeTask() {
   if (!taskOpen) return;
   if (document.activeElement?.closest?.('#task')) document.activeElement.blur();
   const it = taskNow();                                     // left empty: it was never made
-  if (it && !it.text && !it.body && !it.notes && !(it.log || []).some((e) => !e.auto) && !docsUsing(it).length) S.tasks.splice(S.tasks.indexOf(it), 1);
+  if (it?.fresh && !it.text && !it.body && !it.notes && !(it.log || []).some((e) => !e.auto)) S.tasks.splice(S.tasks.indexOf(it), 1);
+  if (it) delete it.fresh;
   taskOpen = null; $('#task').hidden = true; renderAll(); ed?.refresh?.();
 }
 function paintTask() {
@@ -904,7 +924,7 @@ function openDoc(id, tabId, fromEl) {
   $ed.classList.add('open');
   ed.setDoc(nd(curTab).text || '');
   renderEdHead(); renderMap();
-  const an = fromEl && glideFrom($('.ed-panel'), fromEl.getBoundingClientRect(), 360);
+  const an = fromEl && (fromEl.closest?.('#dock') ? restoreFrom(fromEl) : glideFrom($('.ed-panel'), fromEl.getBoundingClientRect(), 360));
   const settle = () => { ed.view.requestMeasure(); ed.refresh?.(); };
   if (an) an.finished.then(settle, settle); else requestAnimationFrame(settle);
   ed.focus();
@@ -961,21 +981,36 @@ function minimize() {
   const id = cur, tab = curTab;
   mins = mins.filter((m) => m.id !== id); mins.push({ id, tab });
   renderDock();
-  const chip = $(`#dock .dk[data-doc="${id}"]`), panel = $('.ed-panel');
-  const done = () => { closeDoc(); };
-  if (chip) {
-    const a = panel.getBoundingClientRect(), b = chip.getBoundingClientRect();
-    panel.animate([{ transformOrigin: '0 0', transform: 'none', opacity: 1 },
-      { transformOrigin: '0 0', transform: `translate(${b.left - a.left}px,${b.top - a.top}px) scale(${b.width / a.width},${b.height / a.height})`, opacity: .3 }], { duration: 300, easing: EASE.out }).finished.then(done, done);
-    chip.animate([{ opacity: 0 }, { opacity: 0 }, { opacity: 1 }], { duration: 360 });
-  } else done();
+  const chip = $(`#dock .dk[data-doc="${id}"]`), panel = $('.ed-panel'), back = $('.ed-back');
+  if (!chip) return closeDoc();
+  const a = panel.getBoundingClientRect(), b = chip.getBoundingClientRect(), k = Math.max(b.width / a.width, 0.1);
+  const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2);
+  const anims = [
+    panel.animate([{ transform: 'none', opacity: 1 }, { opacity: 1, offset: 0.45 }, { transform: `translate(${dx}px,${dy}px) scale(${k})`, opacity: 0 }],
+      { duration: 380, easing: 'cubic-bezier(.55,0,.25,1)', fill: 'forwards' }),
+    back.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, easing: 'ease-out', fill: 'forwards' }),
+  ];
+  chip.animate([{ opacity: 0, transform: 'scale(.5)' }, { opacity: 0, transform: 'scale(.5)', offset: 0.55 }, { opacity: 1, transform: 'scale(1.08)', offset: 0.85 }, { opacity: 1, transform: 'none' }],
+    { duration: 560, easing: 'ease-out' });
+  const done = () => { closeDoc(); anims.forEach((x) => x.cancel()); };
+  anims[0].finished.then(done, done);
+}
+function restoreFrom(el) {   // the reverse: out of the dock, growing whole into place
+  const panel = $('.ed-panel'), a = panel.getBoundingClientRect(), b = el.getBoundingClientRect(), k = Math.max(b.width / a.width, 0.1);
+  const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2);
+  return panel.animate([{ transform: `translate(${dx}px,${dy}px) scale(${k})`, opacity: 0 }, { opacity: 1, offset: 0.55 }, { transform: 'none', opacity: 1 }],
+    { duration: 400, easing: 'cubic-bezier(.2,.8,.25,1)' });
 }
 $('#ed-min').onclick = minimize;
+$('#ed-task').onclick = () => { if (!ed) return; const it = newItem('tarea', '', null); save(); ed.insertAtCursor('{tarea ' + it.n + '}'); openTask(it); };
 $('#dock').addEventListener('click', (e) => {
   const x = e.target.closest('.dk-x'), k = e.target.closest('.dk'); if (!k) return;
   const id = k.dataset.doc, m = mins.find((q) => q.id === id);
+  const ghostChip = k.cloneNode(true); Object.assign(ghostChip.style, { position: 'fixed', left: k.getBoundingClientRect().left + 'px', top: k.getBoundingClientRect().top + 'px', margin: 0, pointerEvents: 'none', zIndex: 29 });
   mins = mins.filter((q) => q.id !== id); renderDock();
-  if (!x) openDoc(id, m?.tab, k);
+  if (x) return;
+  document.body.append(ghostChip); openDoc(id, m?.tab, ghostChip);
+  ghostChip.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200 }).finished.then(() => ghostChip.remove());
 });
 $('.ed-back').onclick = closeDoc;
 for (const b of document.querySelectorAll('#ed-lv [data-l]')) b.onclick = () => ed?.setLevel(+b.dataset.l === level ? 0 : +b.dataset.l);
@@ -999,6 +1034,7 @@ const edApi = {
   getItems: () => [...S.tasks.filter((t) => !t.done), ...S.ideas, ...S.tasks.filter((t) => t.done)],
   createItem(kind, text) { const it = newItem(kind, text, null); save(); renderList(); return it.n; },
   toggleTask(n) { toggleTask(S.tasks.find((x) => x.n === n)); },
+  openItem(kind, n) { const it = listOf(kind).find((x) => x.n === n); if (it && kind === 'tarea') openTask(it); },
   editItem(kind, n, el) { const it = listOf(kind).find((x) => x.n === n); if (!it) return; if (kind === 'tarea') return openTask(it); popEdit(el, it.text, (v) => setItemText(it, v)); },
   createDoc(name, text = '', o = {}) {
     const p = PAR.get(cur), d = mk('doc', name); d.kids.push(mk('dtab', 'Página 1', { text }).id);
@@ -1125,7 +1161,7 @@ function backlinks() {
   const from = docs().filter((o) => o !== d && re.test(docText(o)));
   $('#ed-foot').innerHTML = from.length
     ? '<span>Enlazado desde</span>' + from.map((o) => `<button data-bl="${o.id}">📄 ${esc(o.title)}</button>`).join('')
-    : '<span>Selecciona un texto y pulsa <b>🔗 Enlazar</b> (o Ctrl+K) para enlazarlo a cualquier marco, pestaña, documento o título · <b>[</b> busca documentos, ideas y tareas</span>';
+    : '<span>Selecciona un texto y pulsa <b>🔗 Enlazar</b> (o Ctrl+K) para enlazarlo a cualquier marco, pestaña, documento o título · <b>[]</b> crea una tarea en la línea</span>';
 }
 $('#ed-foot').addEventListener('click', (e) => { const b = e.target.closest('[data-bl]'); if (b) { pushTrail(); openDoc(b.dataset.bl); } });
 

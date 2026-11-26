@@ -70,7 +70,7 @@ class ChipWidget extends WidgetType {
       ico.title = this.done ? 'Reabrir' : 'Hecha';
       ico.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); this.api.toggleTask?.(this.n); });
     }
-    const t = document.createElement('span'); t.className = 'cm-chip-text'; t.textContent = this.text || '…';
+    const t = document.createElement('span'); t.className = 'cm-chip-text' + (this.text ? '' : ' empty'); t.textContent = this.text || '…';
     if (!this.missing) {
       t.title = this.kind === 'tarea' ? 'Abrir la tarea' : 'Clic para cambiar el texto';
       t.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); this.api.editItem?.(this.kind, this.n, s); });
@@ -500,7 +500,7 @@ export function createEditor(parent, api) {
           apply: (view) => view.dispatch({ changes: { from: m.from, to: end, insert: `[${q.trim()}] ` }, selection: { anchor: m.from + q.trim().length + 3 } }) });
       }
     }
-    const docs = (api.getDocs?.() || []).filter((d) => d.name.toLowerCase().includes(ql)).slice(0, 12);
+    const docs = [];   // documents are linked with 🔗 Enlazar (Ctrl+K), not from «[»
     for (const d of docs) {
       opts.push({ label: m.text + '​' + d.n, displayLabel: `${d.icon || '📄'} ${d.name}`, detail: 'documento', type: 'doc',
         apply: (view) => view.dispatch({ changes: { from: m.from, to: end, insert: `[${d.name}*${d.n}]` },
@@ -519,7 +519,7 @@ export function createEditor(parent, api) {
           view.dispatch({ changes: { from: m.from, to: end, insert: ins }, selection: { anchor: m.from + ins.length } });
         } });
     }
-    if (ql && !docs.some((d) => d.name.toLowerCase() === ql)) {
+    if (false) {
       opts.push({ label: m.text + '​+', displayLabel: `＋ Nuevo documento «${q.trim()}»`, type: 'new',
         apply: (view) => {
           const n = api.createDoc?.(q.trim(), '', { announce: true }); if (!n) return;
@@ -600,6 +600,15 @@ export function createEditor(parent, api) {
   const changes = EditorView.updateListener.of((u) => { if (u.docChanged) api.onChange?.(u.state.doc.toString()); });
 
   let plain = false;
+  // «[]» typed anywhere: a task in that place, and its card opens to write it
+  const taskTyped = EditorView.inputHandler.of((view, from, to, text) => {
+    if (text !== ']' || api.readOnly || view.state.sliceDoc(from - 1, from) !== '[') return false;
+    const n = api.createItem?.('tarea', ''); if (!n) return false;
+    const ins = '{tarea ' + n + '}';
+    view.dispatch({ changes: { from: from - 1, to, insert: ins }, selection: { anchor: from - 1 + ins.length }, userEvent: 'input.task' });
+    setTimeout(() => api.openItem?.('tarea', n), 0);
+    return true;
+  });
   const makeState = (text) => EditorState.create({
     doc: text,
     extensions: [...(api.readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []), history(), drawSelection(), EditorView.lineWrapping, codeFolding({
@@ -607,7 +616,7 @@ export function createEditor(parent, api) {
       preparePlaceholder: (state, range) => state.doc.lineAt(range.to).number - state.doc.lineAt(range.from).number,
       placeholderDOM: (view, onclick, n) => { const s = document.createElement('span'); s.className = 'mw-fph'; s.textContent = n + (n === 1 ? ' línea' : ' líneas'); s.title = 'Desplegar'; s.onclick = onclick; return s; },
     }),
-      keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]), changes, rich.of(plain ? [] : richExt())],
+      keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]), changes, taskTyped, rich.of(plain ? [] : richExt())],
   });
 
   const view = new EditorView({ state: makeState(''), parent });
@@ -642,6 +651,7 @@ export function createEditor(parent, api) {
     setKeep(k) { if (blocksPlugin) { blocksPlugin.keep = k; } },
     foldAll(f) { blocksPlugin?.foldAll(f); },
     focus() { view.focus(); },
+    insertAtCursor(text) { const at = view.state.selection.main; view.dispatch({ changes: { from: at.from, to: at.to, insert: text }, selection: { anchor: at.from + text.length }, userEvent: 'input' }); view.focus(); },
     refresh() { view.dispatch({ effects: refreshEffect.of(null) }); },
     foldHeads(f) { blocksPlugin?.foldHeads(f); },
     toggleFoldHeads() { const any = foldedRanges(view.state).size; blocksPlugin?.foldHeads(!any); return !any; },
