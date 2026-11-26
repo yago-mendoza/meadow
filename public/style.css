@@ -997,3 +997,13 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 /* a title reads as it was written, in the page and in the editor (only the index shows its main titles in capitals) */
 .cm-h1 { text-transform: none; letter-spacing: .01em; }
 .doc.near .rh1 { text-transform: none; letter-spacing: 0; }
+/* dragging a section: the legs — a long vertical spine, a short branch at each place it can go; the chosen one reaches the line */
+.mw-tree { position: absolute; left: 10px; width: 2px; background: color-mix(in srgb, var(--accent) 35%, #fff); border-radius: 2px; z-index: 6; pointer-events: none;
+  transform-origin: top; animation: mw-grow .28s cubic-bezier(.22, 1, .36, 1); }
+@keyframes mw-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.mw-leg { position: absolute; left: 0; width: 9px; height: 2px; margin-top: -1px; border-radius: 2px; background: color-mix(in srgb, var(--accent) 45%, #fff);
+  opacity: 0; animation: mw-leg .25s ease forwards; animation-delay: calc(var(--k) * 25ms + 120ms); transition: width .18s cubic-bezier(.22, 1, .36, 1), background .15s; }
+@keyframes mw-leg { from { opacity: 0; transform: scaleX(0); } to { opacity: 1; transform: none; } }
+.mw-leg::after { content: ""; position: absolute; right: -3px; top: -2px; width: 6px; height: 6px; border-radius: 50%; background: inherit; }
+.mw-leg.same { opacity: .35 !important; animation: none; }
+.mw-leg.on { width: 16px; background: var(--accent); }

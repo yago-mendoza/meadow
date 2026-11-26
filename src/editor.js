@@ -324,7 +324,16 @@ class Blocks {
     const hole = document.createElement('div'); hole.className = 'mw-hole';
     hole.style.cssText = `top:${b.top - 2}px;height:${b.bot - b.top + 4}px`;
     const mark = document.createElement('div'); mark.className = 'mw-drop';
-    this.layer.append(hole, ghost, mark);
+    // the legs: a long vertical spine with a short branch at every place the block can go
+    const slotY = (k) => k === 0 ? L[0].top - 6 : k === L.length ? L[L.length - 1].bot + 6 : (L[k - 1].bot + L[k].top) / 2;
+    const tree = document.createElement('div'); tree.className = 'mw-tree';
+    tree.style.cssText = `top:${Math.round(slotY(0))}px;height:${Math.round(slotY(L.length) - slotY(0))}px`;
+    const legs = [];
+    for (let k = 0; k <= L.length; k++) {
+      const leg = document.createElement('div'); leg.className = 'mw-leg' + (k === i || k === i + 1 ? ' same' : '');
+      leg.style.top = Math.round(slotY(k) - slotY(0)) + 'px'; leg.style.setProperty('--k', k); tree.append(leg); legs.push(leg);
+    }
+    this.layer.append(tree, hole, ghost, mark);
     this.layer.classList.add('dragging');
     const docY = (cy) => cy - sd.getBoundingClientRect().top + sd.scrollTop;
     const y0 = docY(e.clientY);
@@ -337,6 +346,7 @@ class Blocks {
       const my = target === 0 ? L[0].top - 6 : target === L.length ? L[L.length - 1].bot + 6 : (L[target - 1].bot + L[target].top) / 2;
       mark.style.top = Math.round(my) + 'px';
       mark.style.display = target === i || target === i + 1 ? 'none' : 'block';
+      legs.forEach((g, k) => g.classList.toggle('on', k === target && target !== i && target !== i + 1));
     };
     const tick = () => { if (!this.drag) return; if (scrollV) { sd.scrollTop += scrollV; place(); } requestAnimationFrame(tick); };
     const move = (ev) => {
@@ -347,7 +357,7 @@ class Blocks {
     };
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
-      this.drag = null; ghost.remove(); hole.remove(); mark.remove(); this.layer.classList.remove('dragging');
+      this.drag = null; ghost.remove(); hole.remove(); mark.remove(); tree.remove(); this.layer.classList.remove('dragging');
       if (target !== i && target !== i + 1) {
         const order = L.map((_, k) => k).filter((k) => k !== i);
         order.splice(target > i ? target - 1 : target, 0, i);
