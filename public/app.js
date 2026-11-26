@@ -344,9 +344,9 @@ function renderAreas(peek) {
     cols.push({ pid, ids: nd(pid).kids.filter((k) => nd(k)?.kind === 'area' || (nd(k)?.kind === 'doc' && (pid === S.root || isGroup(nd(pid)) || !nd(pid).kids.some((x) => nd(x)?.kind === 'frame')))) });
     const nx = chain[lv]; if (!nx || lv + 1 >= depth) break; pid = nx;   // always as many columns as levels: an area with none inside shows an empty one
   }
-  const btn = (k, i) => { const a = nd(k), g = isGroup(a); if (a.kind === 'doc') return `<div role="button" tabindex="0" class="ar ar-doc" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Clic: abrirlo · doble clic: renombrar"><span class="ar-dico">📄</span><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el documento o guardarlo en el cajón">×</b></div>`; return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
+  const btn = (k, i) => { const a = nd(k), g = isGroup(a); if (a.kind === 'doc') return `<div role="button" tabindex="0" class="ar ar-doc sheet" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Clic: abrirlo · doble clic: renombrar"><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el documento o guardarlo en el cajón">×</b></div>`; return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
-  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b>${nb(k)}</span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<span class="ar-adds"><button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button><button class="ar-adddoc" data-pid="${c.pid}" title="Un documento en esta columna">＋ 📄</button></span>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
+  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}" data-pid="${c.pid}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b>${nb(k)}</span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.filter((k) => nd(k).kind !== 'doc').map(btn).join('')}${c.ids.some((k) => nd(k).kind === 'doc') ? `<div class="ar-docs">${c.ids.filter((k) => nd(k).kind === 'doc').map(btn).join('')}</div>` : ''}${S.ideas.filter((x) => x.at === c.pid).map((x) => `<div class="ar-idea st-${stOf(x)}" data-it="${x.id}" data-drag="item:${x.id}" title="Idea · clic para abrirla"><span>💡</span><span class="ar-t">${esc(x.text || '…')}</span></div>`).join('')}<span class="ar-adds"><button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button><button class="ar-addidea" data-pid="${c.pid}" title="Una idea en esta columna (sobre cómo organizar esto)">＋💡</button></span>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; paintHov(); }   // unchanged: leave it (keeps hover, double clicks)
   arPids = cols.map((c) => c.pid);
   if (!peek) document.documentElement.style.setProperty('--areas-w', (cols.length - 1) * 48 + 172 + 'px');   // folded strips + the open column, whatever is hovered
@@ -540,10 +540,24 @@ addEventListener('pointerup', () => {
 function targetAt(x, y) {
   const el = document.elementFromPoint(x, y); if (!el) return null;
   const src = drag.src;
-  if ((src.item || src.make === 'idea' || src.make === 'tarea' || src.make === 'dibujo') && el.closest('#areas')) {   // on an area of the column: loose in that area
-    const arEl = el.closest('.ar[data-area]'); if (!arEl || src.make === 'dibujo') return null;
-    const pid = leafOf(arEl.dataset.area);
-    return src.item ? { kind: 'hang', pid, el: arEl, ok: true } : { kind: 'place', pid, el: arEl, ok: true };
+  if (el.closest('#areas')) {
+    const itemKind = src.item ? [...S.tasks, ...S.ideas].find((x) => x.id === src.item)?.kind : (src.make === 'idea' || src.make === 'tarea') ? src.make : null;
+    const isDoc = src.make === 'doc' || (src.node && nd(src.node)?.kind === 'doc');
+    if (itemKind || isDoc || src.make === 'dibujo') {
+      if (src.make === 'dibujo') return null;
+      const col = el.closest('.ar-col'), arEl = el.closest('.ar[data-area]'), cpid = col?.dataset.pid;
+      const kindOf = (o) => (src.item ? { kind: 'hang', pid: o.pid, el: o.el, ok: true, side: o.side } : { kind: 'place', pid: o.pid, idx: o.idx, forced: isDoc ? 'doc' : undefined, el: o.el, ok: true, side: o.side });
+      if (arEl) {
+        const r = arEl.getBoundingClientRect(), fy = (y - r.top) / r.height, k = arEl.dataset.area, pp = PAR.get(k), i = nd(pp).kids.indexOf(k);
+        const edge = nd(k).kind === 'doc' || fy < .3 || fy > .7;
+        if (edge && itemKind === 'idea') return kindOf({ pid: pp, el: arEl, side: fy < .5 ? 't' : 'b' });
+        if (edge && isDoc) return kindOf({ pid: pp, idx: fy < .5 ? i : i + 1, el: arEl, side: fy < .5 ? 't' : 'b' });
+        if (nd(k).kind === 'doc') return null;
+        return kindOf({ pid: leafOf(k), el: arEl });                                  // the middle of an area: into it
+      }
+      if (cpid && (itemKind === 'idea' || isDoc)) return kindOf({ pid: cpid, el: col });   // the empty part of a column
+      return null;
+    }
   }
   const bg = el.closest('#stage') && !el.closest('.fr, .dc') ? stage.querySelector(':scope > .grid') : null;   // the empty space of an area counts as the area
   // an idea, a task or a drawing hangs on the thing it is over (a document, a tab, a frame, the area): no bars beside
@@ -693,6 +707,7 @@ addEventListener('click', (e) => {
   const tool = t.closest('#tools .tool'); if (tool) { snap(); return makeAt(tool.dataset.drag.slice(4), null); }
   const go = t.closest('[data-go]'); if (go) return focusTo(go.dataset.go);
   if (t.closest('.new-frame')) { snap(); return makeAt('frame', { kind: 'place', pid: S.area || S.root }); }
+  const ari = t.closest('.ar-idea'); if (ari) return openTask(S.ideas.find((x) => x.id === ari.dataset.it));
   const arx = t.closest('.ar-x'); if (arx) return askDelete(arx.closest('.ar').dataset.area, arx);
   const ar = t.closest('.ar'); if (ar) {
     const id = ar.dataset.area;   // the second click of a double click lands on the redrawn button: it renames
@@ -705,6 +720,7 @@ addEventListener('click', (e) => {
     snap(); const P = nd(addd.dataset.pid), d = mk('doc', 'Documento nuevo'); d.kids.push(mk('dtab', 'Página 1', { text: '' }).id); d.active = d.kids[0]; P.kids.push(d.id); reindex(); save(); renderAll();
     const el = $(`.ar[data-area="${d.id}"] .ar-t`); if (el) editInline(el, (v) => { if (v) { d.title = v; save(); } renderAll(); }); return;
   }
+  const adi = t.closest('.ar-addidea'); if (adi) { snap(); const it = newItem('idea', '', adi.dataset.pid); it.fresh = true; save(); renderAll(); return openTask(it); }
   const add = t.closest('.ar-add'); if (add) {
     snap(); const P = nd(add.dataset.pid), a = mk('area', 'Apartado nuevo'); P.kids.push(a.id);
     // next to groups, it gets the same columns inside, so it can be filled at once
