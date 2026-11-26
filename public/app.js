@@ -277,7 +277,7 @@ function tidy() {
 
 // ---- drawing ---------------------------------------------------------------------------------------------------------
 const itemsAt = (id) => [...S.tasks, ...S.ideas].filter((t) => t.at === id);
-const circles = (id) => { const l = itemsAt(id); return l.length ? `<span class="its">${l.map((it) => `<i class="it ${it.kind}${it.done ? ' done' : ''}" data-it="${it.id}" data-drag="item:${it.id}">${it.kind === 'idea' ? '💡' : it.done ? '✔' : ''}</i>`).join('')}</span>` : ''; };
+const circles = (id) => { const l = itemsAt(id); return l.length ? `<span class="its">${l.map((it) => `<i class="it ${it.kind}${it.done ? ' done' : ''}${it.kind === 'tarea' ? ' st-' + stOf(it) : ''}"${it.kind === 'tarea' && it.who && it.who !== 'Yo' ? ` data-w="${esc(it.who[0])}" title="Para ${esc(it.who)}"` : ''} data-it="${it.id}" data-drag="item:${it.id}">${it.kind === 'idea' ? '💡' : it.done ? '✔' : ''}</i>`).join('')}</span>` : ''; };
 function frameHTML(id, depth) {
   const f = nd(id), at = activeTab(f), t = nd(at), tabs = f.kids.map(nd);
   const kids = t.kids.map((k) => (nd(k).kind === 'frame' ? (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)) : docHTML(k))).join('');
@@ -385,13 +385,15 @@ function renderDrawer() {
     : '<p class="dr-none">Arrastra aquí lo que quieras apartar del árbol.</p>';
   if (S.drawer.length) $('#dr-list').insertAdjacentHTML('beforeend', '<button class="dr-empty">Vaciar el cajón</button>');
 }
-let listTab = 'tareas';
+let listTab = 'tareas', listWho = 'Todas', listDone = false;
 function nestPath(id) { return id ? pathOf(id).filter((n) => n.kind !== 'project' && !(n.kind === 'ftab' && parent(n.id)?.kids.length === 1) && !(n.kind === 'dtab' && parent(n.id)?.kids.length === 1)).map((n) => n.title).join(' › ') : ''; }
 function renderList() {
-  const rows = (l) => l.map((it) => `<div class="lrow${it.done ? ' done' : ''}" data-at="${it.at || ''}" data-it="${it.id}">${it.kind === 'idea' ? '<span class="lic">💡</span>' : `<button class="lchk${it.done ? ' on' : ''}" data-chk="${it.id}">${it.done ? '✔' : ''}</button>`}<div><div class="ltx">${esc(it.text) || '…'}</div><div class="lsub">${esc(nestPath(it.at) || (docsUsing(it).length ? 'en «' + docsUsing(it)[0].title + '»' : 'sin sitio'))}</div></div></div>`).join('');
+  const rows = (l) => l.map((it) => `<div class="lrow${it.done ? ' done' : ''}${it.kind === 'tarea' ? ' st-' + stOf(it) : ''}" data-at="${it.at || ''}" data-it="${it.id}">${it.kind === 'idea' ? '<span class="lic">💡</span>' : `<button class="lchk${it.done ? ' on' : ''}" data-chk="${it.id}">${it.done ? '✔' : ''}</button>`}<div><div class="ltx">${esc(it.text) || '…'}</div><div class="lsub">${it.kind === 'tarea' && it.who && it.who !== 'Yo' ? `<b class="lwho">${esc(it.who)}</b>` : ''}${it.kind === 'tarea' && stOf(it) !== 'pendiente' && stOf(it) !== 'hecha' ? `<b class="lst s-${stOf(it)}">${TSTATES.find((x) => x[0] === stOf(it))[1]}</b>` : ''}${esc(nestPath(it.at) || (docsUsing(it).length ? 'en «' + docsUsing(it)[0].title + '»' : 'sin sitio'))}</div></div></div>`).join('');
   for (const b of document.querySelectorAll('#list nav button')) b.classList.toggle('on', b.dataset.l === listTab);
-  const l = listTab === 'tareas' ? [...S.tasks].sort((a, b) => a.done - b.done) : S.ideas;
-  $('#list-body').innerHTML = rows(l) || `<p class="none">${listTab === 'tareas' ? 'Sin tareas. Arrastra «Tarea» a cualquier sitio.' : 'Sin ideas todavía.'}</p>`;
+  const order = { curso: 0, bloqueada: 1, pendiente: 2, hecha: 3 };
+  const l = listTab === 'tareas' ? S.tasks.filter((t) => (listWho === 'Todas' || (t.who || 'Yo') === listWho) && (listDone || !t.done)).sort((a, b) => order[stOf(a)] - order[stOf(b)]) : S.ideas;
+  const fil = listTab === 'tareas' ? `<div class="lfil">${['Todas', ...whoList()].map((w) => `<button data-lw="${esc(w)}" class="${w === listWho ? 'on' : ''}">${esc(w)}</button>`).join('')}<button data-ldone class="${listDone ? 'on' : ''}">✓ Hechas</button></div>` : '';
+  $('#list-body').innerHTML = fil + rows(l) || `<p class="none">${listTab === 'tareas' ? 'Sin tareas. Arrastra «Tarea» a cualquier sitio.' : 'Sin ideas todavía.'}</p>`;
 }
 function renderAll() { tidy(); renderAreas(); renderTop(); renderStage(); renderMap(); renderDrawer(); renderList(); renderDock(); if (cur) renderEdHead(); }
 
@@ -450,7 +452,7 @@ addEventListener('pointermove', (e) => {
   if (!drag.on) {
     if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
     drag.on = true; drag.src = srcOf(drag.key);
-    ghost.textContent = labelOf(drag.src); ghost.classList.add('on'); document.body.classList.add('dragging');
+    ghost.textContent = labelOf(drag.src); ghost.classList.add('on'); document.body.classList.add('dragging'); if (drag.src.item || drag.src.make === 'idea' || drag.src.make === 'tarea') document.body.classList.add('drag-hang');
     drag.el.classList.add('lifted'); $('#drawer').classList.add('near');
   }
   Object.assign(ghost.style, { left: e.clientX + 12 + 'px', top: e.clientY + 10 + 'px' });
@@ -462,7 +464,7 @@ addEventListener('pointerup', () => {
   const d = drag; drag = null;
   if (!d.on) return;
   justDragged = true; setTimeout(() => { justDragged = false; }, 0);
-  ghost.classList.remove('on'); document.body.classList.remove('dragging'); d.el.classList.remove('lifted'); $('#drawer').classList.remove('near');
+  ghost.classList.remove('on'); document.body.classList.remove('dragging', 'drag-hang'); d.el.classList.remove('lifted'); $('#drawer').classList.remove('near');
   paintTarget(null);
   if (d.t?.ok) drop(d.src, d.t);
 });
@@ -559,6 +561,7 @@ function makeAt(kind, t) {
   if (kind === 'idea' || kind === 'tarea') {
     const at = t?.kind === 'place' ? (nd(t.pid).kind === 'ftab' ? parent(t.pid).id : t.pid) : t?.kind === 'head' ? t.tab : (cur || S.focus);
     const it = newItem(kind, '', at); save(); renderAll();
+    if (kind === 'tarea') return openTask(it);              // a task is born as its card
     const el = document.querySelector(`[data-it="${it.id}"]`) || $('#tools .t-' + kind);
     popEdit(el, '', (v) => { if (!v) { listOf(kind).splice(listOf(kind).indexOf(it), 1); } else it.text = v; save(); renderAll(); });
     return;
@@ -641,7 +644,10 @@ addEventListener('click', (e) => {
   const drx = t.closest('.dr-x'); if (drx) { const id = drx.closest('.dr-chip').dataset.id; return askChoice(drx, `¿Borrar «${esc(nd(id).title)}» para siempre?`, 'Sale del cajón y no vuelve (salvo con Deshacer).', [{ label: 'Borrar', danger: true, run: () => { snap(); detach(id); removeTree(id); save(); renderAll(); } }]); }
   const drc = t.closest('.dr-chip'); if (drc) { const n = nd(drc.dataset.id); if (n.kind === 'doc') openDoc(n.id); return; }
   const lchk = t.closest('[data-chk]'); if (lchk) return toggleTask(S.tasks.find((x) => x.id === lchk.dataset.chk));
-  const lrow = t.closest('.lrow'); if (lrow) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === lrow.dataset.it); if (it?.at) return focusTo(nd(it.at).kind === 'ftab' ? parent(it.at).id : it.at); const d = it && docsUsing(it)[0]; if (d) openDoc(d.id); return; }
+  const lw = t.closest('[data-lw]'); if (lw) { listWho = lw.dataset.lw; return renderList(); }
+  if (t.closest('[data-ldone]')) { listDone = !listDone; return renderList(); }
+  const lrow = t.closest('.lrow'); if (lrow && S.tasks.some((x) => x.id === lrow.dataset.it)) return openTask(S.tasks.find((x) => x.id === lrow.dataset.it));
+  if (lrow) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === lrow.dataset.it); if (it?.at) return focusTo(nd(it.at).kind === 'ftab' ? parent(it.at).id : it.at); const d = it && docsUsing(it)[0]; if (d) openDoc(d.id); return; }
   const lb = t.closest('#list nav button'); if (lb) { listTab = lb.dataset.l; return renderList(); }
 });
 const wrapText = (el) => { const s = document.createElement('span'); s.textContent = el.firstChild.textContent; el.firstChild.replaceWith(s); return s; };
@@ -655,7 +661,7 @@ addEventListener('dblclick', (e) => {
 });
 function itemClick(id, el) {
   const it = [...S.ideas, ...S.tasks].find((x) => x.id === id); if (!it) return;
-  if (it.kind === 'tarea') return toggleTask(it);
+  if (it.kind === 'tarea') return openTask(it);
   if (el?.closest?.('#stage')) { clearTimeout(peekT); return showPeek(el, true); }
   popEdit(el, it.text, (v) => setItemText(it, v));
 }
@@ -666,7 +672,7 @@ function setItemText(it, v) {
   else it.text = v;
   save(); renderAll(); ed?.refresh?.();
 }
-function toggleTask(it) { if (!it) return; snap(); it.done = !it.done; it.doneAt = it.done ? Date.now() : null; save(); renderAll(); ed?.refresh?.(); }
+function toggleTask(it) { if (!it) return; snap(); setState(it, it.done ? 'pendiente' : 'hecha'); save(); renderAll(); ed?.refresh?.(); if (taskOpen) paintTask(); }
 // Deleting asks when there is something inside; «al cajón» keeps it aside
 function canLift(n) {
   const p = nd(PAR.get(n.id)); if (!p || !n.kids.length) return false;
@@ -743,7 +749,7 @@ addEventListener('pointermove', (e) => {
 });
 $('#list-btn').onclick = () => $('#list').classList.toggle('closed');
 // a click anywhere else closes the side list
-addEventListener('pointerdown', (e) => { if (!$('#list').classList.contains('closed') && !e.target.closest('#list, #list-btn, #pick, #toasts, #ipeek')) $('#list').classList.add('closed'); }, true);
+addEventListener('pointerdown', (e) => { if (!$('#list').classList.contains('closed') && !e.target.closest('#list, #list-btn, #pick, #toasts, #ipeek, #task, .pop')) $('#list').classList.add('closed'); }, true);
 addEventListener('resize', () => renderMap());
 
 // ---- what an idea or a task says, on hover --------------------------------------------------------------------------
@@ -755,8 +761,8 @@ function showPeek(el, focus) {
   const it = [...S.ideas, ...S.tasks].find((x) => x.id === el.dataset.it); if (!it) return;
   const r = el.getBoundingClientRect();
   peekBox.dataset.id = it.id;
-  peekBox.className = 'k-' + it.kind + (it.done ? ' done' : '');
-  peekBox.innerHTML = `<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea' : '☐ Tarea'} <small>${it.n || ''}</small></span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="Quitar"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Quitar</span></button></div><div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`;
+  peekBox.className = 'k-' + it.kind + (it.done ? ' done' : '') + (it.kind === 'tarea' ? ' st-' + stOf(it) : '');
+  peekBox.innerHTML = `<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea' : 'Tarea · ' + TSTATES.find((x) => x[0] === stOf(it))[1] + (it.who && it.who !== 'Yo' ? ' · para ' + esc(it.who) : '')}</span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="Quitar"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Quitar</span></button></div>${it.kind === 'tarea' ? `<div class="ip-t ip-open" title="Abrir la tarea">${esc(it.text || '…')}${it.body ? `<small>${esc(it.body.slice(0, 160))}${it.body.length > 160 ? '…' : ''}</small>` : ''}</div>` : `<div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`}`;
   const left = Math.min(innerWidth - 300, Math.max(8, r.left + r.width / 2 - 145));
   Object.assign(peekBox.style, { left: left + 'px', top: r.bottom + 10 + 'px' }); peekBox.style.setProperty('--ax', (r.left + r.width / 2 - left) + 'px');
   peekBox.classList.add('on');
@@ -783,12 +789,103 @@ peekBox.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); const it = [...S.ideas, ...S.tasks].find((x) => x.id === peekBox.dataset.id); peekTxt().innerText = it?.text || ''; hidePeek(); }
 });
 peekBox.addEventListener('click', (e) => {
+  if (e.target.closest('.ip-open')) return openTask(S.tasks.find((x) => x.id === peekBox.dataset.id));
   const bt = e.target.closest('[data-ip]'); if (!bt) return;
   const it = [...S.ideas, ...S.tasks].find((x) => x.id === peekBox.dataset.id); if (!it) return;
   if (bt.dataset.ip === 'done') { toggleTask(it); const el = $(`.it[data-it="${it.id}"]`); return el ? showPeek(el) : hidePeek(); }
   peekBox.classList.remove('on');
   snap(); if (docsUsing(it).length) it.at = null; else listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);
   save(); renderAll(); ed?.refresh?.(); toast('Quitada', [['Deshacer', doUndo]]);
+});
+
+// ---- a task is a small document: what to do, what to keep in mind, its state, who it is for, a dated log -----------
+const TSTATES = [['pendiente', 'Pendiente'], ['curso', 'En curso'], ['hecha', 'Hecha'], ['bloqueada', 'Bloqueada']];
+const stOf = (it) => it.state || (it.done ? 'hecha' : 'pendiente');
+const WHO = ['Yo', 'Claude', 'Qwen'];
+const whoList = () => [...new Set([...WHO, ...S.tasks.map((t) => t.who).filter(Boolean)])];
+const whenStr = (t) => new Date(t).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+function setState(it, st) {
+  if (stOf(it) === st) return;
+  it.state = st; it.done = st === 'hecha'; it.doneAt = it.done ? Date.now() : null;
+  (it.log ||= []).push({ t: Date.now(), text: '→ ' + TSTATES.find((s) => s[0] === st)[1], auto: true });
+}
+let taskOpen = null, taskSnapped = false;
+const taskNow = () => S.tasks.find((x) => x.id === taskOpen);
+function taskEdit(fn) { if (!taskSnapped) { snap(); taskSnapped = true; } fn(); save(); }
+function openTask(it) {
+  if (!it) return;
+  clearTimeout(peekT); peekBox.classList.remove('on');
+  taskOpen = it.id; taskSnapped = false; paintTask();
+  const box = $('#task'); box.hidden = false;
+  box.querySelector('.tk-in').animate([{ opacity: 0, transform: 'translateY(10px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
+  if (!it.text) box.querySelector('.tk-title').focus();
+}
+function closeTask() {
+  if (!taskOpen) return;
+  if (document.activeElement?.closest?.('#task')) document.activeElement.blur();
+  const it = taskNow();                                     // left empty: it was never made
+  if (it && !it.text && !it.body && !it.notes && !(it.log || []).some((e) => !e.auto) && !docsUsing(it).length) S.tasks.splice(S.tasks.indexOf(it), 1);
+  taskOpen = null; $('#task').hidden = true; renderAll(); ed?.refresh?.();
+}
+function paintTask() {
+  const it = taskNow(); if (!it) return closeTask();
+  const st = stOf(it), where = it.at && nd(it.at) ? nestPath(it.at) : '', inDocs = docsUsing(it);
+  $('#task .tk-in').innerHTML = `
+    <header class="tk-h st-${st}">
+      <span class="tk-k">Tarea</span>
+      <span class="tk-st">${TSTATES.map(([k, l]) => `<button data-st="${k}" class="s-${k}${k === st ? ' on' : ''}">${l}</button>`).join('')}</span>
+      <button class="tk-x" title="Cerrar (Esc)">×</button>
+    </header>
+    <div class="tk-body">
+      <div class="tk-title" contenteditable="true" spellcheck="false" data-ph="Qué hay que hacer, en una línea…">${esc(it.text || '')}</div>
+      <div class="tk-meta">
+        <span class="tk-lab">Para</span>${whoList().map((w) => `<button class="tk-who${(it.who || 'Yo') === w ? ' on' : ''}" data-who="${esc(w)}">${esc(w)}</button>`).join('')}<button class="tk-who add" data-who="+" title="Otro">＋</button>
+        ${where || inDocs.length ? `<span class="tk-where"><span class="tk-lab">En</span>${where ? `<button data-go-at title="Ir allí">${esc(where)}</button>` : ''}${inDocs.map((d) => `<button data-go-doc="${d.id}" title="Abrir el documento">📄 ${esc(d.title)}</button>`).join('')}</span>` : ''}
+      </div>
+      <div class="tk-sec">Qué hay que hacer</div>
+      <div class="tk-area" contenteditable="true" spellcheck="false" data-f="body" data-ph="Descríbela…">${esc(it.body || '')}</div>
+      <div class="tk-sec">A tener en cuenta</div>
+      <div class="tk-area" contenteditable="true" spellcheck="false" data-f="notes" data-ph="Lo importante para hacerla bien…">${esc(it.notes || '')}</div>
+      <div class="tk-sec">Bitácora</div>
+      <div class="tk-log-in" contenteditable="true" spellcheck="false" data-ph="Apunta cómo va y pulsa Enter: se guarda con la fecha"></div>
+      <div class="tk-log">${(it.log || []).map((e, i) => ({ ...e, i })).reverse().map((e) => `<div class="tk-e${e.auto ? ' auto' : ''}"><time>${whenStr(e.t)}</time><span>${esc(e.text)}</span><button data-rm-log="${e.i}" title="Borrar la nota">×</button></div>`).join('')}</div>
+    </div>
+    <footer><button class="tk-rm">Quitar la tarea</button></footer>`;
+}
+$('#task').addEventListener('input', (e) => {
+  const it = taskNow(); if (!it) return;
+  const t = e.target;
+  if (t.classList.contains('tk-title')) taskEdit(() => { it.text = t.innerText.replace(/\s+/g, ' ').trim(); });
+  else if (t.dataset.f) taskEdit(() => { it[t.dataset.f] = t.innerText.replace(/\n$/, ''); });
+});
+$('#task').addEventListener('keydown', (e) => {
+  const it = taskNow(); if (!it) return;
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); return closeTask(); }
+  if (e.key !== 'Enter' || e.shiftKey) return;
+  if (e.target.classList.contains('tk-title')) { e.preventDefault(); $('#task .tk-area').focus(); }
+  if (e.target.classList.contains('tk-log-in')) {
+    e.preventDefault(); const v = e.target.innerText.trim(); if (!v) return;
+    taskEdit(() => (it.log ||= []).push({ t: Date.now(), text: v })); paintTask(); $('#task .tk-log-in').focus();
+  }
+});
+$('#task').addEventListener('click', (e) => {
+  const it = taskNow(); if (!it) return;
+  const t = e.target;
+  if (t === $('#task') || t.closest('.tk-x')) return closeTask();
+  const s = t.closest('[data-st]'); if (s) { taskEdit(() => setState(it, s.dataset.st)); paintTask(); return renderAll(); }
+  const w = t.closest('[data-who]');
+  if (w) {
+    if (w.dataset.who !== '+') { taskEdit(() => { it.who = w.dataset.who; }); return paintTask(); }
+    return popEdit(w, '', (v) => { if (v) { taskEdit(() => { it.who = v.trim(); }); paintTask(); } });
+  }
+  const rl = t.closest('[data-rm-log]'); if (rl) { taskEdit(() => it.log.splice(+rl.dataset.rmLog, 1)); return paintTask(); }
+  if (t.closest('[data-go-at]')) { const at = it.at; closeTask(); return focusTo(nd(at).kind === 'ftab' ? parent(at).id : at); }
+  const gd = t.closest('[data-go-doc]'); if (gd) { closeTask(); return openDoc(gd.dataset.goDoc); }
+  if (t.closest('.tk-rm')) {
+    taskOpen = null; $('#task').hidden = true;
+    snap(); if (docsUsing(it).length) it.at = null; else S.tasks.splice(S.tasks.indexOf(it), 1);
+    save(); renderAll(); ed?.refresh?.(); return toast('Tarea quitada', [['Deshacer', doUndo]]);
+  }
 });
 
 // ---- the editor: a document, its tabs (pages), the writing ----------------------------------------------------------
@@ -898,7 +995,7 @@ const edApi = {
   getItems: () => [...S.tasks.filter((t) => !t.done), ...S.ideas, ...S.tasks.filter((t) => t.done)],
   createItem(kind, text) { const it = newItem(kind, text, null); save(); renderList(); return it.n; },
   toggleTask(n) { toggleTask(S.tasks.find((x) => x.n === n)); },
-  editItem(kind, n, el) { const it = listOf(kind).find((x) => x.n === n); if (it) popEdit(el, it.text, (v) => setItemText(it, v)); },
+  editItem(kind, n, el) { const it = listOf(kind).find((x) => x.n === n); if (!it) return; if (kind === 'tarea') return openTask(it); popEdit(el, it.text, (v) => setItemText(it, v)); },
   createDoc(name, text = '', o = {}) {
     const p = PAR.get(cur), d = mk('doc', name); d.kids.push(mk('dtab', 'Página 1', { text }).id);
     if (p) { const P = nd(p); P.kids.splice(P.kids.indexOf(cur) + 1, 0, d.id); } else S.drawer.push(d.id);
@@ -1075,6 +1172,7 @@ addEventListener('pointerdown', (e) => { if (!e.target.closest('#pick')) $('#pic
 addEventListener('keydown', (e) => {
   const typing = e.target.closest?.('input, textarea, [contenteditable="true"], .cm-editor');
   if (e.key === 'Escape') {
+    if (taskOpen) { e.preventDefault(); return closeTask(); }
     if ($('#pick').classList.contains('on')) return $('#pick').classList.remove('on');
     if (document.querySelector('.pop')) return;
     if (!$('#map').classList.contains('mini')) return mapOpen(false);

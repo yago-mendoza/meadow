@@ -433,3 +433,70 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .ar-col:has([contenteditable="true"]) { z-index: 50 !important; }
 .ar-col:not(.last):has([contenteditable="true"]) > :not(.ar-strip) { visibility: visible; }
 .ar-col:has([contenteditable="true"]) > .ar-strip { opacity: 0; }
+
+/* ---- a task: a small document ---- */
+#task { position: fixed; inset: 0; z-index: 300; background: rgba(60, 40, 70, .14); display: grid; place-items: center; }
+#task[hidden] { display: none; }
+.tk-in { width: min(640px, 92vw); max-height: 86vh; display: flex; flex-direction: column; background: #fff; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 24px 60px -16px rgba(50, 30, 60, .4), 0 2px 8px rgba(50, 30, 60, .08); border: 1px solid #e6dde9; }
+.tk-h { --sc: #eaf1fc; --sf: #5a6f8f; display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 18px; background: var(--sc); }
+.tk-h.st-curso { --sc: #fdf1dc; --sf: #9a6b1f; } .tk-h.st-hecha { --sc: #e4f4e7; --sf: #3f7f4b; } .tk-h.st-bloqueada { --sc: #fbe4e1; --sf: #a8463f; }
+.tk-k { font: 700 11px "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--sf); }
+.tk-st { display: flex; gap: 2px; margin-left: auto; padding: 3px; border-radius: 10px; background: rgba(255, 255, 255, .6); }
+.tk-st button { padding: 5px 11px; border-radius: 8px; font: 600 12px "Segoe UI", sans-serif; color: #8a7d8e; }
+.tk-st button:hover { background: #fff; color: #4a3f4d; }
+.tk-st button.on { background: #fff; color: var(--sf); box-shadow: 0 1px 3px rgba(60, 40, 70, .15); }
+.tk-x { width: 30px; height: 30px; border-radius: 9px; font-size: 18px; color: #8a7d8e; }
+.tk-x:hover { background: rgba(255, 255, 255, .8); color: #2f2735; }
+.tk-body { flex: 1; overflow: auto; padding: 18px 22px 8px; }
+.tk-title { font: 600 21px/1.35 Georgia, serif; color: #2f2735; outline: none; padding: 2px 0; }
+.tk-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 10px 0 6px; }
+.tk-lab { font: 600 11.5px "Segoe UI", sans-serif; color: #a397a5; margin-right: 2px; }
+.tk-who { padding: 3px 10px; border-radius: 20px; font: 600 12px "Segoe UI", sans-serif; color: #7a6f80; background: #f5f1f6; }
+.tk-who:hover { background: #ece4ef; } .tk-who.on { background: var(--accent); color: #fff; }
+.tk-who.add { padding: 3px 8px; }
+.tk-where { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-left: 14px; }
+.tk-where button { padding: 3px 9px; border-radius: 8px; font: 12px "Segoe UI", sans-serif; color: #6a5e6c; background: #f6f3f7; max-width: 340px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-where button:hover { color: var(--accent); background: #efe7f2; }
+.tk-sec { margin: 18px 0 6px; font: 700 11px "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #a397a5; }
+.tk-area, .tk-log-in { min-height: 46px; padding: 9px 12px; border-radius: 10px; background: #faf8fb; border: 1px solid #eee7f0; outline: none;
+  font: 14.5px/1.55 Georgia, serif; color: #2f2735; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tk-area:focus, .tk-log-in:focus { background: #fff; border-color: #d9c9e0; box-shadow: 0 0 0 3px #f3ecf6; }
+.tk-log-in { min-height: 0; font-size: 13.5px; }
+[data-ph]:empty::before { content: attr(data-ph); color: #b8adbb; pointer-events: none; }
+.tk-log { margin-top: 8px; display: flex; flex-direction: column; }
+.tk-e { display: flex; align-items: baseline; gap: 12px; padding: 6px 4px; border-bottom: 1px solid #f3eef4; font: 13.5px/1.5 Georgia, serif; color: #3a2f3f; }
+.tk-e time { flex: none; width: 104px; font: 600 11.5px "Segoe UI", sans-serif; color: #a397a5; }
+.tk-e span { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tk-e.auto span { font: 600 12px "Segoe UI", sans-serif; color: #8a7d8e; }
+.tk-e button { opacity: 0; width: 20px; height: 20px; border-radius: 50%; color: #b8443f; }
+.tk-e:hover button { opacity: .7; } .tk-e button:hover { opacity: 1; background: #fbe0dc; }
+.tk-in footer { display: flex; justify-content: flex-end; padding: 10px 16px 12px; border-top: 1px solid #f3eef4; }
+.tk-rm { padding: 6px 12px; border-radius: 9px; font: 600 12px "Segoe UI", sans-serif; color: #a08ea4; }
+.tk-rm:hover { background: #fbe0dc; color: #b8443f; }
+
+/* a task's state on its circle, in the text, in the list, on its hover card */
+.it.tarea.st-curso { background: #fdf1dc; } .it.tarea.st-curso::before { border-color: #e0a84a; background: linear-gradient(90deg, #e0a84a 50%, #fff 50%); }
+.it.tarea.st-bloqueada { background: #fbe4e1; } .it.tarea.st-bloqueada::before { border-color: #d2685f; }
+.it[data-w] { position: relative; }
+.it[data-w]::after { content: attr(data-w); position: absolute; right: -4px; bottom: -3px; width: 13px; height: 13px; border-radius: 50%; background: var(--accent);
+  color: #fff; font: 700 8px/13px "Segoe UI", sans-serif; text-align: center; box-shadow: 0 0 0 1.5px #fff; }
+.cm-chip.st-curso .cm-chip-ico { background: linear-gradient(90deg, #e0a84a 50%, #fff 50%); border-color: #e0a84a; }
+.cm-chip.st-bloqueada .cm-chip-ico { border-color: #d2685f; background: #fbe4e1; }
+#ipeek.st-curso { --ip-h: #fdf1dc; } #ipeek.st-bloqueada { --ip-h: #fbe4e1; }
+.ip-open { cursor: pointer; } .ip-open:hover { background: #faf6fb; }
+.ip-open small { display: block; margin-top: 4px; font: 12.5px/1.45 Georgia, serif; color: #8a7d8e; }
+.lfil { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 2px 8px; margin-bottom: 4px; border-bottom: 1px solid #f3eef4; }
+.lfil button { padding: 3px 10px; border-radius: 20px; font: 600 11.5px "Segoe UI", sans-serif; color: #7a6f80; background: #f6f2f7; }
+.lfil button.on { background: var(--accent); color: #fff; }
+.lfil [data-ldone] { margin-left: auto; }
+.lwho, .lst { font: 700 10.5px "Segoe UI", sans-serif; padding: 1px 6px; border-radius: 6px; margin-right: 6px; background: #efe6f3; color: var(--accent); }
+.lst.s-curso { background: #fdf1dc; color: #9a6b1f; } .lst.s-bloqueada { background: #fbe4e1; color: #a8463f; }
+.lrow.st-curso .lchk { background: linear-gradient(90deg, #e0a84a 50%, #fff 50%); border-color: #e0a84a; }
+.lrow.st-bloqueada .lchk { border-color: #d2685f; background: #fbe4e1; }
+
+/* dragging an idea or a task: every place it can hang on shows a dashed edge */
+body.drag-hang #stage .fr, body.drag-hang #stage .dc, body.drag-hang #stage .ft { outline: 1.5px dashed #c6b2cf; outline-offset: 2px; }
+body.drag-hang #stage .ft { outline-offset: 1px; }
+#task ~ .pop, .pop { z-index: 340; }

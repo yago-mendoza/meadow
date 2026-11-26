@@ -35,7 +35,9 @@ pestaña · pestaña de documento → títulos en el texto.
 - **El mapa** (abajo a la izquierda): todo el árbol como rectángulos anidados, con nombres; rueda para acercar, clic
   para ir, y se puede arrastrar desde y hacia él. Arriba de un rectángulo (su nombre) = como pestaña; dentro = dentro.
 - **Un cajón**: lo que se aparta del árbol, para volver a soltarlo donde sea.
-- **Ideas y tareas**: se cuelgan de cualquier nodo (arrastrándolas encima) o se escriben en una línea del texto.
+- **Ideas y tareas**: se cuelgan de cualquier nodo (arrastrándolas encima) o se escriben en una línea del texto. Una tarea es
+  un documento pequeño: qué hay que hacer, a tener en cuenta, estado (pendiente, en curso, hecha, bloqueada), para quién
+  (yo, Claude, Qwen…) y una bitácora con fechas.
 
 Los datos: `data/meadow.json` (`v: 2`, `nodes`, `drawer`, `ideas`, `tasks`). La copia de antes del árbol:
 `data/meadow-antes-del-arbol-2026-11-26.json`.

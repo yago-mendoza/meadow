@@ -58,12 +58,12 @@ const POSTIT_ICO = Decoration.replace({ widget: new PostitWidget() });
 class ChipWidget extends WidgetType {
   constructor(kind, n, item, api) {
     super(); this.kind = kind; this.n = n; this.api = api;
-    this.text = item ? item.text : 'ya no existe'; this.done = !!item?.done; this.missing = !item;
+    this.text = item ? item.text : 'ya no existe'; this.done = !!item?.done; this.missing = !item; this.st = item?.state || '';
   }
-  eq(o) { return o.kind === this.kind && o.n === this.n && o.text === this.text && o.done === this.done && o.missing === this.missing; }
+  eq(o) { return o.kind === this.kind && o.n === this.n && o.text === this.text && o.done === this.done && o.missing === this.missing && o.st === this.st; }
   toDOM() {
     const s = document.createElement('span');
-    s.className = `cm-chip cm-chip-${this.kind}${this.done ? ' done' : ''}${this.missing ? ' missing' : ''}`;
+    s.className = `cm-chip cm-chip-${this.kind}${this.done ? ' done' : ''}${this.missing ? ' missing' : ''}${this.st ? ' st-' + this.st : ''}`;
     const ico = document.createElement('span'); ico.className = 'cm-chip-ico';
     ico.textContent = this.kind === 'idea' ? '💡' : this.done ? '✔' : '';
     if (this.kind === 'tarea' && !this.missing) {
@@ -72,7 +72,7 @@ class ChipWidget extends WidgetType {
     }
     const t = document.createElement('span'); t.className = 'cm-chip-text'; t.textContent = this.text || '…';
     if (!this.missing) {
-      t.title = 'Clic para cambiar el texto';
+      t.title = this.kind === 'tarea' ? 'Abrir la tarea' : 'Clic para cambiar el texto';
       t.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); this.api.editItem?.(this.kind, this.n, s); });
     }
     s.append(ico, t); return s;
