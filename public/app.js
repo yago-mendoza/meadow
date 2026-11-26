@@ -288,11 +288,11 @@ const circles = (id) => { const l = itemsAt(id); return l.length ? `<span class=
 function frameHTML(id, depth) {
   const f = nd(id), at = activeTab(f), t = nd(at), tabs = f.kids.map(nd);
   const kids = t.kids.map((k) => (nd(k).kind === 'frame' ? (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)) : docHTML(k))).join('');
-  return `<section class="fr d${depth}" data-id="${id}" style="--bg:${f.color || PASTEL[4]}">
+  return `<section class="fr d${depth}${drawsAt(id).length ? ' has-pic' : ''}" data-id="${id}" style="--bg:${f.color || PASTEL[4]}">${drawsAt(id).length ? `<div class="fr-pic">${thumbs(id)}</div>` : ''}
     <div class="fr-head">
       <span class="fr-title${tabs.length > 1 && at === tabs[0].id ? ' on' : ''}" data-drag="${id}" data-tab0="${tabs[0].id}" title="${tabs.length > 1 ? 'Clic: su primera pestaña · ' : ''}Arrastra para moverlo · doble clic: renombrar">${esc(f.title)}</span>${nb(id)}${tabs.length > 1 && at === tabs[0].id ? `<button class="fr-tx" data-tab0="${tabs[0].id}" title="Borrar esta pestaña (la siguiente pasa a ser la primera)">×</button>` : ''}
       <span class="fr-tabs" data-drop="tabs" data-id="${id}">${tabs.length > 1 ? tabs.slice(1).map((x) => `<span class="ft${x.id === at ? ' on' : ''}" data-tab="${x.id}" data-drag="${x.id}" data-id="${x.id}">${esc(x.title)}${nb(x.id)}${x.id === at ? '<button class="ft-x" title="Borrar esta pestaña">×</button>' : ''}</span>`).join('') : ''}<button class="ft-add" title="Nueva pestaña">＋</button></span>
-      ${circles(id)}${tabs.length > 1 ? circles(at) : ''}${thumbs(id)}
+      ${circles(id)}${tabs.length > 1 ? circles(at) : ''}
       <span class="grow"></span>
       <span class="fr-pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</span>
       ${depth || S.focus !== id ? '<button class="fr-in" title="Entrar">⤢</button>' : '<button class="fr-out" title="Salir (Esc)">⤡ Salir</button>'}<button class="fr-x" title="Borrar o guardar en el cajón">×</button>
@@ -1198,7 +1198,7 @@ addEventListener('click', (e) => {
 // ---- drawings: quick sketches hung on a frame or a document ------------------------------------------------------------
 // Figures only (rectangle, circle, triangle, diamond, line), chosen by passing over them and put on the sheet by dragging.
 // Stored as figures, never pixels; painted pixel by pixel on a small sheet (96 × 64), so they look like pixel art.
-const DW_W = 96, DW_H = 64;
+const DW_W = 144, DW_H = 96;
 const DW_COLORS = {
   top: ['#f6c9d6', '#f9d8b8', '#f8eaa6', '#cfeccd', '#c4e3f3', '#cfd3f5', '#e3cdf1', '#f2f0ee'],
   left: ['#2f2735', '#3d5a80', '#7a2e3a', '#2e6b4a', '#8a5a2b', '#6b6670'],
@@ -1270,8 +1270,9 @@ function dwPaint(preview) {
   const d = dwNow(); if (!d) return;
   paintShapes($('#dw-c').getContext('2d'), preview ? [...d.shapes.map((s) => ({ ...s })), preview] : d.shapes, d.base || 192);
 }
-function dwPickColor(c) { dwColor = c; for (const el of document.querySelectorAll('#draw [data-col]')) el.classList.toggle('on', el.dataset.col === c); $('#draw .dw-cur').style.background = c; for (const el of document.querySelectorAll('#draw [data-shape]')) el.style.color = c; }
-function dwPickShape(t) { dwShape = t; for (const el of document.querySelectorAll('#draw [data-shape]')) el.classList.toggle('on', el.dataset.shape === t); }
+function dwPickColor(c) { dwColor = c; for (const el of document.querySelectorAll('#draw [data-col]')) el.classList.toggle('on', el.dataset.col === c); dwBrush(); for (const el of document.querySelectorAll('#draw [data-shape]')) el.style.color = c; }
+function dwBrush() { const b = $('#draw .dw-cur'); b.innerHTML = shapeIco(dwShape); b.style.color = dwColor; }
+function dwPickShape(t) { dwShape = t; for (const el of document.querySelectorAll('#draw [data-shape]')) el.classList.toggle('on', el.dataset.shape === t); dwBrush(); }
 function dwEdit(fn) { if (!dwSnapped) { snap(); dwSnapped = true; } fn(); const d = dwNow(); d.v = (d.v || 0) + 1; save(); dwPaint(); }
 // colours and figures are taken by passing over them, no click
 let dwHoverT = null;
