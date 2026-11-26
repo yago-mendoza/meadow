@@ -65,8 +65,8 @@ async function load() {
 }
 function ensureAreas() {
   const root = nd(S.root);
-  if (root.kids.length && root.kids.every((k) => nd(k)?.kind === 'area')) return;
-  const frames = root.kids.filter((k) => nd(k)?.kind !== 'area'), areas = root.kids.filter((k) => nd(k)?.kind === 'area');
+  if (root.kids.length && root.kids.every((k) => nd(k)?.kind === 'area' || nd(k)?.kind === 'doc')) return;
+  const frames = root.kids.filter((k) => nd(k)?.kind !== 'area' && nd(k)?.kind !== 'doc'), areas = root.kids.filter((k) => nd(k)?.kind === 'area');
   if (!areas.length) { const g = mk('area', 'General'); g.kids.push(...frames); root.kids = [g.id]; S.area = g.id; } else { nd(areas[0]).kids.push(...frames); root.kids = areas; }
   save();
 }
@@ -264,12 +264,12 @@ function placeUnderHead(g, tabId, line) {
 }
 function tidy() {
   reindex();
-  for (const a of Object.values(S.nodes)) if (a.kind === 'area' && isGroup(a) && a.kids.some((k) => nd(k)?.kind !== 'area')) {
-    const loose = a.kids.filter((k) => nd(k)?.kind !== 'area'), g = mk('area', 'General'); g.kids = loose;
-    a.kids = [g.id, ...a.kids.filter((k) => nd(k)?.kind === 'area')];
+  for (const a of Object.values(S.nodes)) if (a.kind === 'area' && isGroup(a) && a.kids.some((k) => !['area', 'doc'].includes(nd(k)?.kind))) {
+    const loose = a.kids.filter((k) => !['area', 'doc'].includes(nd(k)?.kind)), g = mk('area', 'General'); g.kids = loose;
+    a.kids = [g.id, ...a.kids.filter((k) => ['area', 'doc'].includes(nd(k)?.kind))];
   }
   reindex();
-  if (S.nodes[S.root] && !nd(S.root).kids.length) { const g = mk('area', 'General'); nd(S.root).kids.push(g.id); reindex(); }
+  if (S.nodes[S.root] && !nd(S.root).kids.some((k) => nd(k)?.kind === 'area')) { const g = mk('area', 'General'); nd(S.root).kids.push(g.id); reindex(); }
   for (const n of Object.values(S.nodes)) if (n.kind === 'frame' || n.kind === 'doc') ensureTab(n);
   for (const it of [...S.ideas, ...S.tasks]) if (it.at && !nd(it.at)) it.at = null;
   if (nd(S.area)?.kind === 'area' && PAR.has(S.area)) S.area = leafOf(S.area);
@@ -290,8 +290,8 @@ function frameHTML(id, depth) {
   const kids = t.kids.map((k) => (nd(k).kind === 'frame' ? (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)) : docHTML(k))).join('');
   return `<section class="fr d${depth}" data-id="${id}" style="--bg:${f.color || PASTEL[4]}">
     <div class="fr-head">
-      <span class="fr-title" data-drag="${id}" title="Arrastra para moverlo · doble clic: renombrar">${esc(f.title)}</span>${nb(id)}
-      <span class="fr-tabs" data-drop="tabs" data-id="${id}">${tabs.length > 1 ? tabs.map((x) => `<span class="ft${x.id === at ? ' on' : ''}" data-tab="${x.id}" data-drag="${x.id}" data-id="${x.id}">${esc(x.title)}${nb(x.id)}${x.id === at ? '<button class="ft-x" title="Borrar esta pestaña">×</button>' : ''}</span>`).join('') : ''}<button class="ft-add" title="Nueva pestaña">＋</button></span>
+      <span class="fr-title${tabs.length > 1 && at === tabs[0].id ? ' on' : ''}" data-drag="${id}" data-tab0="${tabs[0].id}" title="${tabs.length > 1 ? 'Clic: su primera pestaña · ' : ''}Arrastra para moverlo · doble clic: renombrar">${esc(f.title)}</span>${nb(id)}${tabs.length > 1 && at === tabs[0].id ? `<button class="fr-tx" data-tab0="${tabs[0].id}" title="Borrar esta pestaña (la siguiente pasa a ser la primera)">×</button>` : ''}
+      <span class="fr-tabs" data-drop="tabs" data-id="${id}">${tabs.length > 1 ? tabs.slice(1).map((x) => `<span class="ft${x.id === at ? ' on' : ''}" data-tab="${x.id}" data-drag="${x.id}" data-id="${x.id}">${esc(x.title)}${nb(x.id)}${x.id === at ? '<button class="ft-x" title="Borrar esta pestaña">×</button>' : ''}</span>`).join('') : ''}<button class="ft-add" title="Nueva pestaña">＋</button></span>
       ${circles(id)}${tabs.length > 1 ? circles(at) : ''}${thumbs(id)}
       <span class="grow"></span>
       <span class="fr-pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</span>
@@ -304,10 +304,12 @@ const stubHTML = (id) => { const f = nd(id), n = countIn(id); return `<section c
 function nIn(id) {
   const n = nd(id); if (!n) return 0;
   const titles = (t) => ((t || '').match(/^#{1,6}\s/gm) || []).length;
-  if (n.kind === 'frame') return n.kids.length > 1 ? n.kids.length : (nd(n.kids[0])?.kids.length || 0);
+  // only what leads to a document counts: a chain of containers with nothing at the end is 0
+  const full = (k) => { const x = nd(k); return !!x && (x.kind === 'doc' || x.kids.some(full)); };
+  if (n.kind === 'frame') return n.kids.length > 1 ? n.kids.filter(full).length : (nd(n.kids[0])?.kids.filter(full).length || 0);
   if (n.kind === 'doc') return n.kids.length > 1 ? n.kids.length : titles(nd(n.kids[0])?.text);
   if (n.kind === 'dtab') return titles(n.text);
-  return n.kids.length;
+  return n.kids.filter(full).length;
 }
 const nb = (id) => { const k = nIn(id); return k ? `<i class="nb" title="${k} dentro">${k}</i>` : ''; };
 const countIn = (id) => { let c = 0; const w = (x) => { for (const k of nd(x).kids) { if (['frame', 'doc'].includes(nd(k).kind)) c++; w(k); } }; w(id); return c; };
@@ -339,12 +341,12 @@ function renderAreas(peek) {
   const real = ids(S.area), chain = peek && nd(peek) ? ids(leafOf(peek)) : real, cols = [];
   const depth = colsDepth();
   for (let lv = 0, pid = S.root; ; lv++) {
-    cols.push({ pid, ids: nd(pid).kids.filter((k) => nd(k)?.kind === 'area') });
+    cols.push({ pid, ids: nd(pid).kids.filter((k) => nd(k)?.kind === 'area' || (nd(k)?.kind === 'doc' && (pid === S.root || isGroup(nd(pid)) || !nd(pid).kids.some((x) => nd(x)?.kind === 'frame')))) });
     const nx = chain[lv]; if (!nx || lv + 1 >= depth) break; pid = nx;   // always as many columns as levels: an area with none inside shows an empty one
   }
-  const btn = (k, i) => { const a = nd(k), g = isGroup(a); return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
+  const btn = (k, i) => { const a = nd(k), g = isGroup(a); if (a.kind === 'doc') return `<div role="button" tabindex="0" class="ar ar-doc" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Clic: abrirlo · doble clic: renombrar"><span class="ar-dico">📄</span><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el documento o guardarlo en el cajón">×</b></div>`; return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
-  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b>${nb(k)}</span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
+  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b>${nb(k)}</span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<span class="ar-adds"><button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button><button class="ar-adddoc" data-pid="${c.pid}" title="Un documento en esta columna">＋ 📄</button></span>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; paintHov(); }   // unchanged: leave it (keeps hover, double clicks)
   arPids = cols.map((c) => c.pid);
   if (!peek) document.documentElement.style.setProperty('--areas-w', (cols.length - 1) * 48 + 172 + 'px');   // folded strips + the open column, whatever is hovered
@@ -544,7 +546,13 @@ function targetAt(x, y) {
     return src.item ? { kind: 'hang', pid, el: arEl, ok: true } : { kind: 'place', pid, el: arEl, ok: true };
   }
   const bg = el.closest('#stage') && !el.closest('.fr, .dc') ? stage.querySelector(':scope > .grid') : null;   // the empty space of an area counts as the area
-  if (src.item) { const h = el.closest('[data-id]') || bg; const id = h?.dataset.id; return id && nd(id) ? { kind: 'hang', pid: id, el: h, ok: true } : null; }
+  // an idea, a task or a drawing hangs on the thing it is over (a document, a tab, a frame, the area): no bars beside
+  if (src.item || src.make === 'idea' || src.make === 'tarea' || src.make === 'dibujo') {
+    const h = el.closest('.dc[data-id], .ft[data-tab], .fr[data-id]') || bg; if (!h) return null;
+    const id = h.dataset.tab || h.dataset.id; if (!nd(id)) return null;
+    if (src.make === 'dibujo' && !['frame', 'doc', 'ftab'].includes(nd(id).kind)) return null;
+    return { kind: src.item ? 'hang' : 'place', pid: id, el: h, ok: true, slot: true };
+  }
   const t = el.closest('[data-drop]') || bg; if (!t) return null;
   const mode = t.dataset.drop, id = t.dataset.id;
   let spec = null;
@@ -554,7 +562,10 @@ function targetAt(x, y) {
   else if (mode === 'into') spec = { kind: 'place', pid: id, idx: indexInFlow(t, x, y), el: t };
   else if (mode === 'area') {
     const r = t.getBoundingClientRect(), fy = (y - r.top) / r.height, pp = PAR.get(id), i = nd(pp).kids.indexOf(id);
-    spec = src.node && nd(src.node)?.kind === 'area'
+    const docIn = (src.node && nd(src.node)?.kind === 'doc') || src.make === 'doc';
+    if (docIn && (nd(id).kind === 'doc' || fy < .3 || fy > .7)) spec = { kind: 'place', pid: pp, idx: fy < .5 ? i : i + 1, forced: 'doc', el: t, side: fy < .5 ? 't' : 'b' };
+    else if (nd(id).kind === 'doc') spec = null;
+    else spec = src.node && nd(src.node)?.kind === 'area'
       ? (fy < .3 || fy > .7 ? { kind: 'place', pid: pp, idx: fy < .5 ? i : i + 1, forced: 'area', el: t, side: fy < .5 ? 't' : 'b' } : { kind: 'place', pid: id, forced: 'area', into: true, el: t })
       : { kind: 'place', pid: leafOf(id), el: t };
   } else if (mode === 'doc') {
@@ -592,6 +603,14 @@ function indexInFlow(body, x, y) {
 }
 function paintTarget(t) {
   for (const el of document.querySelectorAll('.drop-on, .drop-bad')) el.classList.remove('drop-on', 'drop-bad');
+  document.querySelector('.it-slot')?.remove();
+  if (t?.slot && t.el) {   // where the circle will go: a dashed one, right there
+    const slot = document.createElement('i'); slot.className = 'it-slot' + (drag?.src?.make === 'dibujo' ? ' draw' : '');
+    const fr = t.el.matches('.fr') ? t.el : t.el.matches('.ft') ? t.el.closest('.fr') : null;
+    if (fr) fr.querySelector(':scope > .fr-head .grow')?.before(slot);
+    else if (t.el.matches('.dc')) { let its = t.el.querySelector(':scope > .its'); if (!its) { its = document.createElement('span'); its.className = 'its'; t.el.append(its); } its.append(slot); }
+    else if (t.el.matches('.grid')) { let l = t.el.querySelector(':scope > .loose-its'); if (!l) { l = document.createElement('div'); l.className = 'loose-its'; t.el.prepend(l); } l.append(slot); }
+  }
   bar.classList.remove('on');
   if (!t?.el) return;
   t.el.classList.add(t.ok ? 'drop-on' : 'drop-bad');
@@ -682,6 +701,10 @@ addEventListener('click', (e) => {
     const col = ar.closest('.ar-col'); if (col && !col.classList.contains('last')) { arShut = [...col.parentNode.children].indexOf(col); arHov = -1; }   // chosen: fold it, show the next column
     return focusTo(id);
   }
+  const addd = t.closest('.ar-adddoc'); if (addd) {
+    snap(); const P = nd(addd.dataset.pid), d = mk('doc', 'Documento nuevo'); d.kids.push(mk('dtab', 'Página 1', { text: '' }).id); d.active = d.kids[0]; P.kids.push(d.id); reindex(); save(); renderAll();
+    const el = $(`.ar[data-area="${d.id}"] .ar-t`); if (el) editInline(el, (v) => { if (v) { d.title = v; save(); } renderAll(); }); return;
+  }
   const add = t.closest('.ar-add'); if (add) {
     snap(); const P = nd(add.dataset.pid), a = mk('area', 'Apartado nuevo'); P.kids.push(a.id);
     // next to groups, it gets the same columns inside, so it can be filled at once
@@ -713,11 +736,12 @@ addEventListener('click', (e) => {
   const see = t.closest('.fr-see'); if (see) return openList(see.dataset.see, see.closest('.fr').dataset.id);
   const fin = t.closest('.fr-in'); if (fin) return focusTo(fin.closest('.fr').dataset.id);
   const pal = t.closest('.fr-pal i'); if (pal) { snap(); nd(pal.closest('.fr').dataset.id).color = pal.dataset.c; save(); return renderAll(); }
+  const ftx0 = t.closest('.fr-tx'); if (ftx0) return askDelete(ftx0.dataset.tab0, ftx0);
   const ftx = t.closest('.ft-x'); if (ftx) return askDelete(ftx.closest('.ft').dataset.tab, ftx);
+  const ttl = t.closest('.fr-title[data-tab0]'); if (ttl && nd(ttl.closest('.fr').dataset.id).kids.length > 1) { const f = nd(ttl.closest('.fr').dataset.id); f.active = ttl.dataset.tab0; save(); return renderAll(); }
   const ft = t.closest('.ft'); if (ft) { const f = nd(ft.closest('.fr').dataset.id); f.active = ft.dataset.tab; save(); return renderAll(); }
   const fta = t.closest('.ft-add'); if (fta) {
     snap(); const f = nd(fta.closest('.fr').dataset.id);
-    if (f.kids.length === 1 && nd(f.kids[0]).title === 'General') nd(f.kids[0]).title = f.title;
     const tab = mk('ftab', `Pestaña ${f.kids.length + 1}`); f.kids.push(tab.id); f.active = tab.id; save(); renderAll();
     const el = stage.querySelector(`.ft[data-tab="${tab.id}"]`); if (el) editInline(el.firstChild?.nodeType === 3 ? wrapText(el) : el, (v) => { if (v) { tab.title = v; save(); renderAll(); } });
     return;
