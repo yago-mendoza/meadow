@@ -994,3 +994,6 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 .shape:hover .tb, .shape.sel .tb { opacity: 1; }
 .shape .tb-wh { right: -7px; bottom: -7px; width: 12px; height: 12px; border-radius: 4px; background: #fff; border: 1.5px solid #cbbcc8; cursor: nwse-resize; }
 .shape .tb-wh:hover { background: var(--accent); border-color: var(--accent); }
+/* a title reads as it was written, in the page and in the editor (only the index shows its main titles in capitals) */
+.cm-h1 { text-transform: none; letter-spacing: .01em; }
+.doc.near .rh1 { text-transform: none; letter-spacing: 0; }
