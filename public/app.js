@@ -260,10 +260,11 @@ const countIn = (id) => { let c = 0; const w = (x) => { for (const k of nd(x).ki
 function docHTML(id) {
   const d = nd(id), at = activeTab(d), text = nd(at).text || '';
   const prev = readable(text).split('\n').filter((l, i, a) => l.trim() || (i && a[i - 1].trim())).slice(0, 12).join('\n');
-  return `<article class="dc" data-id="${id}" data-drag="${id}" data-drop="doc">
-    ${d.kids.length > 1 ? `<div class="dc-tabs">${d.kids.map((k) => `<span class="${k === at ? 'on' : ''}">${esc(nd(k).title)}</span>`).join('')}</div>` : ''}
+  const many = d.kids.length > 1;          // with tabs: its name, and its tabs right under it (what each holds stays inside)
+  return `<article class="dc${many ? ' many' : ''}" data-id="${id}" data-drag="${id}" data-drop="doc">
     <h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}</h3>
-    <div class="dc-prev">${prev ? esc(prev).replace(/^(#{1,6})\s+(.*)$/gm, '<b class="h$1">$2</b>') : '<span class="dc-empty">Página en blanco</span>'}</div>
+    ${many ? `<div class="dc-tabs">${d.kids.map((k) => `<span data-pg="${k}" class="${k === at ? 'on' : ''}">${esc(nd(k).title)}</span>`).join('')}</div>`
+      : `<div class="dc-prev">${prev ? esc(prev).replace(/^(#{1,6})\s+(.*)$/gm, '<b class="h$1">$2</b>') : '<span class="dc-empty">Página en blanco</span>'}</div>`}
     ${circles(id)}<button class="dc-x" title="Borrar o guardar en el cajón">×</button>
   </article>`;
 }
@@ -538,6 +539,7 @@ addEventListener('click', (e) => {
   const fx = t.closest('.fr-x'); if (fx) return askDelete(fx.closest('.fr').dataset.id, fx);
   const dx = t.closest('.dc-x'); if (dx) return askDelete(dx.closest('.dc').dataset.id, dx);
   const itc = t.closest('.it'); if (itc) return itemClick(itc.dataset.it, itc);
+  const pg = t.closest('.dc-tabs span[data-pg]'); if (pg) { const dc2 = pg.closest('.dc'); return openDoc(dc2.dataset.id, pg.dataset.pg, dc2); }   // a tab of a document opens it there
   const dc = t.closest('.dc'); if (dc && !t.closest('.its')) return openDoc(dc.dataset.id, null, dc);
   const stub = t.closest('.fr.stub'); if (stub) return focusTo(stub.dataset.id);
   const mr = t.closest('.mr'); if (mr) { if (mr.dataset.head) { const [tab, line] = mr.dataset.head.split(':'); const d = parent(tab); openDoc(d.id, tab); setTimeout(() => ed?.gotoLine(+line), 60); } else focusTo(mr.dataset.id); return; }
