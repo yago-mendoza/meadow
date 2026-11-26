@@ -61,6 +61,7 @@ async function load() {
   else S = fresh();
   S.ideas ||= []; S.tasks ||= []; S.drawings ||= []; S.drawer ||= []; S.seq ||= { idea: 0, tarea: 0, doc: 0 }; S.focus ||= S.root;
   ensureAreas();
+  for (const it of [...S.ideas, ...S.tasks]) if (!it.at && isBlank(it) && !tabsUsing(it).length) listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);   // empty and nowhere: gone
   renderAll();
 }
 function ensureAreas() {
@@ -271,8 +272,7 @@ function tidy() {
   reindex();
   if (S.nodes[S.root] && !nd(S.root).kids.some((k) => nd(k)?.kind === 'area')) { const g = mk('area', 'General'); nd(S.root).kids.push(g.id); reindex(); }
   for (const n of Object.values(S.nodes)) if (n.kind === 'frame' || n.kind === 'doc') ensureTab(n);
-  for (const it of [...S.ideas, ...S.tasks]) if (it.at && !nd(it.at)) it.at = null;
-  if (nd(S.area)?.kind === 'area' && PAR.has(S.area)) S.area = leafOf(S.area);
+  for (const it of [...S.ideas, ...S.tasks]) if (it.at && !nd(it.at)) it.at = null;  if (nd(S.area)?.kind === 'area' && PAR.has(S.area)) S.area = leafOf(S.area);
   else { const a0 = nd(S.root).kids.find((k) => nd(k)?.kind === 'area'); S.area = a0 ? leafOf(a0) : null; }
   if (!nd(S.focus) || !['project', 'area', 'frame'].includes(nd(S.focus).kind) || (S.focus !== S.root && !PAR.has(S.focus))) S.focus = S.area || S.root;
   if (S.focus === S.root && S.area) S.focus = S.area;
@@ -455,7 +455,7 @@ function renderList() {
   }
   const chip = (attr, label, sel, extra = '') => `<button ${attr} class="${sel ? 'on' : ''}"${extra}>${label}</button>`;
   $('#list-body').innerHTML = `<div class="lfil">
-      <div class="lw">${listScope ? `<span class="lw-on">${PLACE_ICO[nd(scope)?.kind] || ''} ${esc(scopeName(scope))}<button data-lscope="" title="En todas partes">×</button></span>` : `<input class="lwq" placeholder="Dónde: un apartado, marco, documento…" value="${esc(listWQ)}">`}${listScope === 'here' ? '' : `<button class="lw-here" data-lscope="here" title="Lo que estás viendo">Aquí</button>`}<div class="lw-sug">${listScope ? '' : whereSug()}</div></div>
+      <div class="lw">${listScope ? `<span class="lw-on">${PLACE_ICO[nd(scope)?.kind] || ''} ${esc(scopeName(scope))}<button data-lscope="" title="En todas partes"><svg viewBox="0 0 10 10" width="9" height="9"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></span>` : `<input class="lwq" placeholder="Dónde: un apartado, marco, documento…" value="${esc(listWQ)}">`}${listScope === 'here' ? '' : `<button class="lw-here" data-lscope="here" title="Lo que estás viendo">Aquí</button>`}<div class="lw-sug">${listScope ? '' : whereSug()}</div></div>
       <input class="lq" placeholder="Buscar en el texto de las ${kind === 'idea' ? 'ideas' : 'tareas'}…" value="${esc(listQ)}">
       <div class="lf-row"><span>Estado</span>${states.map(([k, lab]) => chip(`data-lst="${k}"`, lab, on.has(k))).join('')}</div>
       <div class="lf-row"><span>Para</span>${['Todas', ...WHO].map((w) => chip(`data-lw="${w}"`, w, w === listWho)).join('')}<span class="lf-gap"></span>${chip('data-lnest', '⌥ Anidadas', listNested, ' title="Agruparlas bajo donde están"')}</div>
@@ -809,6 +809,15 @@ function setItemText(it, v) {
   save(); renderAll(); ed?.refresh?.();
 }
 // removing an idea or a task takes it out everywhere: its list, where it hung and its line in any text
+// a task or idea always has a place: when its line leaves the last page that had it, it stays hung on that page (empty, it goes)
+function isBlank(it) { return !(it.text || '').trim() && !(it.body || '').trim() && !(it.notes || '').trim() && !(it.plans || []).some((p) => (p.text || '').trim()) && !(it.log || []).length && !(it.blockedBy || []).length; }
+function keepPlaced(was, now, tab) {
+  for (const it of [...S.tasks, ...S.ideas]) {
+    const tok = token(it);
+    if (it.at || !was.includes(tok) || now.includes(tok) || tabsUsing(it).length) continue;
+    if (isBlank(it) && taskOpen !== it.id && taskOpen !== it) dropItem(it); else it.at = tab;
+  }
+}
 function dropItem(it) {
   const tok = token(it);
   for (const n of Object.values(S.nodes)) if (n.kind === 'dtab' && (n.text || '').includes(tok)) {
@@ -1067,6 +1076,11 @@ $('#task').addEventListener('input', (e) => {
   else if (t.dataset.plan != null) taskEdit(() => { const ps = plansOf(it), k = +t.dataset.plan; ps[k].text = t.innerText.replace(/\n$/, ''); if (k === ps.length - 1) it.body = ps[k].text; });
   else if (t.dataset.f) taskEdit(() => { it[t.dataset.f] = t.innerText.replace(/\n$/, ''); });
 });
+// pasted text comes in as plain text, in the card's own letter
+$('#task').addEventListener('paste', (e) => {
+  if (!e.target.closest('[contenteditable="true"]')) return;
+  e.preventDefault(); document.execCommand('insertText', false, (e.clipboardData.getData('text/plain') || '').replace(/\r\n?/g, '\n'));
+});
 $('#task').addEventListener('keydown', (e) => {
   const it = taskNow(); if (!it) return;
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); return closeTask(); }
@@ -1078,10 +1092,13 @@ $('#task').addEventListener('keydown', (e) => {
     const box = $('#task .tk-body'); box.scrollTop = box.scrollHeight; $('#task .tk-log-in').focus();
   }
 });
+let taskDownOut = false;   // the card closes on a click that begins and ends outside it (selecting text and letting go outside does not)
+$('#task').addEventListener('pointerdown', (e) => { taskDownOut = e.target === $('#task'); });
 $('#task').addEventListener('click', (e) => {
   const it = taskNow(); if (!it) return;
   const t = e.target;
-  if (t === $('#task') || t.closest('.tk-x')) return closeTask();
+  if ((t === $('#task') && taskDownOut) || t.closest('.tk-x')) return closeTask();
+  if (t === $('#task')) return;
   const s = t.closest('[data-st]');
   if (s && it.kind === 'tarea' && s.dataset.st === 'bloqueada' && stOf(it) !== 'bloqueada') { blockPick = new Set(it.blockedBy || []); blockQ = ''; paintTask(); return $('#task .tk-bl-q')?.focus(); }
   if (s) { if (s.dataset.st !== stOf(it)) taskEdit(() => setState(it, s.dataset.st)); paintTask(); return renderAll(); }
@@ -1455,9 +1472,12 @@ $('#dw-c').addEventListener('pointerdown', (e) => {
   const end = () => { c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', end); up(); };
   c.addEventListener('pointermove', mv); c.addEventListener('pointerup', end);
 });
+let drawDownOut = false;
+$('#draw').addEventListener('pointerdown', (e) => { drawDownOut = e.target === $('#draw'); });
 $('#draw').addEventListener('click', (e) => {
   const d = dwNow(); if (!d) return; const t = e.target;
-  if (t === $('#draw') || t.closest('.dw-close')) return closeDrawing();
+  if ((t === $('#draw') && drawDownOut) || t.closest('.dw-close')) return closeDrawing();
+  if (t === $('#draw')) return;
   if (t.closest('.dw-undo')) return dwUndo();
   if (t.closest('.dw-clear')) return d.shapes.length && dwEdit(() => { d.shapes = []; dwSel.clear(); });
   if (t.closest('.dw-rm')) { dwOpen = null; $('#draw').hidden = true; snap(); S.drawings.splice(S.drawings.indexOf(d), 1); save(); renderAll(); return toast('Dibujo quitado', [['Deshacer', doUndo]]); }
@@ -1621,7 +1641,7 @@ let level = 0;
 const edApi = {
   onChange(text) {
     const t = nd(curTab); if (!t || t.text === text) return;
-    t.text = text; save();
+    const was = t.text || ''; t.text = text; keepPlaced(was, text, t.id); save();
     clearTimeout(edApi.t); edApi.t = setTimeout(() => { renderMap(); renderStage(); }, 500);
   },
   getDocs: () => docs().map((d) => ({ n: d.n, name: d.title, icon: '📄' })),

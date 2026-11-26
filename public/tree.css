@@ -930,3 +930,12 @@ body.no-pics .fr.has-pic { margin-top: 0; } body.no-pics .fr.has-pic::before { d
 #toc-list .toc.sel-in, #ed-tabs .bt.sel-in { outline: 1.5px solid color-mix(in srgb, var(--accent) 35%, transparent) !important; outline-offset: -1px; }
 /* the components bar, in the middle of the top */
 #tools { position: absolute; left: 50%; transform: translateX(-50%); }
+
+/* the scope chip's cross, centred in its circle */
+.lw-on button { display: grid; place-items: center; padding: 0; flex: none; }
+.lw-on button svg { display: block; }
+/* the list's empty line, in the app's own letter */
+#list .none { font: 13px/1.5 "Segoe UI", sans-serif; color: var(--muted); text-align: center; padding: 22px 12px; margin: 0; }
+/* a task's plan and notes read like a document's text */
+.tk-area { font: 14px/1.6 Consolas, "Cascadia Mono", "Lucida Console", monospace; color: var(--ink); }
+.tk-area * { font: inherit !important; color: inherit !important; background: none !important; }
