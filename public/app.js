@@ -1120,10 +1120,27 @@ for (const [k, m] of SEL) if (m !== 'all') SEL.set(k, 'all');       // older «o
 let selHidden = false;                                                 // the bar put away (the choice stays)
 function selRotate(id) { SEL.has(id) ? SEL.delete(id) : SEL.set(id, 'all'); selHidden = false; selKeep(); paintSel(); }
 function setSelMode() { if (!SEL.size) return toast('Ctrl+clic en un marco, documento, página, apartado, idea o tarea para elegirlo como contexto'); selHidden = !selHidden; paintSel(); }
+// a title of a page, by its words (lines move as you write)
+function headKey(tab, line) { const l = (nd(tab)?.text || '').split('\n')[line - 1] || ''; const m = l.match(HEAD); return m ? 'head:' + tab + ':' + m[2].trim() : null; }
+// a title's section: its line and everything under it, down to the next title of its level or higher
+function headSection(tab, title) {
+  const ls = (nd(tab)?.text || '').split('\n'); const i = ls.findIndex((l) => { const m = l.match(HEAD); return m && m[2].trim() === title; });
+  if (i < 0) return null; const lv = ls[i].match(HEAD)[1].length; let j = i + 1;
+  while (j < ls.length) { const m = ls[j].match(HEAD); if (m && m[1].length <= lv) break; j++; }
+  return ls.slice(i, j).join('\n');
+}
+function paintEdSel() {   // in the open document: the chosen titles in the index, the chosen pages in its tabs
+  for (const el of document.querySelectorAll('#ed .sel-all, #ed .sel-in')) el.classList.remove('sel-all', 'sel-in');
+  if (!cur || !SEL.size || selHidden) return;
+  const pageIn = SEL.has(curTab) || selUnder(curTab);
+  for (const el of document.querySelectorAll('#toc-list .toc[data-line]')) { const k = headKey(curTab, +el.dataset.line); if (k && SEL.has(k)) el.classList.add('sel-all'); else if (pageIn) el.classList.add('sel-in'); }
+  for (const el of document.querySelectorAll('#ed-tabs .bt[data-pg]')) { if (SEL.has(el.dataset.pg)) el.classList.add('sel-all'); else if (selUnder(el.dataset.pg)) el.classList.add('sel-in'); }
+}
 // what is inside something chosen «with everything» is in too (lighter)
 function selUnder(id) { for (const [k, m] of SEL) if (m === 'all' && k !== id && nd(k) && nd(id) && isIn(id, k)) return true; return false; }
 function paintSel() {
   for (const el of document.querySelectorAll('.sel-all, .sel-self, .sel-in')) el.classList.remove('sel-all', 'sel-self', 'sel-in');
+  paintEdSel();
   if (!SEL.size || selHidden) return paintSelPill();   // the marks show while the bar does
   const mark = (el, id) => { const m = SEL.get(id); if (m) el.classList.add(m === 'all' ? 'sel-all' : 'sel-self'); else if (selUnder(id)) el.classList.add('sel-in'); };
   for (const el of document.querySelectorAll('#stage .fr[data-id], #stage .dc[data-id], #areas .ar[data-area]')) mark(el, el.dataset.id || el.dataset.area);
@@ -1175,6 +1192,18 @@ function buildContext() {
       } else if (mode === 'self' || here.length) out.push('', `## ${KNAME[n.kind] || ''}: ${where(id)}`);
       if (here.length) out.push('', here.map((it) => itemMD(it)).join('\n'));
     }
+    if (!mode && n.kind === 'dtab') {
+      const heads = [...SEL.keys()].filter((k) => k.startsWith('head:' + id + ':')).map((k) => k.slice(('head:' + id + ':').length));
+      const parts = heads.map((h) => headSection(id, h)).filter(Boolean);
+      if (parts.length) {
+        out.push('', `## Documento: ${where(parent(id).id)}`); if (!implicit(n)) out.push('', `### Página: ${n.title}`);
+        for (const p of parts) {
+          if (selInc.texto) out.push('', textOf(p).trim().replace(/^(#{1,6})(?=\s)/gm, (h) => '#'.repeat(Math.min(6, h.length + 3))));
+          stats.titles += (p.match(/^#{1,6}\s/gm) || []).length;
+          const inText = take([...S.tasks, ...S.ideas].filter((it) => p.includes(token(it)))); if (inText.length) out.push('', inText.map((it) => itemMD(it)).join('\n'));
+        }
+      }
+    }
     for (const k of n.kids) walk(k, mode === 'all');
   };
   walk(S.root, false);
@@ -1219,6 +1248,15 @@ $('#selpill').addEventListener('click', (e) => {
 addEventListener('click', (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   const t = e.target;
+  if (t.closest('#ed') && cur) {
+    let id = null;
+    const toc = t.closest('#toc-list .toc[data-line]'), bt = t.closest('#ed-tabs .bt[data-pg]');
+    if (bt) id = bt.dataset.pg;
+    else if (toc) id = headKey(curTab, +toc.dataset.line);
+    else if (t.closest('#ed-body .cm-content') && ed) { const pos = ed.view.posAtCoords({ x: e.clientX, y: e.clientY }); if (pos != null) { const ln = ed.view.state.doc.lineAt(pos); if (HEAD.test(ln.text)) id = headKey(curTab, ln.number); } }
+    if (!id) return;
+    e.preventDefault(); e.stopPropagation(); return selRotate(id);
+  }
   if (t.closest('#selpill, #top, #ed, #task, #draw, #pick, #toasts, #list, #map')) return;
   const arEl = t.closest('#areas .ar[data-area]');
   const it = t.closest('#stage .it[data-it]'), pg = t.closest('#stage [data-pg]'), ft = t.closest('#stage .ft[data-tab]'), dc = t.closest('#stage .dc[data-id]'), fr = t.closest('#stage .fr[data-id]');
@@ -1612,6 +1650,7 @@ const edApi = {
     $('#toc-list').innerHTML = heads.length
       ? heads.map((h) => `<button class="toc d${Math.min(h.d, 3)}${h.line === current ? ' on' : ''}" data-line="${h.line}" data-drag="head:${curTab}:${h.line}" title="Clic: ir · arrastra: llevarlo a otro sitio (se convierte)">${esc(h.text)}</button>`).join('')
       : '<p class="none">Escribe <b># Título</b> para dividir la página en secciones; aparecerán aquí, y podrás arrastrarlas a otro sitio.</p>';
+    paintEdSel();
   },
   onLevel(l) { level = l; for (const b of document.querySelectorAll('#ed-lv [data-l]')) b.classList.toggle('on', +b.dataset.l === l); },
 };

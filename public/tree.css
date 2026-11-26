@@ -924,3 +924,9 @@ body.drag-make .drop-on { animation: none !important; outline: 2.5px solid var(-
 #settings input { accent-color: var(--accent); width: 15px; height: 15px; }
 body.no-pics .fr-pic, body.no-pics .dw-th { display: none !important; }
 body.no-pics .fr.has-pic { margin-top: 0; } body.no-pics .fr.has-pic::before { display: none; }
+
+/* chosen titles and pages inside the open document */
+#toc-list .toc.sel-all, #ed-tabs .bt.sel-all { outline: 2px solid var(--accent) !important; outline-offset: -1px; background: color-mix(in srgb, var(--accent) 10%, #fff); }
+#toc-list .toc.sel-in, #ed-tabs .bt.sel-in { outline: 1.5px solid color-mix(in srgb, var(--accent) 35%, transparent) !important; outline-offset: -1px; }
+/* the components bar, in the middle of the top */
+#tools { position: absolute; left: 50%; transform: translateX(-50%); }
