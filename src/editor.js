@@ -478,11 +478,15 @@ export function createEditor(parent, api) {
   });
 
   const linkClicks = EditorView.domEventHandlers({
-    mousedown(e) {
+    mousedown(e, view) {
       const h = e.target.closest?.('.cm-hmark');
       if (h) { e.preventDefault(); const d = +h.dataset.d; blocksPlugin?.setLevel(blocksPlugin.level === d ? 0 : d); return true; }
       const el = e.target.closest?.('.cm-link, .cm-linkref'); if (!el) return false;
-      if (e.ctrlKey || e.metaKey || el.classList.contains('cm-linkref')) { e.preventDefault(); api.openDoc?.(+el.dataset.n); return true; }
+      if (e.ctrlKey || e.metaKey || el.classList.contains('cm-linkref')) {
+        e.preventDefault();
+        try { view.dispatch({ selection: { anchor: view.posAtDOM(el) } }); } catch { /* keep the caret */ }   // the trail remembers this link
+        api.openDoc?.(+el.dataset.n); return true;
+      }
       return false;
     },
   });

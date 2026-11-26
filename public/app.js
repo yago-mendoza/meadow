@@ -43,6 +43,7 @@ async function load() {
   else S.view = { x: Math.round(innerWidth / 2 - 100), y: Math.round(innerHeight / 2 - 140), z: 1 };
   for (const k of ['postits', 'frames', 'ideas', 'tasks', 'history', 'signs']) S[k] ||= [];
   S.seq ||= { idea: 0, tarea: 0 };
+  for (const d of S.docs) { const t = titleOf(d.text); if (t) d.name = t; else d.text = withTitle(d.text, d.name); }
   if (!S.trays?.length) S.trays = [{ id: 'b1', name: 'Cajón', color: TRAY_COLORS[0], open: true }];
   for (const t of S.trays) t.name = t.name.replace(/^Bandeja\b/, 'Cajón');
   for (const d of S.docs) if (d.place === 'stash' && !S.trays.some((t) => t.id === d.tray)) d.tray = S.trays[0].id;
@@ -89,11 +90,13 @@ function applyView() {
   $('#z-val').textContent = Math.round(z * 100) + ' %';
   drawGrid();
 }
+const SHOW_GRID = false;               // Yago, 26.11: «quita la grid, sin grid»
 function drawGrid() {
   const dpr = devicePixelRatio || 1, w = vp.clientWidth, h = vp.clientHeight;
   if (grid.width !== w * dpr || grid.height !== h * dpr) { grid.width = w * dpr; grid.height = h * dpr; }
   const c = grid.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.fillStyle = '#f7f7fb'; c.fillRect(0, 0, w, h);
+  if (!SHOW_GRID) return;
   const { x, y, z } = S.view;
   let step = 1; const seq = [2, 2.5, 2]; let k = 0;
   while (step * z < 16) step *= seq[k++ % 3];
@@ -151,7 +154,7 @@ $('#z-fit').onclick = () => {
 // ---- rendering -----------------------------------------------------------------------------------------------------
 const palHTML = () => `<div class="pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</div>`;
 function docHTML(d, n) {
-  const text = readable(d.text);
+  const text = readable((d.text || '').replace(/^\s*#{1,6}\s+.*(\n|$)/, '').replace(/^\n+/, ''));
   const words = (text.match(/\S+/g) || []).length;
   return `<div class="doc${sel.has(d.id) ? ' sel' : ''}" data-id="${d.id}" data-k="d" style="left:${d.x}px;top:${d.y}px;z-index:${d.z || 0};--s:${d.s || 1}">
     <div class="page">
@@ -220,8 +223,8 @@ function renderItems() {
   peeked = []; clearTimeout(peekT);
   framesEl.innerHTML = [...S.frames].sort((a, b) => b.w * b.h - a.w * a.h).map(frameHTML).join('');
   itemsEl.innerHTML = S.docs.map((d, i) => (d.place === 'canvas' ? docHTML(d, i + 1) : '')).join('')
-    + S.postits.map(postitHTML).join('')
-    + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas).map(itemHTML).join('');
+    + S.postits.filter((p) => !p.riding).map(postitHTML).join('')
+    + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas && !it.riding).map(itemHTML).join('');
   $('#empty').classList.toggle('on', !itemsEl.children.length && !S.frames.length);
   S.signs = (S.signs || []).filter((g) => find(g.host));
   addSignsToHosts();
@@ -230,7 +233,7 @@ function renderItems() {
 // ---- tasks docked under a document: stacked in order, as wide as the document, moving and scaling with it ----------
 const docked = (d) => S.tasks.filter((t) => t.onCanvas && t.dock === d.id).sort((a, b) => (a.dockAt ?? 0) - (b.dockAt ?? 0));
 function layoutDocks() {
-  for (const t of S.tasks) if (t.dock && !S.docs.some((d) => d.id === t.dock && d.place === 'canvas')) delete t.dock;
+  for (const t of S.tasks) if (t.dock && !t.riding && !S.docs.some((d) => d.id === t.dock && d.place === 'canvas')) delete t.dock;
   for (const d of S.docs) {
     if (d.place !== 'canvas') continue;
     const list = docked(d); if (!list.length) continue;
@@ -281,7 +284,7 @@ function renderStash() {
   const html = S.trays.map((t) => {
     const ds = S.docs.map((d, i) => [d, i + 1]).filter(([d]) => d.place === 'stash' && trayOf(d) === t);
     return `<div class="tray${t.open ? ' open' : ''}" data-tray="${t.id}" style="--t:${t.color};--i:${S.trays.indexOf(t)};--n:${S.trays.length}">
-      <header><i class="hdl"></i><i class="t-dot" title="Cambiar el color"></i><b class="t-name" title="Doble clic para renombrar">${esc(t.name)}</b><span class="t-n">${ds.length || ''}</span>
+      <header><i class="hdl"></i><i class="t-dot" title="Cambiar el color"></i><b class="t-name" title="Clic para renombrar">${esc(t.name)}</b><span class="t-n">${ds.length || ''}</span>
         ${ds.length ? '<button class="t-out" title="Sacar todos sus documentos al plano">⤢</button>' : ''}
         ${S.trays.length > 1 ? '<button class="t-x" title="Quitar el cajón (sus documentos pasan a otro)">×</button>' : ''}</header>
       <div class="t-body"><div class="t-clip"><div class="t-list">${ds.map(([d, n]) => `<div class="chip" data-id="${d.id}" title="Clic para abrir · arrástralo al plano o a otro cajón">
@@ -312,10 +315,24 @@ function hotTray(e, on) {
   const id = on ? overStash(e) : null;
   for (const el of stash.querySelectorAll('.tray')) el.classList.toggle('hot', el.dataset.tray === id);
 }
+// What lies on a document (post-its, ideas, tasks, docked tasks) rides along with it into a drawer: hidden, with its
+// offset kept, and put back in the same place when the document comes out. Its tags go with it by themselves.
+function boardRiders(d) {
+  const keep = new Set(sel); sel.clear(); sel.add(d.id);
+  const deps = collectMoving(false).filter((m) => m.o !== d && (m.k === 'p' || m.k === 'i' || m.k === 't'));
+  sel.clear(); for (const id of keep) sel.add(id);
+  for (const m of deps) { m.o.riding = d.id; m.o.rdx = m.o.x - d.x; m.o.rdy = m.o.y - d.y; sel.delete(m.o.id); }
+}
+function releaseRiders(d) {
+  for (const o of [...S.postits, ...S.ideas, ...S.tasks]) if (o.riding === d.id) {
+    o.x = Math.round(d.x + o.rdx); o.y = Math.round(d.y + o.rdy); o.z = topZ();
+    delete o.riding; delete o.rdx; delete o.rdy;
+  }
+}
 function putInTray(docs, trayId) {
   // (renderStash redraws after this; the open tray is the one that received them)
   const t = S.trays.find((x) => x.id === trayId) || openTray();
-  for (const d of docs) { d.place = 'stash'; d.tray = t.id; sel.delete(d.id); }
+  for (const d of docs) { if (d.place === 'canvas') boardRiders(d); d.place = 'stash'; d.tray = t.id; sel.delete(d.id); }
   for (const x of S.trays) x.open = x === t;
   return t;
 }
@@ -333,7 +350,7 @@ function groupText() {
   const parts = [];
   const ids = [...sel].map(find).filter(Boolean).sort((a, b) => (a.o.y - b.o.y) || (a.o.x - b.o.x));
   for (const { k, o } of ids) {
-    if (k === 'd') parts.push(`# ${o.name}\n${readable(o.text)}`);
+    if (k === 'd') parts.push(titleOf(o.text) ? readable(o.text) : `# ${o.name}\n${readable(o.text)}`);
     else if (k === 'p') parts.push(o.text);
     else if (k === 'i') parts.push(`💡 ${o.text}`);
     else if (k === 't') parts.push(`- [${o.done ? 'x' : ' '}] ${o.text}`);
@@ -349,8 +366,25 @@ function nextName() {
   while (names.has(`Documento ${i}`)) i++;
   return `Documento ${i}`;
 }
+// A document's name is its first title in the text («# Name»): writing it renames the document, renaming writes it.
+const TITLE_LINE = /^#{1,6}\s+(.+?)\s*$/;
+function titleOf(text) { const first = (text || '').split('\n').find((l) => l.trim()); const m = first && first.match(TITLE_LINE); return m ? m[1] : null; }
+function withTitle(text, name) {
+  const lines = (text || '').split('\n'), i = lines.findIndex((l) => l.trim());
+  if (i >= 0 && TITLE_LINE.test(lines[i])) lines[i] = lines[i].replace(/^(#{1,6}\s+).*$/, '$1' + name);
+  else lines.splice(Math.max(0, i), 0, '# ' + name, ...(i >= 0 ? [''] : []));
+  return lines.join('\n');
+}
+function renameDoc(d, name) {
+  if (!name) return;
+  d.name = name; d.text = withTitle(d.text, name); d.updated = Date.now();
+  if (curId === d.id) { ed.replaceText(d.text); if (document.activeElement !== $('#ed-name')) $('#ed-name').value = name; }
+  save();
+}
 function newDoc({ name, place = 'canvas', x = 0, y = 0, text = '' }) {
-  const d = { id: uid(), name: name || nextName(), text, x: Math.round(x), y: Math.round(y), z: topZ(), place, created: Date.now(), updated: Date.now() };
+  name = name || titleOf(text) || nextName();
+  text = withTitle(text, name) + (text ? '' : '\n\n');
+  const d = { id: uid(), name, text, x: Math.round(x), y: Math.round(y), z: topZ(), place, created: Date.now(), updated: Date.now() };
   S.docs.push(d); return d;
 }
 function newItem(kind, text, at) {
@@ -369,7 +403,7 @@ function create(kind, w, inStash) {
     sel.clear(); save(); render();
     if (w.free || inStash) {                       // dragged onto the plane or a tray: placed, not opened; its name ready to type
       const el = inStash ? stash.querySelector(`.chip[data-id="${d.id}"] b`) : elOf(d.id)?.querySelector('.dtitle');
-      if (el) editInline(el, (v) => { if (v) { d.name = v; save(); render(); } });
+      if (el) editInline(el, (v) => { if (v) { renameDoc(d, v); render(); } });
     } else { openEditor(d.id); setTimeout(() => { $('#ed-name').focus(); $('#ed-name').select(); }, 30); }
   } else if (kind === 'postit') {
     const p = { id: uid(), x: Math.round(w.x - 85), y: Math.round(w.y - 75), z: topZ(), text: '', color: PASTEL[0] };
@@ -521,6 +555,7 @@ function removeIds(ids) {
   const idx = S.docs.map((d, i) => (set.has(d.id) ? i : -1)).filter((i) => i >= 0).sort((a, b) => b - a);
   for (const i of idx) {
     const [d] = S.docs.splice(i, 1);
+    if (d.place !== 'canvas') releaseRiders(d);
     log('borrar', `Documento «${d.name}»`, { restore: { k: 'd', o: d } });
     for (const o of S.docs) o.text = renumber(o.text, i + 1);
   }
@@ -567,7 +602,13 @@ async function docAction(a, d) {
 let act = null, space = false;
 vp.addEventListener('contextmenu', (e) => e.preventDefault());
 vp.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.sign')) return;
+  const sgEl = e.target.closest('.sign');
+  if (sgEl) {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    act = { k: 'sign', g: S.signs.find((x) => x.id === sgEl.dataset.sign), el: sgEl, sx: e.clientX, sy: e.clientY, moved: false };
+    return;
+  }
   if (e.target.closest('.acts, .x, .pal, .chk, .f-add, [contenteditable="true"]')) return;
   const it = e.target.closest('[data-k]');
   // pan: dragging the empty grid (the common thing), or middle/right button, or Space + drag; Ctrl + drag selects a group
@@ -655,6 +696,14 @@ addEventListener('pointermove', (e) => {
   if (gh) return moveGhost(e);
   if (!act) return;
   const z = S.view.z;
+  if (act.k === 'sign') {
+    if (!act.moved && Math.hypot(e.clientX - act.sx, e.clientY - act.sy) < 4) return;
+    if (!act.moved) { act.moved = true; document.body.classList.add('dragging'); act.el.style.visibility = 'hidden'; }
+    world.querySelector('.sign.preview')?.remove();
+    const sp = signSpot(e);
+    if (sp) sp.hostEl.insertAdjacentHTML('beforeend', signHTML({ ...act.g, id: act.g.id, edge: sp.edge, t: sp.t }, ' preview'));
+    return;
+  }
   if (act.k === 'pan') { S.view.x = act.vx + e.clientX - act.sx; S.view.y = act.vy + e.clientY - act.sy; applyView(); }
   else if (act.k === 'move') {
     if (!act.moved && Math.hypot(e.clientX - act.sx, e.clientY - act.sy) < 3) return;
@@ -705,6 +754,14 @@ addEventListener('pointerup', (e) => {
   if (gh) return dropGhost(e);
   if (!act) return;
   const a = act; act = null;
+  if (a.k === 'sign') {
+    world.querySelector('.sign.preview')?.remove(); document.body.classList.remove('dragging');
+    if (!a.moved) return openSign(a.g);
+    const sp = signSpot(e);
+    if (sp) { snap(); a.g.host = sp.hostEl.dataset.id; a.g.edge = sp.edge; a.g.t = sp.t; save(); }
+    else toast('Suéltala junto al borde de algo');
+    renderItems(); paintSel(); return;
+  }
   const trayAt = overStash(e);                     // read it before the trays tuck away
   vp.classList.remove('panning'); document.body.classList.remove('dragging'); hotTray(e, false); dragTrays(false);
   if (a.k === 'pan') { if (a.empty && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < 3) { sel.clear(); paintSel(); } else saveView(); }
@@ -719,7 +776,7 @@ addEventListener('pointerup', (e) => {
     const tray = trayAt;
     if (tray) {
       const ds = a.moving.filter((m) => m.k === 'd');
-      for (const m of ds) { m.o.x = m.x0; m.o.y = m.y0; }
+      for (const m of a.moving) { m.o.x = m.x0; m.o.y = m.y0; }
       if (ds.length) { const t = putInTray(ds.map((m) => m.o), tray); toast(ds.length === 1 ? `«${ds[0].o.name}» en «${t.name}»` : `${ds.length} documentos en «${t.name}»`); }
     } else if (a.moving.length === 1 && a.moving[0].k === 'f') {
       const f = a.moving[0].o, before = { ...f };
@@ -728,7 +785,7 @@ addEventListener('pointerup', (e) => {
     save(); render();
   } else if (a.k === 'move' && a.title && !a.toggle) {
     const f = find(a.id).o;                              // one click on a frame's or a document's title edits it
-    if (a.kind === 'd') editInline(a.title, (v) => { if (v) { f.name = v; save(); render(); } });
+    if (a.kind === 'd') editInline(a.title, (v) => { if (v) { renameDoc(f, v); render(); } });
     else editInline(a.title, (v) => { if (v !== null) { f.title = v; save(); render(); } }, true);
   } else if (a.k === 'move' && !a.toggle) {
     clearTimeout(clickT); clickT = setTimeout(() => focusOn(a.id), 240);   // a click brings it close; a double click opens
@@ -739,8 +796,7 @@ addEventListener('pointerup', (e) => {
 });
 
 vp.addEventListener('click', (e) => {
-  const sg = e.target.closest('.sign');
-  if (sg) return openSign(S.signs.find((g) => g.id === sg.dataset.sign));
+  if (e.target.closest('.sign')) return;                // a tag is read on pointerup (a click), or dragged
   const b = e.target.closest('.acts button');
   if (b) {
     const host = b.closest('[data-k]'), f = find(host.dataset.id);
@@ -831,6 +887,27 @@ $('#backpill').onclick = () => {
   backView = null; clearTimeout(backT); $('#backpill').classList.remove('on');
 };
 
+// ---- viewer: zoomed out too far to read, the thing under the pointer says its title at the bottom ------------------
+const VIEWER_BELOW = 0.6;
+function titleLine(f) {
+  const { k, o } = f;
+  if (k === 'd') { const w = (readable(o.text).match(/\S+/g) || []).length; return ['📄', o.name, w ? w + (w === 1 ? ' palabra' : ' palabras') : '']; }
+  if (k === 'p') return ['🗒️', (o.text || 'post-it vacío').split('\n')[0], ''];
+  if (k === 'i') return ['💡', o.text || 'idea', ''];
+  if (k === 't') return [o.done ? '☑' : '☐', o.text || 'tarea', o.done ? 'hecha' : ''];
+  return ['⬚', o.title || 'Marco sin título', ''];
+}
+vp.addEventListener('pointermove', (e) => {
+  const v = $('#viewer');
+  if (act || gh || S.view.z >= VIEWER_BELOW) { v.classList.remove('on'); return; }
+  const el = e.target.closest?.('[data-k]'), f = el && find(el.dataset.id);
+  if (!f) { v.classList.remove('on'); return; }
+  const [ico, title, sub] = titleLine(f);
+  v.innerHTML = `<span>${ico}</span><b>${esc(title)}</b>${sub ? `<i>${esc(sub)}</i>` : ''}`;
+  v.classList.add('on');
+});
+vp.addEventListener('pointerleave', () => $('#viewer').classList.remove('on'));
+
 // ---- peek: hovering something that is partly covered brings it forward for a moment, with what lies on it ----------
 let peekT = null, peeked = [];
 function unpeek() {
@@ -894,7 +971,7 @@ function dropGhost(e) {
     if (tray) { if (tray !== trayOf(d).id) { snap(); putInTray([d], tray); save(); render(); } return; }
     if (overCanvas(e)) {
       snap(); const w = toWorld(e.clientX, e.clientY);
-      d.place = 'canvas'; d.x = Math.round(w.x - DOC_W / 2); d.y = Math.round(w.y - 20);
+      d.place = 'canvas'; d.x = Math.round(w.x - DOC_W / 2); d.y = Math.round(w.y - 20); releaseRiders(d);
       sel.clear(); sel.add(d.id); save(); render();
     }
     return;
@@ -938,7 +1015,7 @@ stash.addEventListener('click', (e) => {
     const t = S.trays.find((o) => o.id === out.closest('.tray').dataset.tray);
     const ds = S.docs.filter((d) => d.place === 'stash' && trayOf(d) === t); if (!ds.length) return;
     snap(); const c = centerWorld(), cols = Math.min(4, ds.length);
-    ds.forEach((d, i) => { d.place = 'canvas'; d.x = Math.round(c.x - (cols * 230) / 2 + (i % cols) * 230); d.y = Math.round(c.y - 140 + Math.floor(i / cols) * 300); d.z = topZ(); });
+    ds.forEach((d, i) => { d.place = 'canvas'; d.x = Math.round(c.x - (cols * 230) / 2 + (i % cols) * 230); d.y = Math.round(c.y - 140 + Math.floor(i / cols) * 300); d.z = topZ(); releaseRiders(d); });
     sel.clear(); ds.forEach((d) => sel.add(d.id)); changed(); return toast(`${ds.length} documento${ds.length > 1 ? 's' : ''} fuera de «${t.name}»`, [['Deshacer', doUndo]]);
   }
   const x = e.target.closest('.chip .x'); if (x) return removeIds([x.closest('.chip').dataset.id]);
@@ -959,6 +1036,8 @@ stash.addEventListener('click', (e) => {
     if (t.open) to.open = true;
     save(); renderStash(); return;
   }
+  const nm1 = e.target.closest('.t-name');
+  if (nm1 && !nm1.isContentEditable) { const t = S.trays.find((o) => o.id === nm1.closest('.tray').dataset.tray); return editInline(nm1, (v) => { if (v) { t.name = v; save(); renderStash(); } }); }
   const hd = e.target.closest('.tray header');
   if (hd && !e.target.closest('[contenteditable="true"]')) {
     const t = S.trays.find((o) => o.id === hd.closest('.tray').dataset.tray);
@@ -1005,6 +1084,7 @@ function framePath(x, y) {
 // Where an idea or task lives for grouping: its own place on the plane, else the place of the first document holding it.
 function groupOf(it) {
   const at = (o) => { const el = elOf(o.id); const [w, h] = el ? sizeOf(el, o) : [0, 0]; return framePath(o.x + w / 2, o.y + h / 2); };
+  if (it.riding) return 'En un cajón, con su documento';
   if (it.onCanvas) return at(it) || 'En el plano, sin marco';
   const d = docsUsing(it).find((x) => x.place === 'canvas');
   if (d) return at(d) || 'En documentos sueltos';
@@ -1148,7 +1228,9 @@ function popEdit(anchor, value, onDone) {
 const edApi = {
   onChange(text) {
     const d = docById(curId); if (!d || d.text === text) return;
-    d.text = text; d.updated = Date.now(); save();
+    d.text = text; d.updated = Date.now();
+    const t = titleOf(text); if (t && t !== d.name) { d.name = t; if (document.activeElement !== $('#ed-name')) $('#ed-name').value = t; }
+    save();
     clearTimeout(edApi.t); edApi.t = setTimeout(backlinks, 500);
   },
   getDocs: () => S.docs.map((d, i) => ({ n: i + 1, name: d.name, icon: '📄' })),
@@ -1189,7 +1271,7 @@ function closeSession() {
 }
 function openEditor(id, push = true) {
   const d = docById(id); if (!d) return;
-  if (curId && push && curId !== id) hist.push(curId);
+  if (curId && push && curId !== id && ed) hist.push({ id: curId, pos: ed.view.state.selection.main.head, top: ed.view.scrollDOM.scrollTop });
   closeSession(); session = { id, before: d.text || '' };
   curId = id;
   $('#ed').classList.add('open');
@@ -1202,6 +1284,7 @@ function fillHead() {
   $('#ed-ico').textContent = '📄';
   $('#ed-name').value = d.name;
   $('#ed-prev').hidden = !hist.length;
+  renderCrumbs();
   backlinks();
 }
 function backlinks() {
@@ -1215,9 +1298,44 @@ function backlinks() {
 function closeEditor() { closeSession(); $('#ed').classList.remove('open'); curId = null; hist = []; render(); }
 $('#ed-close').onclick = closeEditor;
 $('.ed-back').onclick = closeEditor;
-$('#ed-prev').onclick = () => { const id = hist.pop(); if (id) openEditor(id, false); };
+$('#ed-prev').onclick = () => backTo(hist.length - 1);
+// Going back to a step of the trail: that document, at the place you left it.
+function backTo(i) {
+  const at = hist[i]; if (!at) return;
+  hist = hist.slice(0, i);
+  openEditor(at.id, false);
+  const v = ed.view, pos = Math.min(at.pos, v.state.doc.length);
+  v.dispatch({ selection: { anchor: pos } });
+  requestAnimationFrame(() => { v.scrollDOM.scrollTop = at.top; });
+}
+// The trail between documents, over the text: each step can be peeked (hover: that document where you were) or reached.
+function renderCrumbs() {
+  const bar = $('#ed-crumbs'), d = docById(curId);
+  bar.classList.toggle('on', hist.length > 0);
+  if (!hist.length || !d) { bar.innerHTML = ''; return; }
+  bar.innerHTML = '<button class="cr-back" title="Volver al anterior">← Volver</button>'
+    + hist.map((h, i) => { const o = docById(h.id); return o ? `<button class="cr" data-i="${i}">${esc(o.name)}</button><span class="cr-sep">›</span>` : ''; }).join('')
+    + `<span class="cr cur">${esc(d.name)}</span>`;
+}
+$('#ed-crumbs').addEventListener('click', (e) => {
+  if (e.target.closest('.cr-back')) return backTo(hist.length - 1);
+  const c = e.target.closest('.cr[data-i]'); if (c) { $('#crumb-peek').classList.remove('on'); backTo(+c.dataset.i); }
+});
+$('#ed-crumbs').addEventListener('pointerover', (e) => {
+  const c = e.target.closest('.cr[data-i]'); const pk = $('#crumb-peek');
+  if (!c) return;
+  const h = hist[+c.dataset.i], o = h && docById(h.id); if (!o) return;
+  const text = o.text || '', lineAt = text.slice(0, h.pos).split('\n').length - 1, lines = text.split('\n');
+  const from = Math.max(0, lineAt - 4), to = Math.min(lines.length, lineAt + 9);
+  pk.innerHTML = `<div class="pk-t">📄 ${esc(o.name)}</div><div class="pk-b">${lines.slice(from, to).map((l, k) =>
+    `<div class="${from + k === lineAt ? 'here' : ''}">${esc(readable(l)) || '&nbsp;'}</div>`).join('')}</div>`;
+  const r = c.getBoundingClientRect();
+  Object.assign(pk.style, { left: Math.min(r.left, innerWidth - 440) + 'px', top: r.bottom + 6 + 'px' });
+  pk.classList.add('on');
+});
+$('#ed-crumbs').addEventListener('pointerout', (e) => { if (!e.relatedTarget?.closest?.('.cr[data-i]')) $('#crumb-peek').classList.remove('on'); });
 $('#ed-foot').onclick = (e) => { const b = e.target.closest('button[data-id]'); if (b) openEditor(b.dataset.id); };
-$('#ed-name').addEventListener('input', (e) => { const d = docById(curId); if (d) { d.name = e.target.value; save(); } });
+$('#ed-name').addEventListener('input', (e) => { const d = docById(curId); if (d && e.target.value.trim()) renameDoc(d, e.target.value.trim()); });
 $('#ed-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ed.focus(); } });
 $('#ed-plain').onclick = () => {
   plain = !plain; ed.setPlain(plain);

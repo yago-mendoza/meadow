@@ -21,14 +21,16 @@ A zoomable grid (pastel, dotted) of documents, post-its, ideas, tasks, frames an
 - **Frames**: dropped near loose things they wrap them; «＋» on the tab makes a frame inside; square corners.
 - **Tags** («etiquetas»): a paper tag tied with a string to the nearest edge of what you drop it on, with a scribble; a click reads it.
 - **Drawers** («cajones», bottom left): tucked away as a little chest of drawers; they come out when a dragged document reaches
-  their corner, and go back when it leaves. One open at a time, up to four, each with its colour (click its dot), rename (double
-  click), «⤢» puts all its documents on the plane. «Recoger» only shows when you opened them yourself.
+  their corner, and go back when it leaves. One open at a time, up to four, each with its colour (click its dot), rename (click
+  its name), «⤢» puts all its documents on the plane. «Recoger» only shows when you opened them yourself.
 - **Panel** (right): tasks (pending / done / all) and ideas, grouped by the frame they are in; history with «Restaurar»,
   «Volver a como estaba» for documents, and «Ir» / «Abrir» for pieces that still exist.
+- Zoomed out too far to read, the thing under the pointer shows its title in a viewer at the bottom.
+- A document's name is its first `# Title` in the text: renaming it (plane, header, drawer) rewrites that title, and editing the title renames it.
 - Ctrl+V on the plane: a copied idea or task appears there; any other text becomes a post-it.
 
 ## The editor
-- Index on the left (click to go). `# Title` (capitals), `## Title`, `### Title` make sections; a chevron left of each title folds
+- Index on the left (click to go). Jumping through links leaves a trail over the text: «← Volver», each step peeked on hover (that document where you were) and reached on click. `# Title` (capitals), `## Title`, `### Title` make sections; a chevron left of each title folds
   it (to the title), and the one above them folds or unfolds all. Clicking a title's «#» (or #/##/### in the header) splits the
   text into the sections of that level: each one gets a band, a grip to drag it and buttons to copy, paste over, save as a document and fold.
 - `[` suggests documents, ideas and tasks, or creates a new one; `[name*]` creates a document. A link shows its label and a ↗ that opens it.
