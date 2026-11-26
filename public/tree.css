@@ -273,3 +273,5 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .hm-root button { color: var(--accent); font-weight: 600; text-decoration: underline; }
 #top .brand { font-size: 20px; padding: 2px 4px; border-radius: 8px; }
 #top .brand:hover { background: #efe9f0; }
+/* popups and notices above the start screen too */
+#pick { z-index: 320; } #toasts { z-index: 330; } #ipeek { z-index: 310; }

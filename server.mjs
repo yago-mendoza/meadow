@@ -100,7 +100,7 @@ function moveDir(from, to) {
 }
 function pickFolder(title) {
   if (process.platform !== 'win32') return null;
-  const ps = `Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = '${title.replace(/'/g, "''")}'; $d.ShowNewFolderButton = $true; $f = New-Object System.Windows.Forms.Form; $f.TopMost = $true; if ($d.ShowDialog($f) -eq 'OK') { $d.SelectedPath }`;
+  const ps = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::EnableVisualStyles(); $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = '${title.replace(/'/g, "''")}'; $d.ShowNewFolderButton = $true; $f = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false; WindowState = 'Minimized' }; $f.Show(); $f.Activate(); if ($d.ShowDialog($f) -eq 'OK') { $d.SelectedPath }; $f.Close()`;   // in front of the browser
   const r = spawnSync('powershell', ['-NoProfile', '-STA', '-Command', ps], { encoding: 'utf8' });
   return r.stdout.trim() || null;
 }
