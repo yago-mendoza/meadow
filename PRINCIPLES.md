@@ -20,7 +20,11 @@ aquí con su frase y la fecha; si sustituye a uno, se cambia el viejo, no se api
    aparecen al pasar por encima.
 7. **Nunca perder el sitio.** Siempre hay vuelta: «Volver a donde estabas» (Enter), las migas entre documentos, el
    historial con restaurar, Ctrl+Z.
-8. **El texto es texto.** Debajo de todo hay un bloc de notas; el formato es una lectura que se apaga con ¶.
+8. **El movimiento es la referencia.** Yago, 26.11: «ahora la animación es PERFECTA, me encanta, sigue así con lo ergonómico de las
+   animaciones de stick, arrastre…». Todo lo nuevo se mueve con `motion.js` (encajar elástico, crecer suave, irse al revés de
+   como vino); nada inventa su propia animación.
+9. **Solo dos relaciones.** Interior y borde (ver `MODEL.md`). Lo pequeño nunca mueve ni cambia lo grande.
+10. **El texto es texto.** Debajo de todo hay un bloc de notas; el formato es una lectura que se apaga con ¶.
 
 ## Del desarrollo
 
