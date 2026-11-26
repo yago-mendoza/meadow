@@ -665,3 +665,17 @@ button.cr:hover { background: #fff; color: var(--accent); box-shadow: var(--shad
 .x:hover::before, .x:hover::after { background: #fff; }
 .ftab .x, .chip .x, .item.circle .x { width: 18px; height: 18px; }
 .ftab .x::before, .ftab .x::after, .chip .x::before, .chip .x::after, .item.circle .x::before, .item.circle .x::after { width: 7px; }
+
+/* nothing on the plane is selectable as text, except what is being written */
+#items, #items *, #frames, #frames *, #reader .rd-text { user-select: none; -webkit-user-select: none; }
+#items [contenteditable="true"], #frames [contenteditable="true"], #items [contenteditable="true"] * { user-select: text; -webkit-user-select: text; }
+
+/* the four places for hover buttons (chosen so they cover nothing) */
+.acts.at-top { top: auto !important; bottom: 100% !important; left: 0; right: 0; flex-direction: row; padding: 0 0 10px !important; }
+.acts.at-bottom { top: 100% !important; bottom: auto !important; left: 0; right: 0; flex-direction: row; padding: 10px 0 0 !important; }
+.acts.at-right { top: 0 !important; bottom: auto !important; left: 100% !important; right: auto !important; width: max-content; flex-direction: column; padding: 0 0 0 10px !important; transform: none !important; }
+.acts.at-left { top: 0 !important; bottom: auto !important; left: auto !important; right: 100% !important; width: max-content; flex-direction: column; padding: 0 10px 0 0 !important; transform: none !important; }
+.acts.at-top b { top: auto; bottom: 42px; }
+.acts.at-right b { top: 50%; left: 44px; transform: translateY(-50%); }
+.acts.at-left b { top: 50%; left: auto; right: 44px; transform: translateY(-50%); }
+.item.circle .acts.at-top, .item.circle .acts.at-bottom { left: 50%; right: auto; transform: translateX(-50%) !important; width: max-content; }

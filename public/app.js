@@ -198,13 +198,13 @@ function itemHTML(it) {
     return `<div class="item circle ${it.kind}${it.done ? ' done' : ''}${sel.has(it.id) ? ' sel' : ''}" data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
       <span class="cico">${it.kind === 'idea' ? '💡' : it.done ? '✔' : ''}</span>
       <button class="x" title="${uses ? 'Quitar del plano (sigue en sus documentos)' : 'Borrar'}">×</button>
-      <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button>${ZB}</div>${it.pin ? '' : PRS}</div>`;   // pinned: its size is its host's
+      <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button>${it.pin ? '' : ZB}</div>${it.pin ? '' : PRS}</div>`;   // pinned: its size is its host's
   }
   const lead = it.kind === 'idea' ? '<span class="iico">💡</span>' : `<button class="chk" title="${it.done ? 'Reabrir' : 'Hecha'}">${it.done ? '✔' : ''}</button>`;
   return `<div class="item ${it.kind}${it.done ? ' done' : ''} docked${sel.has(it.id) ? ' sel' : ''}" data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
     ${lead}<span class="itext">${esc(it.text) || '…'}</span>
     <button class="x" title="${uses ? 'Quitar del plano (sigue en sus documentos)' : 'Borrar'}">×</button>
-    <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button>${ZB}</div>${PRS}</div>`;
+    <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button></div></div>`;
 }
 // ---- signs: a tab standing out of an edge of a document, post-it, idea, task or frame; a click reads it -------------
 const signsOf = (id) => (S.signs || []).filter((g) => g.host === id);
@@ -591,7 +591,8 @@ function create(kind, w, inStash) {
     if (fitted) elOf(f.id)?.animate([{ opacity: 0, transform: 'scale(1.06)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.34,1.56,.64,1)' });
     editInline(elOf(f.id).querySelector('.ftitle'), (v) => { f.title = v; save(); render(); }, true);
   } else {
-    const it = newItem(kind, '', { x: w.x - 90, y: w.y - 18 });
+    const it = newItem(kind, '', { x: w.x - 19, y: w.y - 19 });
+    if (w.pin) { it.pin = { ...w.pin, at: w.pin.side === 'tab' ? 99 : w.pin.at }; }
     sel.clear(); sel.add(it.id); save(); render();
     writeInline(it, true);
   }
@@ -878,7 +879,19 @@ vp.addEventListener('pointerdown', (e) => {
     const keep = new Set(sel); sel.clear(); sel.add(f.id);
     const deps = e.shiftKey ? collectMoving(false).filter((m) => m.o !== f).map((m) => ({ ...m, s0: m.o.s || 1, w0: m.o.w, h0: m.o.h })) : [];
     sel.clear(); for (const id of keep) sel.add(id);
-    act = { k: 'resize', f, sx: e.clientX, sy: e.clientY, x: f.x, y: f.y, w: f.w, h: f.h, c: rs.dataset.c || 'br', el: rs.closest('.frame'), deps }; return;
+    // the contents' outline: the frame can't be pulled inside it (unless they scale with it)
+    let hold = null;
+    if (!e.shiftKey) {
+      sel.clear(); sel.add(f.id);
+      for (const m of collectMoving(false)) {
+        if (m.o === f) continue;
+        const [w, h] = m.k === 'f' ? [m.o.w, m.o.h] : sizeOf(m.el, m.o), y0 = m.k === 'f' ? m.o.y - 34 : m.o.y;
+        hold = hold ? { x0: Math.min(hold.x0, m.o.x), y0: Math.min(hold.y0, y0), x1: Math.max(hold.x1, m.o.x + w), y1: Math.max(hold.y1, m.o.y + h) }
+          : { x0: m.o.x, y0, x1: m.o.x + w, y1: m.o.y + h };
+      }
+      sel.clear(); for (const id of keep) sel.add(id);
+    }
+    act = { k: 'resize', f, sx: e.clientX, sy: e.clientY, x: f.x, y: f.y, w: f.w, h: f.h, c: rs.dataset.c || 'br', el: rs.closest('.frame'), deps, hold }; return;
   }
   if (it) {
     const id = it.dataset.id, toggle = e.shiftKey || e.ctrlKey || e.metaKey, selBefore = new Set(sel);
@@ -916,22 +929,31 @@ function collectMoving(alone) {
   }
   for (const m of [...out.values()]) { if (m.k === 'd') for (const t of docked(m.o)) add(t.id); for (const t of pinnedTo(m.o.id)) add(t.id); }
   const boxes = [...itemsEl.querySelectorAll('[data-k]')].map((el) => {
-    const { k, o } = find(el.dataset.id), [w, h] = sizeOf(el, o); return { id: o.id, k, x: o.x, y: o.y, w, h, z: o.z || 0 };
+    const { k, o } = find(el.dataset.id), [w, h] = sizeOf(el, o); return { id: o.id, k, x: o.x, y: o.y, w, h, z: o.z || 0, o };
   });
-  const over = (p, q) => p.x < q.x + q.w && q.x < p.x + p.w && p.y < q.y + q.h && q.y < p.y + p.h;
-  const queue = boxes.filter((x) => out.has(x.id));
-  while (queue.length) {
-    const X = queue.shift();
+  // the owner of each thing: the smallest bigger thing (not of a lower kind) whose rectangle holds its centre;
+  // ties go to the one on top
+  const ownerOf = new Map();
+  for (const Y of boxes) {
+    if (Y.o.pin || Y.o.dock) continue;                                   // edge things belong to their host already
+    const cx = Y.x + Y.w / 2, cy = Y.y + Y.h / 2, area = Y.w * Y.h;
+    let best = null;
+    for (const X of boxes) {
+      if (X === Y || RANK[X.k] < RANK[Y.k] || X.w * X.h <= area * 1.05) continue;
+      if (cx <= X.x || cx >= X.x + X.w || cy <= X.y || cy >= X.y + X.h) continue;
+      if (!best || X.w * X.h < best.w * best.h || (X.w * X.h === best.w * best.h && X.z > best.z)) best = X;
+    }
+    if (best) ownerOf.set(Y.id, best.id);
+  }
+  // carry: whatever is owned by something moving moves too (and what it owns, and so on)
+  let grew = true;
+  while (grew) {
+    grew = false;
     for (const Y of boxes) {
-      if (out.has(Y.id) || !over(X, Y)) continue;
-      const rx = RANK[X.k], ry = RANK[Y.k];
-      if (ry > rx || (ry === rx && rx !== 2)) continue;          // never carries a bigger thing, nor a document another
-      const under = boxes.filter((D) => D.k === 'd' && D.id !== Y.id && over(D, Y));
-      if (under.length) {
-        if (X.k === 'd') { const top = under.reduce((m, D) => (D.z > m.z ? D : m)); if (top.id !== X.id) continue; }
-        else if (under.some((D) => !out.has(D.id))) continue;    // it lies on a document that stays: it stays
-      }
-      add(Y.id); queue.push(Y);
+      if (out.has(Y.id)) continue;
+      const own = ownerOf.get(Y.id);
+      if (own && out.has(own)) { add(Y.id); grew = true; }
+      if (out.has(Y.id)) for (const t of [...docked(Y.o), ...pinnedTo(Y.id)]) add(t.id);
     }
   }
   return [...out.values()];
@@ -985,7 +1007,12 @@ addEventListener('pointermove', (e) => {
   } else if (act.k === 'resize') {
     if (!act.snapped) { act.snapped = true; snap(); document.body.classList.add('dragging'); }
     const dx = (e.clientX - act.sx) / z, dy = (e.clientY - act.sy) / z, c = act.c, f = act.f;
-    const W = Math.max(160, Math.round(c.includes('l') ? act.w - dx : act.w + dx)), H = Math.max(100, Math.round(c.includes('t') ? act.h - dy : act.h + dy));
+    let W = Math.max(160, Math.round(c.includes('l') ? act.w - dx : act.w + dx)), H = Math.max(100, Math.round(c.includes('t') ? act.h - dy : act.h + dy));
+    if (act.hold) {                                // never smaller than what it holds
+      const p = FIT_PAD, hd = act.hold, top = p + (act.f.desc ? 30 : 0);
+      W = Math.max(W, c.includes('l') ? act.x + act.w - (hd.x0 - p) : hd.x1 + p - act.x);
+      H = Math.max(H, c.includes('t') ? act.y + act.h - (hd.y0 - top) : hd.y1 + p - act.y);
+    }
     f.w = W; f.h = H; f.x = c.includes('l') ? act.x + act.w - W : act.x; f.y = c.includes('t') ? act.y + act.h - H : act.y;
     Object.assign(act.el.style, { left: f.x + 'px', top: f.y + 'px', width: W + 'px', height: H + 'px' });
     if (act.deps.length) scaleDeps(act.deps, c.includes('l') ? act.x + act.w : act.x, c.includes('t') ? act.y + act.h : act.y, W / act.w, H / act.h);
@@ -1043,6 +1070,7 @@ addEventListener('pointerup', (e) => {
       const f = a.moving[0].o, before = { ...f };
       if (fitFrame(f)) toast('Marco ajustado a lo que tiene cerca', [['Deshacer', () => { Object.assign(f, before); save(); render(); }]]);
     }
+    pushApart([...a.moving.filter((m) => m.k === 'f').map((m) => m.o), ...(a.fitOrig ? a.fitOrig.keys() : [])]);
     save(); render();
   } else if (a.k === 'move' && a.title && !a.toggle) {
     const f = find(a.id).o;                              // one click on a frame's or a document's title edits it
@@ -1058,12 +1086,20 @@ addEventListener('pointerup', (e) => {
     const wasAll = a.selBefore && a.selBefore.size === all.length && all.every((id) => a.selBefore.has(id));
     sel.clear(); for (const id of wasAll ? keep : all) sel.add(id);
     paintSel();
+  } else if (a.k === 'move' && !a.toggle && a.kind === 'd') {
+    const d = find(a.id).o; sel.clear(); sel.add(d.id);
+    const all = collectMoving(false).map((m) => m.o.id);
+    const wasAll = all.length > 1 && a.selBefore && a.selBefore.size === all.length && all.every((id) => a.selBefore.has(id));
+    sel.clear(); for (const id of wasAll ? [d.id] : all) sel.add(id);
+    paintSel();
+    if (!wasAll) { clearTimeout(clickT); clickT = setTimeout(() => focusOn(a.id), 240); }
   } else if (a.k === 'move' && !a.toggle) {
     clearTimeout(clickT); clickT = setTimeout(() => focusOn(a.id), 240);   // a click brings it close; a double click opens
   } else if (a.k === 'box') {
     $('#selrect').style.display = 'none';
     if (!a.moved && !a.add) { sel.clear(); paintSel(); }
-  } else if (a.k === 'resize' || a.k === 'scale') save();
+  } else if (a.k === 'resize') { pushApart([a.f]); save(); render(); }
+  else if (a.k === 'scale') save();
 });
 
 vp.addEventListener('click', (e) => {
@@ -1162,7 +1198,7 @@ $('#backpill').onclick = () => {
 };
 
 // ---- frames make room: dragging things into a frame grows it, and the frames that hold it, to keep them inside -----
-const FIT_PAD = 26;
+const FIT_PAD = 58;                    // frames fitting their contents keep room for hover buttons (not too snug)
 const FIT_FAST = 1.1;                   // px per ms: faster than this, a dragged document leaves the frame instead
 function liveFit(a) {
   // only a document makes a frame adapt: smaller things never move or resize bigger ones (hierarchy)
@@ -1205,6 +1241,32 @@ function liveFit(a) {
     Object.assign(f, { x: Math.round(x0), y: Math.round(y0), w: Math.max(160, Math.round(x1 - x0)), h: Math.max(100, Math.round(y1 - y0)) });
     paintFrame(f, true);
     inner = { x0: f.x, y0: f.y - 34, x1: f.x + f.w, y1: f.y + f.h };    // the next frame out keeps this one, tab included
+  }
+}
+// ---- frames never overlap a frame that is not inside them: a frame that grows, moves or is stretched over another
+// pushes it away (with everything it holds) just enough, along the shortest way out; the pushed one may push others ----
+const PUSH_GAP = 24, TAB_H = 34;
+const fbox = (f) => ({ x0: f.x, y0: f.y - TAB_H, x1: f.x + f.w, y1: f.y + f.h });
+const inside = (a, b) => a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;   // a within b
+function shiftFrame(f, dx, dy) {
+  const keep = new Set(sel); sel.clear(); sel.add(f.id);
+  const group = collectMoving(false); sel.clear(); for (const id of keep) sel.add(id);
+  for (const m of group) { m.o.x = Math.round(m.o.x + dx); m.o.y = Math.round(m.o.y + dy); }
+}
+function pushApart(changed) {
+  const queue = [...new Set(changed)].filter((f) => S.frames.includes(f));
+  let guard = 0;
+  while (queue.length && guard++ < 60) {
+    const A = queue.shift(), a = fbox(A);
+    for (const B of S.frames) {
+      if (B === A || inside(A, B) || inside(B, A)) continue;              // nested frames may overlap: that is nesting
+      const b = fbox(B);
+      if (a.x1 + PUSH_GAP / 2 <= b.x0 || b.x1 + PUSH_GAP / 2 <= a.x0 || a.y1 + PUSH_GAP / 2 <= b.y0 || b.y1 + PUSH_GAP / 2 <= a.y0) continue;
+      const moves = [[a.x1 + PUSH_GAP - b.x0, 0], [a.x0 - PUSH_GAP - b.x1, 0], [0, a.y1 + PUSH_GAP - b.y0], [0, a.y0 - PUSH_GAP - b.y1]];
+      const [dx, dy] = moves.sort((p, q) => Math.hypot(...p) - Math.hypot(...q))[0];
+      shiftFrame(B, dx, dy);
+      queue.push(B);
+    }
   }
 }
 function paintFrame(f, smooth = false) {
@@ -1258,6 +1320,27 @@ vp.addEventListener('pointermove', (e) => {
 });
 vp.addEventListener('pointerleave', () => $('#viewer').classList.remove('on'));
 
+// ---- hover buttons never cover anything: before they show, the first free side is chosen (above, below, right, left)
+const ACT_SIDES = ['at-top', 'at-bottom', 'at-right', 'at-left'];
+function placeActs(host) {
+  const acts = host.querySelector(':scope > .acts'); if (!acts) return;
+  const others = [...world.querySelectorAll('#items [data-k], .ftab, .fdesc:not(.empty), .dgroup, .sign')]
+    .filter((o) => o !== host && !host.contains(o) && !o.contains(host)).map((o) => o.getBoundingClientRect());
+  const hit = (r) => others.some((q) => q.left < r.right && r.left < q.right && q.top < r.bottom && r.top < q.bottom);
+  const pref = host.dataset.k === 'd' ? ACT_SIDES : ['at-bottom', 'at-top', 'at-right', 'at-left'];
+  for (const side of pref) {
+    acts.classList.remove(...ACT_SIDES); acts.classList.add(side);
+    const r = [...acts.children].reduce((u, b) => { const q = b.getBoundingClientRect(); return u ? { left: Math.min(u.left, q.left), top: Math.min(u.top, q.top), right: Math.max(u.right, q.right), bottom: Math.max(u.bottom, q.bottom) } : q; }, null);
+    if (r && !hit(r)) return;
+  }
+  acts.classList.remove(...ACT_SIDES); acts.classList.add(pref[0]);
+}
+itemsEl.addEventListener('pointerover', (e) => {
+  const host = e.target.closest('[data-k]'); if (!host || act || gh) return;
+  if (e.relatedTarget && host.contains(e.relatedTarget)) return;       // still inside the same thing
+  placeActs(host);
+});
+
 // ---- peek: hovering something that is partly covered brings it forward for a moment, with what lies on it ----------
 let peekT = null, peeked = [];
 function unpeek() {
@@ -1308,6 +1391,7 @@ function moveGhost(e) {
     return;
   }
   hotTray(e, gh.kind === 'doc' || gh.kind === 'chip');
+  if (gh.kind === 'idea' || gh.kind === 'tarea') pinHint({ id: '__new', kind: gh.kind }, e); else $('#pinhint').classList.remove('on');
 }
 function dropGhost(e) {
   const g = gh; gh = null;
@@ -1330,7 +1414,8 @@ function dropGhost(e) {
   if (!g.moved) return create(g.kind, centerWorld(), false);
   const tray = trayAt;
   if (tray) { if (g.kind === 'doc') create('doc', { x: 0, y: 0 }, tray); return; }
-  if (overCanvas(e)) create(g.kind, { ...toWorld(e.clientX, e.clientY), free: true }, false);
+  $('#pinhint').classList.remove('on');
+  if (overCanvas(e)) create(g.kind, { ...toWorld(e.clientX, e.clientY), free: true, pin: (g.kind === 'idea' || g.kind === 'tarea') ? pinTarget({ id: '__new' }, e) : null }, false);
 }
 
 const TOOLS = [
