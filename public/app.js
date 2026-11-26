@@ -24,6 +24,8 @@ const pathOf = (id) => { const p = []; for (let c = nd(id); c; c = parent(c.id))
 const isIn = (id, anc) => { for (let c = id; c; c = PAR.get(c)) if (c === anc) return true; return false; };
 const docs = () => Object.values(S.nodes).filter((n) => n.kind === 'doc');
 const listOf = (kind) => (kind === 'idea' ? S.ideas : S.tasks);
+// what each one is (said where you meet them)
+const DEF = { tarea: 'Tarea: algo que hay que hacer fuera de Meadow.', idea: 'Idea: algo que se podría hacer más adelante en el propio Meadow (ampliar una definición, una información…).' };
 const token = (it) => `{${it.kind} ${it.n}}`;
 function mk(kind, title, extra = {}) {
   const n = { id: uid(), kind, title: title ?? '', kids: [], ...extra };
@@ -315,7 +317,7 @@ function renderStage() {
   const f = nd(S.focus);
   const before = measure(stage, '.fr[data-id], .dc[data-id]');
   stage.innerHTML = f.kind === 'project' || f.kind === 'area'
-    ? `<div class="grid" data-drop="into" data-id="${f.id}">${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}<div class="fr-new" data-drop="into" data-id="${f.id}"><button class="new-frame">＋ Marco</button></div></div>`
+    ? `<div class="grid" data-drop="into" data-id="${f.id}">${itemsAt(f.id).length ? `<div class="loose-its" data-id="${f.id}">${circles(f.id)}</div>` : ''}${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}<div class="fr-new" data-drop="into" data-id="${f.id}"><button class="new-frame">＋ Marco</button></div></div>`
     : `<div class="solo">${frameHTML(f.id, 0)}</div>`;
   if (!skipFlip) flip(stage, before, () => 1, { sel: '.dc[data-id]', appear: false });
 }
@@ -349,7 +351,7 @@ function renderTop() {
   $('#crumbs').innerHTML = p.map((n, i) => `${i ? '<span class="sep">›</span>' : ''}<button class="cr${i === p.length - 1 ? ' on' : ''}" data-go="${n.id}" data-drop="into" data-id="${n.kind === 'frame' ? activeTab(n) : n.id}" title="${i === 0 ? 'Doble clic: renombrar el proyecto' : ''}">${esc(n.title)}</button>`).join('');
 }
 const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea']];
-$('#tools').innerHTML = TOOLS.map(([k, ico, name]) => `<button class="tool t-${k}" data-drag="new:${k}" title="Clic: crear aquí · arrastra: crear donde lo sueltes"><span class="ico">${ico}</span>${name}</button>`).join('');
+$('#tools').innerHTML = TOOLS.map(([k, ico, name]) => `<button class="tool t-${k}" data-drag="new:${k}" title="${k === 'tarea' || k === 'idea' ? DEF[k].replace(/'/g, '') + ' ' : ''}Clic: crear aquí · arrastra: crear donde lo sueltes"><span class="ico">${ico}</span>${name}</button>`).join('');
 
 // the map: every node as a rectangle inside its parent; a frame's (or page's) only tab adds no level
 function vtree(id) {
@@ -482,8 +484,10 @@ addEventListener('pointerup', () => {
 function targetAt(x, y) {
   const el = document.elementFromPoint(x, y); if (!el) return null;
   const src = drag.src;
-  if (src.item) { const h = el.closest('[data-id]'); const id = h?.dataset.id; return id && nd(id) ? { kind: 'hang', pid: id, el: h, ok: true } : null; }
-  const t = el.closest('[data-drop]'); if (!t) return null;
+  if ((src.item || src.make === 'idea' || src.make === 'tarea') && el.closest('#areas')) return null;   // not on a column's buttons: loose in the area instead
+  const bg = el.closest('#stage') && !el.closest('.fr, .dc') ? stage.querySelector(':scope > .grid') : null;   // the empty space of an area counts as the area
+  if (src.item) { const h = el.closest('[data-id]') || bg; const id = h?.dataset.id; return id && nd(id) ? { kind: 'hang', pid: id, el: h, ok: true } : null; }
+  const t = el.closest('[data-drop]') || bg; if (!t) return null;
   const mode = t.dataset.drop, id = t.dataset.id;
   let spec = null;
   if (mode === 'drawer') spec = { kind: 'drawer', el: t };
@@ -574,7 +578,7 @@ function makeAt(kind, t) {
   if (kind === 'idea' || kind === 'tarea') {
     const at = t?.kind === 'place' ? (nd(t.pid).kind === 'ftab' ? parent(t.pid).id : t.pid) : t?.kind === 'head' ? t.tab : (cur || S.focus);
     const it = newItem(kind, '', at); save(); renderAll();
-    if (kind === 'tarea') { it.fresh = true; return openTask(it); }   // a task is born as its card
+    it.fresh = true; return openTask(it);                     // an idea or a task is born as its card
     const el = document.querySelector(`[data-it="${it.id}"]`) || $('#tools .t-' + kind);
     popEdit(el, '', (v) => { if (!v) { listOf(kind).splice(listOf(kind).indexOf(it), 1); } else it.text = v; save(); renderAll(); });
     return;
@@ -672,7 +676,7 @@ addEventListener('click', (e) => {
   const lchk = t.closest('[data-chk]'); if (lchk) return toggleTask(S.tasks.find((x) => x.id === lchk.dataset.chk));
   const lw = t.closest('[data-lw]'); if (lw) { listWho = lw.dataset.lw; return renderList(); }
   if (t.closest('[data-ldone]')) { listDone = !listDone; return renderList(); }
-  const lrow = t.closest('.lrow'); if (lrow && S.tasks.some((x) => x.id === lrow.dataset.it)) return openTask(S.tasks.find((x) => x.id === lrow.dataset.it));
+  const lrow = t.closest('.lrow'); if (lrow && !t.closest('[data-chk]')) return openTask([...S.tasks, ...S.ideas].find((x) => x.id === lrow.dataset.it));
   if (lrow) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === lrow.dataset.it); if (it?.at) return focusTo(nd(it.at).kind === 'ftab' ? parent(it.at).id : it.at); const d = it && docsUsing(it)[0]; if (d) openDoc(d.id); return; }
   const lb = t.closest('#list nav button'); if (lb) { listTab = lb.dataset.l; return renderList(); }
 });
@@ -687,7 +691,7 @@ addEventListener('dblclick', (e) => {
 });
 function itemClick(id, el) {
   const it = [...S.ideas, ...S.tasks].find((x) => x.id === id); if (!it) return;
-  if (it.kind === 'tarea') return openTask(it);
+  if (it.kind === 'tarea' || el?.closest?.('#stage')) return openTask(it);
   if (el?.closest?.('#stage')) { clearTimeout(peekT); return showPeek(el, true); }
   popEdit(el, it.text, (v) => setItemText(it, v));
 }
@@ -797,7 +801,7 @@ function showPeek(el, focus) {
   const r = el.getBoundingClientRect();
   peekBox.dataset.id = it.id;
   peekBox.className = 'k-' + it.kind + (it.done ? ' done' : '') + (it.kind === 'tarea' ? ' st-' + stOf(it) : '');
-  peekBox.innerHTML = `<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea' : 'Tarea · ' + TSTATES.find((x) => x[0] === stOf(it))[1] + (it.who && it.who !== 'Yo' ? ' · para ' + esc(it.who) : '')}</span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="Quitar"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Quitar</span></button></div>${it.kind === 'tarea' ? `<div class="ip-t ip-open" title="Abrir la tarea">${esc(it.text || '…')}${it.body ? `<small>${esc(it.body.slice(0, 160))}${it.body.length > 160 ? '…' : ''}</small>` : ''}</div>` : `<div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`}`;
+  peekBox.innerHTML = `<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea' : 'Tarea · ' + TSTATES.find((x) => x[0] === stOf(it))[1] + (it.who && it.who !== 'Yo' ? ' · para ' + esc(it.who) : '')}</span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="Quitar"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Quitar</span></button></div>${true ? `<div class="ip-t ip-open" title="Abrir">${esc(it.text || '…')}${it.body ? `<small>${esc(it.body.slice(0, 160))}${it.body.length > 160 ? '…' : ''}</small>` : ''}</div>` : `<div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`}`;
   const left = Math.min(innerWidth - 300, Math.max(8, r.left + r.width / 2 - 145));
   Object.assign(peekBox.style, { left: left + 'px', top: r.bottom + 10 + 'px' }); peekBox.style.setProperty('--ax', (r.left + r.width / 2 - left) + 'px');
   peekBox.classList.add('on');
@@ -824,7 +828,7 @@ peekBox.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); const it = [...S.ideas, ...S.tasks].find((x) => x.id === peekBox.dataset.id); peekTxt().innerText = it?.text || ''; hidePeek(); }
 });
 peekBox.addEventListener('click', (e) => {
-  if (e.target.closest('.ip-open')) return openTask(S.tasks.find((x) => x.id === peekBox.dataset.id));
+  if (e.target.closest('.ip-open')) return openTask([...S.tasks, ...S.ideas].find((x) => x.id === peekBox.dataset.id));
   const bt = e.target.closest('[data-ip]'); if (!bt) return;
   const it = [...S.ideas, ...S.tasks].find((x) => x.id === peekBox.dataset.id); if (!it) return;
   if (bt.dataset.ip === 'done') { toggleTask(it); const el = $(`.it[data-it="${it.id}"]`); return el ? showPeek(el) : hidePeek(); }
@@ -845,7 +849,7 @@ function setState(it, st) {
   (it.log ||= []).push({ t: Date.now(), text: '→ ' + TSTATES.find((s) => s[0] === st)[1], auto: true });
 }
 let taskOpen = null, taskSnapped = false;
-const taskNow = () => S.tasks.find((x) => x.id === taskOpen);
+const taskNow = () => [...S.tasks, ...S.ideas].find((x) => x.id === taskOpen);
 function taskEdit(fn) { if (!taskSnapped) { snap(); taskSnapped = true; } fn(); save(); }
 function openTask(it) {
   if (!it) return;
@@ -859,34 +863,34 @@ function closeTask() {
   if (!taskOpen) return;
   if (document.activeElement?.closest?.('#task')) document.activeElement.blur();
   const it = taskNow();                                     // left empty: it was never made
-  if (it?.fresh && !it.text && !it.body && !it.notes && !(it.log || []).some((e) => !e.auto)) S.tasks.splice(S.tasks.indexOf(it), 1);
+  if (it?.fresh && !it.text && !it.body && !it.notes && !(it.log || []).some((e) => !e.auto)) listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);
   if (it) delete it.fresh;
   taskOpen = null; $('#task').hidden = true; renderAll(); ed?.refresh?.();
 }
 function paintTask() {
   const it = taskNow(); if (!it) return closeTask();
-  const st = stOf(it), where = it.at && nd(it.at) ? nestPath(it.at) : '', inDocs = docsUsing(it);
+  const idea = it.kind === 'idea', st = idea ? 'idea' : stOf(it), where = it.at && nd(it.at) ? nestPath(it.at) : '', inDocs = docsUsing(it);
   $('#task .tk-in').innerHTML = `
     <header class="tk-h st-${st}">
-      <span class="tk-k">Tarea</span>
-      <span class="tk-st">${TSTATES.map(([k, l]) => `<button data-st="${k}" class="s-${k}${k === st ? ' on' : ''}">${l}</button>`).join('')}</span>
+      <span class="tk-k" title="${DEF[it.kind]}">${idea ? '💡 Idea' : 'Tarea'}</span>
+      ${idea ? '<span class="tk-def">' + DEF.idea.slice(6) + '</span>' : `<span class="tk-st">${TSTATES.map(([k, l]) => `<button data-st="${k}" class="s-${k}${k === st ? ' on' : ''}">${l}</button>`).join('')}</span>`}
       <button class="tk-x" title="Cerrar (Esc)">×</button>
     </header>
     <div class="tk-body">
-      <div class="tk-title" contenteditable="true" spellcheck="false" data-ph="Qué hay que hacer, en una línea…">${esc(it.text || '')}</div>
+      <div class="tk-title" contenteditable="true" spellcheck="false" data-ph="${idea ? 'La idea, en una línea…' : 'Qué hay que hacer, en una línea…'}">${esc(it.text || '')}</div>
       <div class="tk-meta">
-        <span class="tk-lab">Para</span>${whoList().map((w) => `<button class="tk-who${(it.who || 'Yo') === w ? ' on' : ''}" data-who="${esc(w)}">${esc(w)}</button>`).join('')}<button class="tk-who add" data-who="+" title="Otro">＋</button>
+        ${idea ? '' : `<span class="tk-lab">Para</span>${whoList().map((w) => `<button class="tk-who${(it.who || 'Yo') === w ? ' on' : ''}" data-who="${esc(w)}">${esc(w)}</button>`).join('')}<button class="tk-who add" data-who="+" title="Otro">＋</button>`}
         ${where || inDocs.length ? `<span class="tk-where"><span class="tk-lab">En</span>${where ? `<button data-go-at title="Ir allí">${esc(where)}</button>` : ''}${inDocs.map((d) => `<button data-go-doc="${d.id}" title="Abrir el documento">📄 ${esc(d.title)}</button>`).join('')}</span>` : ''}
       </div>
-      <div class="tk-sec">Qué hay que hacer</div>
-      <div class="tk-area" contenteditable="true" spellcheck="false" data-f="body" data-ph="Descríbela…">${esc(it.body || '')}</div>
+      <div class="tk-sec">${idea ? 'Qué idea es' : 'Qué hay que hacer'}</div>
+      <div class="tk-area" contenteditable="true" spellcheck="false" data-f="body" data-ph="${idea ? 'Cuéntala…' : 'Descríbela…'}">${esc(it.body || '')}</div>
       <div class="tk-sec">A tener en cuenta</div>
-      <div class="tk-area" contenteditable="true" spellcheck="false" data-f="notes" data-ph="Lo importante para hacerla bien…">${esc(it.notes || '')}</div>
-      <div class="tk-sec">Bitácora</div>
+      <div class="tk-area" contenteditable="true" spellcheck="false" data-f="notes" data-ph="${idea ? 'Lo que la limita o la condiciona…' : 'Lo importante para hacerla bien…'}">${esc(it.notes || '')}</div>
+      ${idea ? '' : `<div class="tk-sec">Bitácora</div>
       <div class="tk-log-in" contenteditable="true" spellcheck="false" data-ph="Apunta cómo va y pulsa Enter: se guarda con la fecha"></div>
-      <div class="tk-log">${(it.log || []).map((e, i) => ({ ...e, i })).reverse().map((e) => `<div class="tk-e${e.auto ? ' auto' : ''}"><time>${whenStr(e.t)}</time><span>${esc(e.text)}</span><button data-rm-log="${e.i}" title="Borrar la nota">×</button></div>`).join('')}</div>
+      <div class="tk-log">${(it.log || []).map((e, i) => ({ ...e, i })).reverse().map((e) => `<div class="tk-e${e.auto ? ' auto' : ''}"><time>${whenStr(e.t)}</time><span>${esc(e.text)}</span><button data-rm-log="${e.i}" title="Borrar la nota">×</button></div>`).join('')}</div>`}
     </div>
-    <footer><button class="tk-rm">Quitar la tarea</button></footer>`;
+    <footer><button class="tk-rm">${idea ? 'Quitar la idea' : 'Quitar la tarea'}</button></footer>`;
 }
 $('#task').addEventListener('input', (e) => {
   const it = taskNow(); if (!it) return;
@@ -919,8 +923,8 @@ $('#task').addEventListener('click', (e) => {
   const gd = t.closest('[data-go-doc]'); if (gd) { closeTask(); return openDoc(gd.dataset.goDoc); }
   if (t.closest('.tk-rm')) {
     taskOpen = null; $('#task').hidden = true;
-    snap(); if (docsUsing(it).length) it.at = null; else S.tasks.splice(S.tasks.indexOf(it), 1);
-    save(); renderAll(); ed?.refresh?.(); return toast('Tarea quitada', [['Deshacer', doUndo]]);
+    snap(); if (docsUsing(it).length) it.at = null; else listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);
+    save(); renderAll(); ed?.refresh?.(); return toast(it.kind === 'idea' ? 'Idea quitada' : 'Tarea quitada', [['Deshacer', doUndo]]);
   }
 });
 
@@ -1046,8 +1050,8 @@ const edApi = {
   getItems: () => [...S.tasks.filter((t) => !t.done), ...S.ideas, ...S.tasks.filter((t) => t.done)],
   createItem(kind, text) { const it = newItem(kind, text, null); save(); renderList(); return it.n; },
   toggleTask(n) { toggleTask(S.tasks.find((x) => x.n === n)); },
-  openItem(kind, n) { const it = listOf(kind).find((x) => x.n === n); if (it && kind === 'tarea') openTask(it); },
-  editItem(kind, n, el) { const it = listOf(kind).find((x) => x.n === n); if (!it) return; if (kind === 'tarea') return openTask(it); popEdit(el, it.text, (v) => setItemText(it, v)); },
+  openItem(kind, n) { openTask(listOf(kind).find((x) => x.n === n)); },
+  editItem(kind, n, el) { const it = listOf(kind).find((x) => x.n === n); if (it) openTask(it); },
   createDoc(name, text = '', o = {}) {
     const p = PAR.get(cur), d = mk('doc', name); d.kids.push(mk('dtab', 'Página 1', { text }).id);
     if (p) { const P = nd(p); P.kids.splice(P.kids.indexOf(cur) + 1, 0, d.id); } else S.drawer.push(d.id);

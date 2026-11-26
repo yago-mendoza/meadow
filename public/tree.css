@@ -543,3 +543,9 @@ body.drag-hang #stage .ft { outline-offset: 1px; }
 .dr-t small { font-size: 11.5px; color: #a397a5; }
 .dr-none { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0; padding: 22px 26px 24px; text-align: center; font-size: 12.5px; line-height: 1.5; color: #a397a5; }
 .dr-big { font-size: 26px; opacity: .55; }
+
+/* an idea's card; loose circles on top of an area */
+.tk-h.st-idea { --sc: #fff7dc; --sf: #8a7262; }
+.tk-def { margin-left: 10px; flex: 1; font: 12px "Segoe UI", sans-serif; color: #a08b6e; }
+.loose-its { flex: 0 0 100%; display: flex; gap: 6px; padding: 2px 2px 0; }
+.loose-its .its { gap: 6px; } .loose-its .it { width: 26px; height: 26px; font-size: 13px; }
