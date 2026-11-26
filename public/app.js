@@ -288,7 +288,7 @@ function frameHTML(id, depth) {
       ${circles(id)}${tabs.length > 1 ? circles(at) : ''}
       <span class="grow"></span>
       <span class="fr-pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</span>
-      ${depth || S.focus !== id ? '<button class="fr-in" title="Entrar">⤢</button>' : ''}<button class="fr-x" title="Borrar o guardar en el cajón">×</button>
+      ${depth || S.focus !== id ? '<button class="fr-in" title="Entrar">⤢</button>' : '<button class="fr-out" title="Salir (Esc)">⤡ Salir</button>'}<button class="fr-x" title="Borrar o guardar en el cajón">×</button>
     </div>
     <div class="fr-body" data-drop="into" data-id="${at}">${kids || '<div class="hint">Vacío · arrastra aquí documentos o marcos</div>'}</div>
   </section>`;
@@ -614,6 +614,7 @@ addEventListener('click', (e) => {
     reindex(); save(); renderAll();
     const el = $(`.ar[data-area="${g.id}"] .ar-t`); if (el) editInline(el, (v) => { if (v) { g.title = v; save(); } renderAll(); }); return;
   }
+  if (t.closest('.fr-out')) return zoomOut();
   const fin = t.closest('.fr-in'); if (fin) return focusTo(fin.closest('.fr').dataset.id);
   const pal = t.closest('.fr-pal i'); if (pal) { snap(); nd(pal.closest('.fr').dataset.id).color = pal.dataset.c; save(); return renderAll(); }
   const ftx = t.closest('.ft-x'); if (ftx) return askDelete(ftx.closest('.ft').dataset.tab, ftx);
@@ -654,6 +655,7 @@ addEventListener('dblclick', (e) => {
 function itemClick(id, el) {
   const it = [...S.ideas, ...S.tasks].find((x) => x.id === id); if (!it) return;
   if (it.kind === 'tarea') return toggleTask(it);
+  if (el?.closest?.('#stage')) { clearTimeout(peekT); return showPeek(el, true); }
   popEdit(el, it.text, (v) => setItemText(it, v));
 }
 function setItemText(it, v) {
@@ -739,21 +741,53 @@ addEventListener('pointermove', (e) => {
   if (!over && mapHoverT) { clearTimeout(mapHoverT); mapHoverT = null; }
 });
 $('#list-btn').onclick = () => $('#list').classList.toggle('closed');
+// a click anywhere else closes the side list
+addEventListener('pointerdown', (e) => { if (!$('#list').classList.contains('closed') && !e.target.closest('#list, #list-btn, #pick, #toasts, #ipeek')) $('#list').classList.add('closed'); }, true);
 addEventListener('resize', () => renderMap());
 
 // ---- what an idea or a task says, on hover --------------------------------------------------------------------------
 let peekT = null;
+const peekBox = $('#ipeek'), peekTxt = () => peekBox.querySelector('.ip-t');
+const peekEditing = () => peekBox.classList.contains('on') && document.activeElement === peekTxt();
+// one card: hovering shows it, clicking an idea (or into the card) writes in it; no second box
+function showPeek(el, focus) {
+  const it = [...S.ideas, ...S.tasks].find((x) => x.id === el.dataset.it); if (!it) return;
+  const r = el.getBoundingClientRect();
+  peekBox.dataset.id = it.id;
+  peekBox.className = 'k-' + it.kind + (it.done ? ' done' : '');
+  peekBox.innerHTML = `<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea' : '☐ Tarea'} <small>${it.n || ''}</small></span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="Quitar"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Quitar</span></button></div><div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`;
+  const left = Math.min(innerWidth - 300, Math.max(8, r.left + r.width / 2 - 145));
+  Object.assign(peekBox.style, { left: left + 'px', top: r.bottom + 10 + 'px' }); peekBox.style.setProperty('--ax', (r.left + r.width / 2 - left) + 'px');
+  peekBox.classList.add('on');
+  if (focus) { const t = peekTxt(); t.focus(); const g = getSelection(); g.selectAllChildren(t); g.collapseToEnd(); }
+}
+function hidePeek() { if (peekEditing()) peekTxt().blur(); peekBox.classList.remove('on'); }
 addEventListener('pointerover', (e) => {
-  const el = e.target.closest('.it'); const box = $('#ipeek');
-  if (!el || drag?.on) { if (!e.target.closest('#ipeek')) { clearTimeout(peekT); box.classList.remove('on'); } return; }
-  clearTimeout(peekT);
-  peekT = setTimeout(() => {
-    const it = [...S.ideas, ...S.tasks].find((x) => x.id === el.dataset.it); if (!it) return;
-    const r = el.getBoundingClientRect();
-    box.innerHTML = `<span class="ip-k">${it.kind === 'idea' ? '💡 Idea' : it.done ? '☑ Tarea hecha' : '☐ Tarea'}</span>${esc(it.text || '…')}`;
-    Object.assign(box.style, { left: Math.min(innerWidth - 300, Math.max(8, r.left + r.width / 2 - 140)) + 'px', top: r.bottom + 8 + 'px' });
-    box.classList.add('on');
-  }, 200);
+  if (e.target.closest('#ipeek')) return clearTimeout(peekT);       // on its way to the card: stay
+  if (peekEditing()) return;                                         // writing: it stays until you click elsewhere
+  const el = e.target.closest('.it');
+  if (!el || drag?.on) { clearTimeout(peekT); if (peekBox.classList.contains('on')) peekT = setTimeout(hidePeek, drag?.on ? 0 : 350); return; }
+  if (peekBox.classList.contains('on') && peekBox.dataset.id === el.dataset.it) return clearTimeout(peekT);
+  clearTimeout(peekT); peekT = setTimeout(() => showPeek(el), 200);
+});
+addEventListener('pointerdown', (e) => { if (peekBox.classList.contains('on') && !e.target.closest('#ipeek, .it')) hidePeek(); }, true);
+peekBox.addEventListener('focusout', () => {                         // what was written is kept when you leave the text
+  const it = [...S.ideas, ...S.tasks].find((x) => x.id === peekBox.dataset.id), t = peekTxt(); if (!it || !t) return;
+  const v = t.innerText.replace(/s+$/, '');
+  if (v !== (it.text || '')) { snap(); it.text = v; save(); renderAll(); ed?.refresh?.(); }
+});
+peekBox.addEventListener('keydown', (e) => {
+  if (!e.target.closest('.ip-t')) return;
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); hidePeek(); }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); const it = [...S.ideas, ...S.tasks].find((x) => x.id === peekBox.dataset.id); peekTxt().innerText = it?.text || ''; hidePeek(); }
+});
+peekBox.addEventListener('click', (e) => {
+  const bt = e.target.closest('[data-ip]'); if (!bt) return;
+  const it = [...S.ideas, ...S.tasks].find((x) => x.id === peekBox.dataset.id); if (!it) return;
+  if (bt.dataset.ip === 'done') { toggleTask(it); const el = $(`.it[data-it="${it.id}"]`); return el ? showPeek(el) : hidePeek(); }
+  peekBox.classList.remove('on');
+  snap(); if (docsUsing(it).length) it.at = null; else listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);
+  save(); renderAll(); ed?.refresh?.(); toast('Quitada', [['Deshacer', doUndo]]);
 });
 
 // ---- the editor: a document, its tabs (pages), the writing ----------------------------------------------------------

@@ -376,3 +376,45 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .fr-new .new-frame { color: #c2adc9; }
 .fr-new:hover { background: #ece2f1; border-color: #c9b3d2; }
 .fr-new:hover .new-frame { color: var(--accent); }
+#ipeek.on { pointer-events: auto; }
+.ip-acts { display: flex; gap: 6px; margin-top: 8px; }
+.ip-acts button { padding: 4px 10px; border-radius: 8px; font: 600 12px "Segoe UI", sans-serif; background: #f4eff5; color: #6a5e6c; }
+.ip-acts button:hover { background: #efe5f1; color: var(--accent); }
+.ip-acts button[data-ip="rm"]:hover { background: #fbe0dc; color: #b8443f; }
+
+/* the idea card is also where you write it */
+.ip-t { outline: none; min-height: 1.45em; border-radius: 6px; margin: 0 -4px; padding: 1px 4px; cursor: text; }
+.ip-t:hover { background: #faf7fb; } .ip-t:focus { background: #f8f4f9; }
+.ip-t:empty::before { content: attr(data-ph); color: #b3a7b8; }
+
+/* the idea / task card, worked */
+#ipeek { width: 290px; padding: 0; border-radius: 14px; white-space: normal; font: 14px/1.5 Georgia, serif; overflow: visible;
+  border: 1px solid #e6dde9; box-shadow: 0 10px 28px -8px rgba(60, 35, 70, .28), 0 2px 6px rgba(60, 35, 70, .08); clip-path: none;
+  transform: translateY(-4px) scale(.98); transform-origin: var(--ax, 50%) 0; transition: opacity .14s, transform .22s cubic-bezier(.22, 1, .36, 1); }
+#ipeek.on { clip-path: none; transform: none; }
+#ipeek::before { content: ''; position: absolute; top: -6px; left: calc(var(--ax, 50%) - 6px); width: 11px; height: 11px; background: var(--ip-h, #fff);
+  border: 1px solid #e6dde9; border-right: 0; border-bottom: 0; transform: rotate(45deg); border-radius: 2px 0 0 0; }
+#ipeek.k-idea { --ip-h: #fff7dc; } #ipeek.k-tarea { --ip-h: #eaf1fc; } #ipeek.k-tarea.done { --ip-h: #e7f5e9; }
+.ip-h { position: relative; display: flex; align-items: center; gap: 6px; padding: 7px 8px 7px 13px; background: var(--ip-h); border-radius: 13px 13px 0 0; }
+#ipeek .ip-k { flex: 1; display: block; margin: 0; font: 700 11px "Segoe UI", sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #8a7262; }
+#ipeek.k-tarea .ip-k { color: #5a6f8f; } #ipeek.k-tarea.done .ip-k { color: #4f7f57; }
+.ip-k small { font-weight: 600; opacity: .6; font-size: inherit; }
+.ip-h button { display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px; border-radius: 8px; font: 600 12px "Segoe UI", sans-serif;
+  color: #8a7d8e; background: rgba(255, 255, 255, .6); transition: background .15s, color .15s; }
+.ip-done:hover { background: #fff; color: #3f8a4c; }
+#ipeek.done .ip-done { background: #d5efd9; color: #2f7a3d; }
+.ip-rm span { max-width: 0; overflow: hidden; white-space: nowrap; transition: max-width .2s; }
+.ip-rm:hover { background: #fde3df; color: #c0443d; }
+.ip-rm:hover span { max-width: 60px; }
+.ip-t { margin: 0; padding: 10px 14px 12px; min-height: 44px; border-radius: 0 0 14px 14px; white-space: pre-wrap; overflow-wrap: anywhere; color: #2f2735; }
+.ip-t:hover { background: #fdfbfd; } .ip-t:focus { background: #fff; box-shadow: inset 0 0 0 2px #efe6f2; }
+
+/* the side list: text keeps inside its margins, rows aligned */
+#list-body { padding: 8px 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+.lrow { gap: 10px; padding: 9px 10px; }
+.lrow > div { flex: 1; min-width: 0; }
+.lic { width: 18px; flex: none; text-align: center; line-height: 20px; }
+.ltx { font: 13.5px/1.4 Georgia, serif; color: #2f2735; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.lsub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fr-out { height: 26px; padding: 0 10px; border-radius: 8px; font: 600 12px "Segoe UI", sans-serif; color: var(--accent); background: rgba(255, 255, 255, .7); }
+.fr-out:hover { background: #fff; box-shadow: 0 1px 3px rgba(60, 40, 70, .15); }
