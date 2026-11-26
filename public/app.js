@@ -321,9 +321,10 @@ const SCALES = ['#f7e4ec', '#e3edf9', '#e5f3e4', '#f9eedb', '#ece3f7', '#dff2f0'
 function renderAreas(peek) {
   const ids = (x) => pathOf(x).filter((n) => n.kind === 'area').map((n) => n.id);
   const real = ids(S.area), chain = peek && nd(peek) ? ids(leafOf(peek)) : real, cols = [];
+  const depth = colsDepth();
   for (let lv = 0, pid = S.root; ; lv++) {
     cols.push({ pid, ids: nd(pid).kids.filter((k) => nd(k)?.kind === 'area') });
-    const nx = chain[lv]; if (!nx || !isGroup(nd(nx))) break; pid = nx;
+    const nx = chain[lv]; if (!nx || lv + 1 >= depth) break; pid = nx;   // always as many columns as levels: an area with none inside shows an empty one
   }
   const btn = (k, i) => { const a = nd(k), g = isGroup(a); return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><span class="ar-t">${esc(a.title)}</span><i>${a.kids.length || ''}</i><b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
@@ -608,6 +609,8 @@ addEventListener('click', (e) => {
     // next to groups, it gets the same columns inside, so it can be filled at once
     const deep = Math.max(1, ...P.kids.filter((k) => k !== a.id && nd(k)?.kind === 'area').map(areaDepth));
     let x = a; for (let i = 1; i < deep; i++) { const c = mk('area', 'General'); x.kids.push(c.id); x = c; }
+    const loose = P.kids.filter((k) => nd(k)?.kind !== 'area');   // the frames of an area that now gets areas inside move into the new one
+    if (P.kind === 'area' && loose.length) { P.kids = P.kids.filter((k) => nd(k)?.kind === 'area'); x.kids.push(...loose); }
     reindex(); S.area = x.id; S.focus = x.id; save(); renderAll();
     const el = $(`.ar[data-area="${a.id}"] .ar-t`); if (el) editInline(el, (v) => { if (v) { a.title = v; save(); } renderAll(); }); return;
   }
