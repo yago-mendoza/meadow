@@ -811,3 +811,65 @@ button.cr:hover { background: #fff; color: var(--accent); box-shadow: var(--shad
 .ftabs .pal { left: 0 !important; top: auto !important; bottom: calc(100% + 8px); transform: translateY(4px) !important; }
 .frame:hover .ftabs .pal, .frame.sel .ftabs .pal { transform: none !important; }
 .ftabs .pal::after { left: 0; right: 0; top: 100%; bottom: auto; width: auto; height: 12px; }
+/* «make a frame inside»: a clear «+» in a small solid disc on the open tab */
+.ftab .f-add { width: 18px; height: 18px; border-radius: 50%; opacity: 1 !important; background: var(--accent); color: #fff;
+  font: 700 13px/18px "Segoe UI", sans-serif !important; display: grid; place-items: center; padding: 0; }
+.ftab .f-add:hover { transform: scale(1.12); filter: brightness(1.15); }
+/* «new tab»: an empty tab with «+», as tall as the tabs, always there */
+.tab-add { opacity: 1 !important; height: auto; align-self: stretch; min-height: 28px; width: 34px; margin-bottom: -1px; border-radius: 11px 11px 0 0;
+  font: 600 16px/1 "Segoe UI", sans-serif; display: grid; place-items: center; }
+
+/* a stack of circles: a little pile under the top one, and the number */
+.item.circle.stacked { box-shadow: 3px 3px 0 -1px #fff, 3px 3px 0 0 rgba(60, 40, 70, .18), 6px 6px 0 -1px #fff, 6px 6px 0 0 rgba(60, 40, 70, .14), var(--shadow); }
+.item.circle.stacked::after { content: attr(data-stack); position: absolute; right: -8px; top: -8px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+  background: var(--accent); color: #fff; font: 700 10.5px/18px "Segoe UI", sans-serif; text-align: center; box-shadow: 0 1px 3px rgba(0, 0, 0, .2); }
+.item.circle.stacked > .x { display: none; }
+/* the fan: the stack spreads out beside it */
+#fan { position: fixed; z-index: 57; display: flex; align-items: center; gap: 8px; padding: 0 4px; pointer-events: none; }
+#fan.on { pointer-events: auto; }
+.fan-c { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; cursor: grab; box-shadow: var(--shadow);
+  opacity: 0; transform: translateX(calc(var(--i) * -46px - 20px)) scale(.6);
+  transition: transform .38s cubic-bezier(.34, 1.56, .64, 1) calc(var(--i) * 35ms), opacity .2s ease calc(var(--i) * 35ms); }
+#fan.left .fan-c { transform: translateX(calc(var(--i) * 46px + 20px)) scale(.6); }
+#fan.on .fan-c { opacity: 1; transform: none; }
+.fan-c.idea { background: linear-gradient(135deg, #f3fbf6, #e3f5ea); border: 1.5px solid #bfe5cd; }
+.fan-c.tarea { background: #f4f8fe; border: 1.5px solid #c7dcf5; }
+.fan-c.tarea i { width: 16px; height: 16px; border-radius: 5px; border: 1.8px solid #8fb3df; background: #fff; }
+.fan-c.tarea.done { color: #fff; } .fan-c.tarea.done { background: var(--teal); border-color: var(--teal); }
+.fan-c:hover { box-shadow: var(--shadow-up); transform: translateY(-2px) !important; }
+
+/* the preview of an idea or a task: a fine continuous border */
+#ipeek { border: 1px solid #e4dce6; }
+/* which things go inside a new frame */
+#pick { position: fixed; z-index: 66; width: 310px; max-height: 340px; overflow: auto; background: #fff; border-radius: 14px; border: 1px solid #e4dce6; box-shadow: var(--shadow-up);
+  padding: 8px; clip-path: inset(0 0 100% 0 round 14px); opacity: 0; pointer-events: none; transition: clip-path .3s cubic-bezier(.22, 1, .36, 1), opacity .12s; }
+#pick.on { clip-path: inset(0 0 0 0 round 14px); opacity: 1; pointer-events: auto; }
+.pk-h { font-weight: 700; font-size: 13px; color: var(--accent); padding: 4px 6px 8px; }
+.pk-r { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 9px; font-size: 13px; cursor: pointer; user-select: none; }
+.pk-r:hover { background: #f7f3f6; }
+.pk-r input { accent-color: var(--accent); width: 15px; height: 15px; }
+.pk-i { width: 18px; text-align: center; font-size: 12px; color: #8a7f8f; }
+.pk-none { color: var(--muted); font-size: 12.5px; padding: 4px 8px; }
+.pk-b { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 4px 2px; border-top: 1px solid var(--line); margin-top: 6px; }
+.pk-b button { padding: 6px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 600; }
+.pk-cancel { color: #7a7180; } .pk-cancel:hover { background: #f4eff3; }
+.pk-ok { background: var(--accent); color: #fff; } .pk-ok:hover { filter: brightness(1.12); }
+
+/* a description strip keeps room at its right for the tab's ideas and tasks */
+.fdesc { padding-right: 120px !important; }
+.fdesc.empty.has-pins { height: 30px; padding: 6px 14px; border-bottom: 1px dashed color-mix(in srgb, var(--bg) 60%, #4a3550 25%); }
+.fdesc.empty.has-pins::before { content: none; }
+.frame:hover .fdesc.empty.has-pins::before { content: "Añade una descripción…"; }
+
+/* a free text's box: right edge = width, bottom edge = height */
+.ftext[style*="width:"] { max-width: none; }
+.ftext[style*="height:"] { overflow: hidden; }
+.ftext[style*="height:"] .xt { overflow: hidden; height: 100%; }
+.ftext .tb { position: absolute; opacity: 0; transition: opacity .15s; z-index: 2; }
+.ftext:hover .tb, .ftext.sel .tb { opacity: 1; }
+.tb-w { right: -9px; top: 50%; width: 6px; height: 26px; margin-top: -13px; border-radius: 3px; background: #fff; border: 1.5px solid #cbbcc8; cursor: ew-resize; }
+.tb-h { bottom: -9px; left: 50%; height: 6px; width: 26px; margin-left: -13px; border-radius: 3px; background: #fff; border: 1.5px solid #cbbcc8; cursor: ns-resize; }
+.tb:hover { border-color: var(--accent); background: var(--accent); }
+body.dragging .tb { visibility: hidden; }
+.ftext[style*="height:"] { overflow: visible; }
+.ftext[style*="height:"] .xt { -webkit-mask-image: linear-gradient(#000 calc(100% - 10px), transparent); mask-image: linear-gradient(#000 calc(100% - 10px), transparent); }

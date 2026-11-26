@@ -271,8 +271,8 @@ const ZB = '<button data-a="front">⤒<b>Al frente</b></button><button data-a="b
 const postitHTML = (p) => `<div class="postit${sel.has(p.id) ? ' sel' : ''}" data-id="${p.id}" data-k="p" style="left:${p.x}px;top:${p.y}px;z-index:${p.z || 0};--bg:${p.color};--s:${p.s || 1};--tilt:${tiltOf(p.id)}deg">
   <div class="ptext">${esc(p.text)}</div><button class="x" title="Borrar">×</button>${palHTML()}<div class="acts">${ZB}</div>${PRS}</div>`;
 // Free text: words straight on the plane, no document.
-const textHTML = (x) => `<div class="ftext${sel.has(x.id) ? ' sel' : ''}" data-id="${x.id}" data-k="x" style="left:${x.x}px;top:${x.y}px;z-index:${x.z || 0};--s:${x.s || 1}">
-  <div class="xt">${esc(x.text)}</div><button class="x" title="Borrar">×</button><div class="acts">${ZB}</div>${PRS}</div>`;
+const textHTML = (x) => `<div class="ftext${sel.has(x.id) ? ' sel' : ''}" data-id="${x.id}" data-k="x" style="left:${x.x}px;top:${x.y}px;z-index:${x.z || 0};--s:${x.s || 1}${x.w ? `;width:${x.w}px` : ''}${x.h ? `;height:${x.h}px` : ''}">
+  <div class="xt">${esc(x.text)}</div><button class="x" title="Borrar">×</button><div class="acts">${ZB}</div><div class="tb tb-w" data-d="w" title="Ancho"></div><div class="tb tb-h" data-d="h" title="Alto"></div>${PRS}</div>`;
 function writeText(x, fresh = false) {
   const el = elOf(x.id)?.querySelector('.xt'); if (!el) return;
   el.contentEditable = 'true'; el.focus();
@@ -299,20 +299,21 @@ const NOTHING_DOC = `<div class="nothing doc-nothing"><svg viewBox="0 0 80 50" w
   <path d="M14 42 C22 38 28 46 36 42 S50 38 58 42" fill="none" stroke="#cdc3cf" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="1 4"/>
 </svg><span>Página en blanco</span></div>`;
 const frameHTML = (f) => `<div class="frame${sel.has(f.id) ? ' sel' : ''}" data-id="${f.id}" data-k="f" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;--bg:${f.color}">
-  <div class="fdesc${f.desc ? '' : ' empty'}" title="Clic para escribir la descripción">${esc(f.desc || '')}</div>${NOTHING_FRAME}
+  <div class="fdesc${f.desc ? '' : ' empty'}${pinnedTo(f.id).some((t) => t.pin.side === 'desc' && t.pin.tab === activeTab(f)) ? ' has-pins' : ''}" title="Clic para escribir la descripción">${esc(f.desc || '')}</div>${NOTHING_FRAME}
   <div class="ftabs">${tabsOf(f).map((t, i) => { const on = t.id === activeTab(f); const n = on ? 0 : tabCount(f, t.id);
-    return `<div class="ftab${on ? ' on' : ''}" data-tab="${t.id}"><span class="ftitle">${esc(t.title)}</span>${n ? `<i class="tn">${n}</i>` : ''}${on ? `<button class="f-add" title="Crear un marco dentro">⊞</button><button class="x" title="${i ? 'Quitar esta pestaña (su contenido pasa a la primera)' : 'Borrar el marco (no lo de dentro)'}">×</button>` : ''}</div>`; }).join('')}<button class="tab-add" title="Nueva pestaña">＋</button>${palHTML()}</div>
+    return `<div class="ftab${on ? ' on' : ''}" data-tab="${t.id}"><span class="ftitle">${esc(t.title)}</span>${n ? `<i class="tn">${n}</i>` : ''}${on ? `<button class="f-add" title="Crear un marco dentro de este">＋</button><button class="x" title="${i ? 'Quitar esta pestaña (su contenido pasa a la primera)' : 'Borrar el marco (no lo de dentro)'}">×</button>` : ''}</div>`; }).join('')}<button class="tab-add" title="Nueva pestaña">＋</button>${palHTML()}</div>
   <div class="edge e-t"></div><div class="edge e-b"></div><div class="edge e-l"></div><div class="edge e-r"></div><div class="rs c-tl" data-c="tl"></div><div class="rs c-tr" data-c="tr"></div><div class="rs c-bl" data-c="bl"></div><div class="rs c-br" data-c="br"></div></div>`;
 // A frame's tabs: the first is its title; the active one decides what is shown inside.
 function tabsOf(f) { if (!f.tabs?.length) f.tabs = [{ id: 'tab-' + f.id, title: f.title || '' }]; f.tabs[0].title = f.title || ''; return f.tabs; }
 const activeTab = (f) => (tabsOf(f).some((t) => t.id === f.active) ? f.active : tabsOf(f)[0].id);
 const things = () => [...S.docs.filter((d) => d.place === 'canvas'), ...S.postits, ...S.texts, ...S.ideas, ...S.tasks];
-const tabCount = (f, tid) => things().filter((o) => o.ftab?.f === f.id && o.ftab.t === tid).length;
+const tabCount = (f, tid) => things().filter((o) => (o.ftab?.f === f.id && o.ftab.t === tid) || (o.pin?.host === f.id && o.pin.side === 'desc' && o.pin.tab === tid)).length;
 // hidden behind another tab: itself, or the host it is pinned or docked to
 function inOtherTab(o) {
   if (!o) return false;
   const t = o.ftab, f = t && S.frames.find((x) => x.id === t.f);
   if (f && tabsOf(f).length > 1 && t.t !== activeTab(f)) return true;
+  if (o.pin?.side === 'desc') { const h = find(o.pin.host)?.o; if (h && o.pin.tab && o.pin.tab !== activeTab(h)) return true; return inOtherTab(h); }
   if (o.pin) return inOtherTab(find(o.pin.host)?.o);
   if (o.dock) return inOtherTab(docById(o.dock));
   return false;
@@ -328,10 +329,22 @@ function assignTabs() {
 }
 // What is hidden in a frame's other tabs moves with the frame.
 function shiftHidden(f, dx, dy) { for (const o of things()) if (o.ftab?.f === f.id && inOtherTab(o)) { o.x = Math.round(o.x + dx); o.y = Math.round(o.y + dy); } }
+// The ones of its kind that live where it lives: the same edge of the same host (and tab), the same page's column, or
+// loose ones of the same kind in the same place (the same frame tab, or the open plane).
+function siblingsOf(it) {
+  const pool = (it.kind === 'idea' ? S.ideas : S.tasks).filter((x) => x.onCanvas && !x.riding && !stackBase(x) && !inOtherTab(x));
+  if (it.pin) return pool.filter((x) => x.pin?.host === it.pin.host && x.pin.side === it.pin.side && (x.pin.tab || '') === (it.pin.tab || ''));
+  if (it.dock) return pool.filter((x) => x.dock === it.dock);
+  return pool.filter((x) => !x.pin && !x.dock && (x.ftab?.f || '') === (it.ftab?.f || ''));
+}
+// A stack: circles dropped onto another circle join it (stackOf = the base's id). Only the base is drawn, with a number.
+const stackBase = (it) => (it.stackOf && [...S.ideas, ...S.tasks].find((x) => x.id === it.stackOf)) || null;
+const stackMembers = (base) => [...S.ideas, ...S.tasks].filter((x) => x.stackOf === base.id);
 function itemHTML(it) {
   const k = it.kind === 'idea' ? 'i' : 't', uses = docsUsing(it).length;
   if (!it.dock) {                                   // loose: a small circle with its icon; a click reads it
-    return `<div class="item circle ${it.kind}${it.done ? ' done' : ''}${sel.has(it.id) ? ' sel' : ''}" data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
+    const sn = stackMembers(it).length;
+    return `<div class="item circle ${it.kind}${it.done ? ' done' : ''}${sn ? ' stacked' : ''}${sel.has(it.id) ? ' sel' : ''}"${sn ? ` data-stack="${sn + 1}"` : ''} data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
       <span class="cico">${it.kind === 'idea' ? '💡' : it.done ? '✔' : ''}</span>
       <button class="x" title="${uses ? 'Quitar del plano (sigue en sus documentos)' : 'Borrar'}">×</button>
       <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button>${it.pin ? '' : ZB}</div>${it.pin ? '' : PRS}</div>`;   // pinned: its size is its host's
@@ -375,7 +388,7 @@ function renderItems() {
   itemsEl.innerHTML = S.docs.map((d, i) => (d.place === 'canvas' && !inOtherTab(d) ? docHTML(d, i + 1) : '')).join('')
     + S.postits.filter((p) => !p.riding && !inOtherTab(p)).map(postitHTML).join('')
     + (S.texts || []).filter((x) => !x.riding && !inOtherTab(x)).map(textHTML).join('')
-    + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas && !it.riding && !hiddenInFold(it) && !inOtherTab(it)).map(itemHTML).join('')
+    + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas && !it.riding && !hiddenInFold(it) && !inOtherTab(it) && !stackBase(it)).map(itemHTML).join('')
     + groupsHTML();
   $('#empty').classList.toggle('on', !itemsEl.children.length && !S.frames.length);
   S.signs = (S.signs || []).filter((g) => find(g.host));
@@ -444,7 +457,11 @@ const pinnedTo = (id) => [...S.ideas, ...S.tasks].filter((t) => t.onCanvas && !t
 // line (it runs through the circle's centre). Several circles on one anchor spread along the side.
 const ANCHORS = ['tl', 't', 'tr', 'r', 'br', 'b', 'bl', 'l'];
 const hostRect = (f, hel) => f.k === 'f' ? [f.o.w, f.o.h] : sizeOf(hel, f.o);
+const DESC_S = 0.68;                                            // circles in a description strip are a little smaller
+function descBox(f) { const d = elOf(f.o.id)?.querySelector('.fdesc'); return d ? d.offsetHeight : 0; }
 function anchorAt(f, hel, side, i, n, sc) {
+  if (f.k === 'f' && side === 'desc') { const h = Math.max(30, descBox(f)); return [f.o.x + f.o.w - 22 - i * 30, f.o.y + h / 2]; }
+  if (f.k === 'f') return [f.o.x, f.o.y + 30 + i * 44];          // a frame: only its left side, stacked from the top
   const h = f.o, [w, hh] = hostRect(f, hel), gap = 44 * sc, off = (i - (n - 1) / 2) * gap;
   const col = f.k === 'd' ? docked(h).filter((x) => !hiddenInFold(x)).reduce((a, x) => { const xe = elOf(x.id); return a + (xe ? xe.offsetHeight * (x.s || 1) + 6 * sc : 0); }, 0) + (itemsEl.querySelector('.dgroup[data-doc="' + h.id + '"]') ? 46 * sc : 0) : 0;
   const L = h.x, R = h.x + w, T = h.y, B = h.y + hh + (col ? col + 8 * sc : 0), CX = h.x + w / 2, CY = h.y + hh / 2;
@@ -456,13 +473,14 @@ function anchorAt(f, hel, side, i, n, sc) {
   }
 }
 function layoutPins() {
-  for (const t of [...S.ideas, ...S.tasks]) { if (t.pin && !t.riding && !find(t.pin.host)) delete t.pin; if (t.pin?.side === 'tl' && find(t.pin.host)?.k === 'f') t.pin.side = 'l'; }
+  for (const t of [...S.ideas, ...S.tasks]) { if (t.pin && !t.riding && !find(t.pin.host)) delete t.pin; if (t.pin && find(t.pin.host)?.k === 'f' && t.pin.side !== 'desc') t.pin.side = 'l'; }
   const hosts = new Set([...S.ideas, ...S.tasks].filter((t) => t.pin && t.onCanvas && !t.riding).map((t) => t.pin.host));
   for (const id of hosts) {
     const f = find(id), hel = elOf(id); if (!f || !hel) continue;
-    const h = f.o, sc = f.k === 'f' ? 1 : h.s || 1;
+    const h = f.o;
     for (const side of new Set(pinnedTo(id).map((t) => t.pin.side))) {
-      const list = pinnedTo(id).filter((t) => t.pin.side === side).sort((a, b) => (a.pin.at ?? 0) - (b.pin.at ?? 0));
+      const sc = side === 'desc' ? DESC_S : f.k === 'f' ? 1 : h.s || 1;
+      const list = pinnedTo(id).filter((t) => t.pin.side === side && !(side === 'desc' && t.pin.tab !== activeTab(h))).sort((a, b) => (a.pin.at ?? 0) - (b.pin.at ?? 0));
       list.forEach((t, i) => {
         t.s = sc; const r = 19 * sc;
         const [cx, cy] = anchorAt(f, hel, side, i, list.length, sc);
@@ -499,7 +517,11 @@ function pinTarget(it, e) {
   let side;
   if (edge === 'l' || edge === 'r') { const c = corner(fy); side = c === null ? edge : (c ? 'b' : 't') + edge; }
   else { const c = corner(fx); side = c === null ? edge : edge + (c ? 'r' : 'l'); }
-  if (host.dataset.k === 'f' && side === 'tl') side = 'l';              // a frame's top-left corner is its tab
+  if (host.dataset.k === 'f') {                                         // a frame: its description strip, or its left side
+    const fo = find(host.dataset.id).o, dh = Math.max(30, descBox({ o: fo })) * S.view.z;
+    if (cy > r.top && cy < r.top + dh + 6 && cx > r.left + r.width * 0.35) return { host: fo.id, side: 'desc', tab: activeTab(fo), at: -cx };
+    side = 'l';
+  }
   return { host: host.dataset.id, side, at: side === 't' || side === 'b' ? cx : cy };
 }
 // The dotted slot: where a circle being dragged would land if dropped now (a dock slot under a page, or an anchor).
@@ -517,8 +539,8 @@ function pinHint(it, e) {
   const pt = it && pinTarget(it, e);
   if (!pt) { hint.classList.remove('on'); return; }
   const f = find(pt.host), hel = elOf(pt.host); if (!f || !hel) return hint.classList.remove('on');
-  const z = S.view.z, sc = f.k === 'f' ? 1 : f.o.s || 1;
-  const n = pinnedTo(f.o.id).filter((x) => x !== it && x.pin.side === pt.side).length;
+  const z = S.view.z, sc = pt.side === 'desc' ? DESC_S : f.k === 'f' ? 1 : f.o.s || 1;
+  const n = pinnedTo(f.o.id).filter((x) => x !== it && x.pin.side === pt.side && (pt.side !== 'desc' || x.pin.tab === pt.tab)).length;
   const [wx, wy] = anchorAt(f, hel, pt.side, n, n + 1, sc);
   const d = 38 * sc * z;
   Object.assign(hint.style, { left: S.view.x + wx * z - d / 2 + 'px', top: S.view.y + wy * z - d / 2 + 'px', width: d + 'px', height: d + 'px' });
@@ -655,14 +677,30 @@ function paintSelBar() {
   bar.classList.toggle('no-arrange', !arrangeKind());
 }
 function groupText() {
-  const parts = [];
-  const ids = [...sel].map(find).filter(Boolean).sort((a, b) => (a.o.y - b.o.y) || (a.o.x - b.o.x));
-  for (const { k, o } of ids) {
-    if (k === 'd') parts.push(titleOf(o.text) ? readable(o.text) : `# ${o.name}\n${readable(o.text)}`);
-    else if (k === 'p' || k === 'x') parts.push(o.text);
-    else if (k === 'i') parts.push(`💡 ${o.text}`);
-    else if (k === 't') parts.push(`- [${o.done ? 'x' : ' '}] ${o.text}`);
+  const line = ({ k, o }) => k === 'd' ? (titleOf(o.text) ? readable(o.text) : `# ${o.name}\n${readable(o.text)}`)
+    : k === 'p' || k === 'x' ? o.text : k === 'i' ? `💡 ${o.text}` : k === 't' ? `- [${o.done ? 'x' : ' '}] ${o.text}` : '';
+  const order = (p, q) => (p.o.y - q.o.y) || (p.o.x - q.o.x);
+  const done = new Set(), parts = [];
+  const withRiders = (o) => [o, ...(find(o.id)?.k === 'd' ? docked(o) : []), ...pinnedTo(o.id).filter((t) => t.pin.side !== 'desc')];
+  const frames = [...sel].map(find).filter((f) => f?.k === 'f').map((f) => f.o).sort((p, q) => (p.y - q.y) || (p.x - q.x));
+  for (const f of frames) {
+    done.add(f.id);
+    const head = [f.title ? `# ${f.title}` : '', f.desc || ''].filter(Boolean).join('\n');
+    const tabs = tabsOf(f), multi = tabs.length > 1, body = [];
+    for (const t of tabs) {
+      const strip = pinnedTo(f.id).filter((x) => x.pin.side === 'desc' && (x.pin.tab || tabs[0].id) === t.id);
+      const inTab = multi ? things().filter((o) => o.ftab?.f === f.id && o.ftab.t === t.id)
+        : [...sel].filter((id) => id !== f.id).map(find).filter(Boolean).map((x) => x.o);
+      const items = [...strip, ...inTab.flatMap(withRiders)].filter((o) => !done.has(o.id));
+      for (const o of items) done.add(o.id);
+      const txt = items.map((o) => find(o.id)).filter(Boolean).sort(order).map(line).filter((p) => p.trim()).join('\n\n');
+      if (multi) body.push(`## ${t.title || 'Pestaña'}` + (txt ? '\n\n' + txt : ''));
+      else if (txt) body.push(txt);
+    }
+    parts.push([head, ...body].filter(Boolean).join('\n\n'));
   }
+  const rest = [...sel].filter((id) => !done.has(id)).map(find).filter(Boolean).sort(order);
+  for (const x of rest) parts.push(line(x));
   return parts.filter((p) => p.trim()).join('\n\n');
 }
 function moveWith(o, dx, dy) {
@@ -870,14 +908,43 @@ function fitFrame(f, near) {
   f.x = Math.round(x0 - pad); f.y = Math.round(y0 - pad); f.w = Math.round(x1 - x0 + pad * 2); f.h = Math.round(y1 - y0 + pad * 2);
   return true;
 }
+// A frame inside a frame: first, which of the things in it go inside the new one (a menu with ticks).
 function frameInside(outer) {
-  snap();
-  const f = { id: uid(), x: outer.x + 28, y: outer.y + 48, w: Math.max(180, Math.round(outer.w * 0.5)), h: Math.max(120, Math.round(outer.h * 0.45)), title: '',
-    color: PASTEL[(PASTEL.indexOf(outer.color) + 2) % PASTEL.length] };
-  S.frames.push(f); sel.clear(); sel.add(f.id); save(); render();
-  elOf(f.id)?.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 280, easing: 'cubic-bezier(.34,1.56,.64,1)' });
-  editInline(elOf(f.id).querySelector('.ftitle'), (v) => { f.title = v || ''; save(); render(); }, true);
+  const holds = (o, el) => { const [w, h] = el ? sizeOf(el, o) : [0, 0]; const cx = o.x + w / 2, cy = o.y + h / 2; return cx > outer.x && cx < outer.x + outer.w && cy > outer.y && cy < outer.y + outer.h; };
+  const cands = [];
+  for (const el of itemsEl.querySelectorAll('[data-k="d"], [data-k="p"], [data-k="x"]')) { const f = find(el.dataset.id); if (f && holds(f.o, el)) cands.push(f); }
+  for (const g of S.frames) if (g !== outer && g.x >= outer.x && g.y >= outer.y && g.x + g.w <= outer.x + outer.w && g.y + g.h <= outer.y + outer.h) cands.push({ k: 'f', o: g });
+  const pop = $('#pick'), tab = elOf(outer.id)?.querySelector('.ftabs')?.getBoundingClientRect() || { left: 200, bottom: 200 };
+  const icon = { d: '📄', p: '🗒️', x: 'Aa', f: '⬚' };
+  const label = (c) => c.k === 'd' ? c.o.name : c.k === 'f' ? (c.o.title || 'Marco sin título') : (c.o.text || '').split('\n')[0] || (c.k === 'p' ? 'Post-it' : 'Texto');
+  pop.innerHTML = `<div class="pk-h">¿Qué va dentro del marco nuevo?</div>
+    ${cands.length ? cands.map((c, i) => `<label class="pk-r"><input type="checkbox" data-i="${i}"><span class="pk-i">${icon[c.k]}</span><span>${esc(label(c))}</span></label>`).join('')
+      : '<p class="pk-none">Este marco está vacío: el nuevo saldrá vacío.</p>'}
+    <div class="pk-b"><button class="pk-cancel">Cancelar</button><button class="pk-ok">Crear marco</button></div>`;
+  Object.assign(pop.style, { left: Math.min(innerWidth - 330, Math.max(8, tab.left)) + 'px', top: Math.min(innerHeight - 340, tab.bottom + 8) + 'px' });
+  pop.classList.add('on');
+  pop.onclick = (e) => {
+    if (e.target.closest('.pk-cancel')) return pop.classList.remove('on');
+    if (!e.target.closest('.pk-ok')) return;
+    const chosen = [...pop.querySelectorAll('input:checked')].map((x) => cands[+x.dataset.i]);
+    pop.classList.remove('on');
+    snap();
+    const f = { id: uid(), title: '', color: PASTEL[(PASTEL.indexOf(outer.color) + 2) % PASTEL.length] };
+    if (chosen.length) {                              // it wraps what was chosen, with the usual margin
+      const boxes = chosen.map((c) => { if (c.k === 'f') return [c.o.x, c.o.y - 34, c.o.w, c.o.h + 34]; const el = elOf(c.o.id), [w, h] = sizeOf(el, c.o); return [c.o.x, c.o.y, w, h]; });
+      const x0 = Math.min(...boxes.map((q) => q[0])), y0 = Math.min(...boxes.map((q) => q[1])), x1 = Math.max(...boxes.map((q) => q[0] + q[2])), y1 = Math.max(...boxes.map((q) => q[1] + q[3]));
+      Object.assign(f, { x: Math.round(x0 - FIT_PAD), y: Math.round(y0 - FIT_PAD), w: Math.round(x1 - x0 + FIT_PAD * 2), h: Math.round(y1 - y0 + FIT_PAD * 2) });
+    } else Object.assign(f, { x: outer.x + 28, y: outer.y + 48, w: Math.max(180, Math.round(outer.w * 0.5)), h: Math.max(120, Math.round(outer.h * 0.45)) });
+    // nested: the outer frame grows (never shrinks) to hold the new one with its tab and margin
+    const m = 24, nx0 = Math.min(outer.x, f.x - m), ny0 = Math.min(outer.y, f.y - 34 - m), nx1 = Math.max(outer.x + outer.w, f.x + f.w + m), ny1 = Math.max(outer.y + outer.h, f.y + f.h + m);
+    Object.assign(outer, { x: nx0, y: ny0, w: nx1 - nx0, h: ny1 - ny0 });
+    S.frames.push(f);
+    pushApart([outer]);
+    sel.clear(); sel.add(f.id); save(); render();
+    editInline(elOf(f.id).querySelector('.ftitle'), (v) => { f.title = v || ''; save(); render(); }, true);
+  };
 }
+addEventListener('pointerdown', (e) => { if (!e.target.closest('#pick, .f-add')) $('#pick')?.classList.remove('on'); }, true);
 const RIBBON_RED = '#d9534f';
 const RIBBON_COLORS = [RIBBON_RED, '#e8973a', '#e5c33f', '#5cae6b', '#4a90d9', '#8e6bd1', '#d96aa6', '#6b6470'];
 function dropSign(e) {
@@ -1024,6 +1091,10 @@ function removeIds(ids) {
   S.postits = S.postits.filter((p) => !set.has(p.id));
   for (const o of things()) if (o.ftab && set.has(o.ftab.f)) delete o.ftab;
   S.frames = S.frames.filter((f) => !set.has(f.id));
+  for (const it of [...S.ideas, ...S.tasks].filter((x) => set.has(x.id) && !x.stackOf)) {
+    const rest = stackMembers(it).filter((x) => !set.has(x.id));
+    if (rest.length) { const nb = rest[0]; delete nb.stackOf; Object.assign(nb, { x: it.x, y: it.y, pin: it.pin, dock: it.dock, dockAt: it.dockAt, z: it.z }); for (const x of rest.slice(1)) x.stackOf = nb.id; }
+  }
   for (const it of [...S.ideas, ...S.tasks].filter((x) => set.has(x.id))) {
     if (docsUsing(it).length) { it.onCanvas = false; left++; continue; }
     log('borrar', `${it.kind === 'idea' ? 'Idea' : 'Tarea'} «${it.text}»`, { restore: { k: it.kind, o: { ...it } } });
@@ -1084,6 +1155,12 @@ vp.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   document.activeElement?.blur?.();
   const rs = e.target.closest('.rs');
+  const tb = e.target.closest('.ftext .tb');
+  if (tb && e.button === 0) {
+    e.stopPropagation();
+    const host = tb.closest('.ftext'), x = find(host.dataset.id).o;
+    act = { k: 'tbox', x, el: host, d: tb.dataset.d, sx: e.clientX, sy: e.clientY, w0: host.offsetWidth, h0: host.offsetHeight }; return;
+  }
   const prs = e.target.closest('.prs');
   if (prs) {
     const host = prs.closest('[data-k]'), p = find(host.dataset.id).o;
@@ -1209,6 +1286,11 @@ addEventListener('pointermove', (e) => {
       if (hit) sel.add(el.dataset.id);
     }
     paintSel();
+  } else if (act.k === 'tbox') {
+    if (!act.snapped) { act.snapped = true; snap(); document.body.classList.add('dragging'); }
+    const s2 = (act.x.s || 1) * z;
+    if (act.d === 'w') { act.x.w = Math.round(Math.max(60, act.w0 + (e.clientX - act.sx) / s2)); act.el.style.width = act.x.w + 'px'; }
+    else { act.x.h = Math.round(Math.max(30, act.h0 + (e.clientY - act.sy) / s2)); act.el.style.height = act.x.h + 'px'; }
   } else if (act.k === 'scale') {
     if (!act.snapped) { act.snapped = true; snap(); document.body.classList.add('dragging'); }
     const ns = Math.round(Math.min(4, Math.max(0.25, act.s0 * (1 + (e.clientX - act.sx) / z / (act.w0 * act.s0)))) * 100) / 100;
@@ -1258,6 +1340,15 @@ addEventListener('pointerup', (e) => {
   else if (a.k === 'move' && a.moved) {
     const movedDocs = new Set(a.moving.filter((m) => m.k === 'd').map((m) => m.o.id));
     for (const m of a.moving) {
+      // dropped onto another circle: it joins that circle's stack
+      if ((m.k === 't' || m.k === 'i') && m.o.id === a.id) {
+        const onto = document.elementsFromPoint(e.clientX, e.clientY).map((x) => x.closest?.('.item.circle')).find((x) => x && x.dataset.id !== m.o.id);
+        if (onto) {
+          const base = find(onto.dataset.id).o, root = stackBase(base) || base;
+          for (const x of [m.o, ...stackMembers(m.o)]) { x.stackOf = root.id; delete x.pin; delete x.dock; }
+          continue;
+        }
+      }
       // only the circle you grabbed is re-placed by where the pointer is; everything carried keeps its edge
       if ((m.k !== 't' && m.k !== 'i') || m.o.id !== a.id || (m.o.dock && movedDocs.has(m.o.dock))) continue;
       const wp = toWorld(e.clientX, e.clientY), tg = dockAt(wp.x, wp.y, m.o);
@@ -1299,12 +1390,17 @@ addEventListener('pointerup', (e) => {
       editInline(a.title, (v) => { if (v !== null && v !== t.title) { snap(); t.title = v; if (t === tabsOf(f)[0]) f.title = v; save(); render(); } }, true);
     }
   } else if (a.k === 'move' && !a.toggle && (a.kind === 'i' || a.kind === 't')) {
-    clearTimeout(clickT); clickT = setTimeout(() => openItem(find(a.id).o), 240);   // a click reads it (a double click writes)
+    const it = find(a.id).o, kin = siblingsOf(it).map((x) => x.id);
+    const wasAll = kin.length > 1 && a.selBefore && a.selBefore.size === kin.length && kin.every((id) => a.selBefore.has(id));
+    sel.clear(); for (const id of wasAll || kin.length < 2 ? [it.id] : kin) sel.add(id);
+    paintSel();
   } else if (a.k === 'move' && !a.toggle && a.kind === 'f') {
     const f = find(a.id).o, keep = new Set([f.id]);
+    const fr = elOf(f.id).getBoundingClientRect(), top = fr.top + (Math.max(30, descBox({ o: f })) + 22) * S.view.z;
+    const body = !a.tabEl && a.sy > top && a.sy < fr.bottom - 18 && a.sx > fr.left + 18 && a.sx < fr.right - 18;
     sel.clear(); sel.add(f.id);
     const all = collectMoving(false).map((m) => m.o.id);
-    const wasAll = a.selBefore && a.selBefore.size === all.length && all.every((id) => a.selBefore.has(id));
+    const wasAll = !body || (a.selBefore && a.selBefore.size === all.length && all.every((id) => a.selBefore.has(id)));
     sel.clear(); for (const id of wasAll ? keep : all) sel.add(id);
     paintSel();
   } else if (a.k === 'move' && !a.toggle && (a.kind === 'd' || a.kind === 'p' || a.kind === 'x')) {
@@ -1320,7 +1416,7 @@ addEventListener('pointerup', (e) => {
     $('#selrect').style.display = 'none';
     if (!a.moved && !a.add) { sel.clear(); paintSel(); }
   } else if (a.k === 'resize') { pushApart([a.f]); save(); render(); }
-  else if (a.k === 'scale') save();
+  else if (a.k === 'scale' || a.k === 'tbox') save();
 });
 
 vp.addEventListener('click', (e) => {
@@ -1605,6 +1701,53 @@ itemsEl.addEventListener('pointerout', (e) => {
 });
 addEventListener('pointerdown', () => { clearTimeout(ipeekT); $('#ipeek')?.classList.remove('on'); }, true);
 
+let fanFor = null, fanT = null;
+itemsEl.addEventListener('pointerover', (e) => {
+  const el = e.target.closest('.item.stacked'); if (!el || act || gh || fanFor === el.dataset.id) return;
+  clearTimeout(fanT); fanT = setTimeout(() => openFan(el), 160);
+});
+function openFan(el) {
+  const base = find(el.dataset.id)?.o; if (!base) return;
+  closeFan(); fanFor = base.id;
+  const fan = $('#fan'), r = el.getBoundingClientRect(), list = [base, ...stackMembers(base)];
+  fan.innerHTML = list.map((it, i) => `<div class="fan-c ${it.kind}${it.done ? ' done' : ''}" data-id="${it.id}" style="--i:${i}" title="${esc(it.text)}">${it.kind === 'idea' ? '💡' : it.done ? '✔' : '<i></i>'}</div>`).join('');
+  const goRight = r.right + list.length * 46 + 20 < innerWidth - 340;
+  Object.assign(fan.style, { left: (goRight ? r.right + 6 : r.left - 6 - list.length * 46) + 'px', top: r.top + 'px', height: r.height + 'px' });
+  fan.classList.toggle('left', !goRight);
+  requestAnimationFrame(() => fan.classList.add('on'));
+}
+function closeFan() { clearTimeout(fanT); fanFor = null; const f = $('#fan'); f.classList.remove('on'); f.innerHTML = ''; }
+addEventListener('pointermove', (e) => {
+  if (!fanFor || act) return;
+  if (e.target.closest?.('#fan') || e.target.closest?.(`.item[data-id="${fanFor}"]`)) return;
+  closeFan();
+});
+$('#fan').addEventListener('pointerover', (e) => {
+  const c = e.target.closest('.fan-c'); if (!c) return;
+  const it = find(c.dataset.id)?.o, box = $('#ipeek'), r = c.getBoundingClientRect(); if (!it) return;
+  box.innerHTML = `<span class="ip-k">${it.kind === 'idea' ? '💡 Idea' : it.done ? '☑ Tarea hecha' : '☐ Tarea'}</span>${esc(it.text || '…')}`;
+  Object.assign(box.style, { left: Math.min(innerWidth - 300, Math.max(8, r.left + r.width / 2 - 140)) + 'px', top: r.bottom + 8 + 'px' });
+  box.classList.add('on');
+});
+$('#fan').addEventListener('pointerdown', (e) => {
+  const c = e.target.closest('.fan-c'); if (!c || e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  const it = find(c.dataset.id)?.o; if (!it) return;
+  const sx = e.clientX, sy = e.clientY;
+  const up = (ev) => {
+    removeEventListener('pointerup', up);
+    if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) { closeFan(); return openItem(it); }   // a click reads it
+    // dragged out: it leaves the stack and lands where it was dropped (the base hands over if it was the base)
+    snap();
+    const base = stackBase(it) || it, rest = stackMembers(base).filter((x) => x !== it);
+    if (it === base && rest.length) { const nb = rest[0]; delete nb.stackOf; Object.assign(nb, { x: it.x, y: it.y, pin: it.pin, dock: it.dock, z: it.z }); for (const x of rest.slice(1)) x.stackOf = nb.id; delete it.pin; delete it.dock; }
+    delete it.stackOf;
+    const w = toWorld(ev.clientX, ev.clientY); it.x = Math.round(w.x - 19); it.y = Math.round(w.y - 19); it.z = topZ();
+    closeFan(); $('#ipeek').classList.remove('on'); changed();
+  };
+  addEventListener('pointerup', up);
+});
+
 // ---- peek: hovering something that is partly covered brings it forward for a moment, with what lies on it ----------
 let peekT = null, peeked = [];
 function unpeek() {
@@ -1794,6 +1937,7 @@ function framePath(x, y) {
 // Where an idea or task lives for grouping: its own place on the plane, else the place of the first document holding it.
 function groupOf(it) {
   const at = (o) => { const el = elOf(o.id); const [w, h] = el ? sizeOf(el, o) : [0, 0]; return framePath(o.x + w / 2, o.y + h / 2); };
+  if (stackBase(it)) return groupOf(stackBase(it));
   if (it.riding) return 'En un cajón, con su documento';
   if (it.onCanvas) return at(it) || 'En el plano, sin marco';
   const d = docsUsing(it).find((x) => x.place === 'canvas');

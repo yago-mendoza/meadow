@@ -26,7 +26,7 @@ Yago, 26.11: «relación de interior o de borde, no hay más».
 - **Borde.** Ideas y tareas viven solo aquí, nunca dentro de nada: en uno de los 8 atractores de un documento, post-it o
   marco (4 esquinas y el centro de cada lado, con la línea del borde pasando por su centro), o enganchadas debajo de un
   documento (en columna, del ancho de la hoja, 3 líneas; más de 5, el tipo mayoritario se pliega en un circulito con
-  número). Soltadas dentro de algo, van a su atractor más cercano. Los ribetes también son de borde. Lo de borde hereda el
+  número). Soltadas dentro de algo, van a su atractor más cercano. En un marco, solo en su lado izquierdo (apiladas desde arriba) o en la franja de la descripción, a la derecha: esas son de la pestaña abierta y se van con ella. Soltar un circulito sobre otro los apila (un número; al pasar el ratón se despliegan). Los ribetes también son de borde. Lo de borde hereda el
   tamaño y la altura de su anfitrión: no se escala ni va al frente o al fondo por su cuenta.
 
 Con las dos pasa lo mismo: **lo de dentro y lo del borde viajan con su anfitrión** al moverlo, escalarlo o guardarlo en
