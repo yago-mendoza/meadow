@@ -563,10 +563,10 @@ vp.addEventListener('pointerdown', (e) => {
   if (e.target.closest('.sign')) return;
   if (e.target.closest('.acts, .x, .pal, .chk, .f-add, [contenteditable="true"]')) return;
   const it = e.target.closest('[data-k]');
-  // pan: middle or right button, Space + drag, or Ctrl + drag on empty grid
-  if (e.button === 1 || e.button === 2 || (e.button === 0 && (space || (e.ctrlKey && !it)))) {
+  // pan: dragging the empty grid (the common thing), or middle/right button, or Space + drag; Ctrl + drag selects a group
+  if (e.button === 1 || e.button === 2 || (e.button === 0 && (space || (!it && !e.ctrlKey && !e.metaKey)))) {
     e.preventDefault();
-    act = { k: 'pan', sx: e.clientX, sy: e.clientY, vx: S.view.x, vy: S.view.y }; vp.classList.add('panning'); return;
+    act = { k: 'pan', sx: e.clientX, sy: e.clientY, vx: S.view.x, vy: S.view.y, empty: !it }; vp.classList.add('panning'); return;
   }
   if (e.button !== 0) return;
   document.activeElement?.blur?.();
@@ -594,7 +594,7 @@ vp.addEventListener('pointerdown', (e) => {
     act = { k: 'move', sx: e.clientX, sy: e.clientY, moving: collectMoving(e.altKey), moved: false, id, kind: it.dataset.k, toggle, title: e.target.closest('.ftitle, .dtitle') };
     return;
   }
-  act = { k: 'box', sx: e.clientX, sy: e.clientY, add: e.shiftKey, base: new Set(sel), moved: false };
+  act = { k: 'box', sx: e.clientX, sy: e.clientY, add: e.shiftKey, base: new Set(sel), moved: false };   // Ctrl + drag on empty grid (Shift adds)
 });
 
 // What moves with the selection: the selected things, and whatever sits inside a selected frame (Alt: the frame alone).
@@ -699,7 +699,7 @@ addEventListener('pointerup', (e) => {
   const a = act; act = null;
   const trayAt = overStash(e);                     // read it before the trays tuck away
   vp.classList.remove('panning'); document.body.classList.remove('dragging'); hotTray(e, false); dragTrays(false);
-  if (a.k === 'pan') saveView();
+  if (a.k === 'pan') { if (a.empty && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < 3) { sel.clear(); paintSel(); } else saveView(); }
   else if (a.k === 'move' && a.moved) {
     const movedDocs = new Set(a.moving.filter((m) => m.k === 'd').map((m) => m.o.id));
     for (const m of a.moving) {

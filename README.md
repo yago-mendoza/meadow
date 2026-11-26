@@ -11,8 +11,8 @@ A zoomable grid (pastel, dotted) of documents, post-its, ideas, tasks, frames an
 - Left bar: Documento, Post-it, Idea, Tarea, Marco, Letrero. Click: at the centre (a document opens); drag: where you drop it.
 - **Click** a thing: the view centres and zooms on it, and «Volver a donde estabas» takes you back. **Double click** a document opens it.
   Click a document's or a frame's title to rename it.
-- Wheel zooms around the pointer; pan with the middle or right button, Space + drag, or Ctrl + drag on empty grid.
-- Drag on empty space selects; Shift/Ctrl + click adds or removes one. With two or more selected, a bar copies them all.
+- Drag the empty grid to move around (also middle/right button or Space + drag); the wheel zooms around the pointer.
+- Ctrl + drag on empty grid selects a group (Shift adds); Shift/Ctrl + click adds or removes one. With two or more selected, a bar copies them all.
 - **What moves with what** (Alt: only the selection): a frame carries what is inside it, frames inside it too (nested);
   a document carries the post-its, ideas and tasks lying on it; small things carry the small things they touch, except
   what lies on a document that is not moving. The corner handle scales a thing as a whole, with what it carries.

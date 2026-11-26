@@ -10,7 +10,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #f6f6fa; use
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
 
 /* ---- plane ---- */
-#vp { position: fixed; inset: 0; overflow: hidden; cursor: default; }
+#vp { position: fixed; inset: 0; overflow: hidden; cursor: grab; }
 #vp.space { cursor: grab; } #vp.panning { cursor: grabbing; }
 #grid { position: absolute; inset: 0; }
 #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
