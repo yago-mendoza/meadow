@@ -8,7 +8,7 @@ primero; si un gesto hace en un género algo distinto que en otro, tiene que est
 | Género | Piezas | Qué es |
 |---|---|---|
 | **Contenedor** | Marco | Agrupa lo que tiene dentro. Puede anidarse en otro marco. Tiene lengüeta (título) y descripción. |
-| **Hoja** | Documento | Texto largo que se abre. Lleva cosas encima, enganchadas debajo y clavadas en sus bordes. |
+| **Hoja** | Documento, Libreta | Texto largo que se abre. Lleva cosas encima, enganchadas debajo y clavadas en sus bordes. |
 | **Pieza suelta** | Post-it, Texto | Se lee sin abrir; se escribe encima. |
 | **Ficha** | Idea, Tarea | Un objeto único: el mismo en el plano y dentro de cualquier documento. Suelta, es un circulito. |
 | **Adorno** | Ribete | Marca un borde de otra cosa; no existe sin ella. |
@@ -16,6 +16,9 @@ primero; si un gesto hace en un género algo distinto que en otro, tiene que est
 
 Rango (para «quién lleva a quién»): contenedor 4 · hoja 3 · pieza suelta y ficha 2. El adorno no tiene rango: vive en
 su anfitrión.
+
+Libreta: un documento con sus propias pestañas dentro (páginas). En el plano es una hoja con lomo y sus pestañas asomando;
+al entrar, cada pestaña es un texto. Copiarla copia todas sus páginas.
 
 ## 2. Relaciones: solo dos
 

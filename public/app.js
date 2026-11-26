@@ -34,7 +34,10 @@ const sizeOf = (el, o) => [el.offsetWidth * (o.s || 1), el.offsetHeight * (o.s |
 const readable = (t) => (t || '')
   .replace(LINK_RE, (m, label) => label)
   .replace(TOKEN_RE, (m, kind, n) => { const it = getItem(kind, +n); return it ? `${kind === 'idea' ? '💡' : it.done ? '☑' : '☐'} ${it.text}` : ''; });
-const docsUsing = (it) => S.docs.filter((d) => (d.text || '').includes(token(it)));
+const allText = (d) => d.book ? (d.pages || []).map((p) => p.id === d.page ? d.text : p.text).join('\n') : (d.text || '');
+const docsUsing = (it) => S.docs.filter((d) => allText(d).includes(token(it)));
+// a notebook as one text: each page under its tab's name
+const bookText = (d) => (d.pages || []).map((p) => `## ${p.title}\n${readable(p.id === d.page ? d.text : p.text)}`).join('\n\n');
 
 // ---- saving --------------------------------------------------------------------------------------------------------
 async function load() {
@@ -281,9 +284,9 @@ function docHTML(d, n) {
   const text = readable((d.text || '').replace(/^\s*#{1,6}\s+.*(\n|$)/, '').replace(/^\n+/, ''));
   const words = (text.match(/\S+/g) || []).length;
   const tint = docTint(d);
-  return `<div class="doc${sel.has(d.id) ? ' sel' : ''}${tint ? ' tinted' : ''}" data-id="${d.id}" data-k="d" style="left:${d.x}px;top:${d.y}px;z-index:${d.z || 0};--s:${d.s || 1}${tint ? ';--tint:' + tint : ''}">
+  return `<div class="doc${d.book ? ' book' : ''}${sel.has(d.id) ? ' sel' : ''}${tint ? ' tinted' : ''}" data-id="${d.id}" data-k="d" style="left:${d.x}px;top:${d.y}px;z-index:${d.z || 0};--s:${d.s || 1}${tint ? ';--tint:' + tint : ''}">
     <div class="page">
-      <div class="dtitle">${esc(d.name)}</div>
+      ${d.book ? `<div class="btabs">${(d.pages || []).map((p) => `<span class="${p.id === d.page ? 'on' : ''}">${esc(p.title)}</span>`).join('')}</div>` : ''}<div class="dtitle">${esc(d.name)}</div>
       <div class="dbody">${text ? esc(text.split('\n').slice(0, 14).join('\n')) : NOTHING_DOC}</div>
       <div class="dfoot"><span>📄</span><span>${words ? words + (words === 1 ? ' palabra' : ' palabras') : ''}</span></div>
     </div>
@@ -732,7 +735,7 @@ function paintSelBar() {
   bar.classList.toggle('no-arrange', !arrangeKind());
 }
 function groupText() {
-  const line = ({ k, o }) => k === 'd' ? (titleOf(o.text) ? readable(o.text) : `# ${o.name}\n${readable(o.text)}`)
+  const line = ({ k, o }) => k === 'd' ? (o.book ? `# ${o.name}\n\n${bookText(o)}` : titleOf(o.text) ? readable(o.text) : `# ${o.name}\n${readable(o.text)}`)
     : k === 'p' || k === 'x' ? o.text : k === 'i' ? `💡 ${o.text}` : k === 't' ? `- [${o.done ? 'x' : ' '}] ${o.text}` : '';
   const order = (p, q) => (p.o.y - q.o.y) || (p.o.x - q.o.x);
   const done = new Set(), parts = [];
@@ -798,6 +801,7 @@ $('#selbar-copy').onclick = async () => { await navigator.clipboard.writeText(gr
 $('#selbar-del').onclick = () => removeIds([...sel]);
 
 // ---- creating ------------------------------------------------------------------------------------------------------
+function nextBookName() { const names = new Set(S.docs.map((d) => d.name)); let i = 1; while (names.has(`Libreta ${i}`)) i++; return `Libreta ${i}`; }
 function nextName() {
   const names = new Set(S.docs.map((d) => d.name)); let i = 1;
   while (names.has(`Documento ${i}`)) i++;
@@ -815,7 +819,7 @@ function withTitle(text, name) {
 function renameDoc(d, name) {
   if (!name || name === d.name) return;
   if (!renameDoc.typing) snap();
-  d.name = name; d.text = withTitle(d.text, name); d.updated = Date.now();
+  d.name = name; if (!d.book) d.text = withTitle(d.text, name); d.updated = Date.now();
   if (curId === d.id) { ed.replaceText(d.text); if (document.activeElement !== $('#ed-name')) $('#ed-name').value = name; }
   save();
 }
@@ -846,6 +850,15 @@ function create(kind, w, inStash) {
   } else if (kind === 'text') {
     const x = { id: uid(), x: Math.round(w.x - 40), y: Math.round(w.y - 14), z: topZ(), text: '' };
     S.texts.push(x); sel.clear(); sel.add(x.id); save(); render(); writeText(x, true);
+  } else if (kind === 'book') {
+    const d = newDoc({ name: nextBookName(), place: inStash ? 'stash' : 'canvas', x: w.x - DOC_W / 2, y: w.y - 30 });
+    const p = { id: uid(), title: 'Página 1', text: '' };
+    Object.assign(d, { book: true, text: '', pages: [p], page: p.id });
+    if (inStash) putInTray([d], inStash);
+    log('crear', `Libreta «${d.name}»`, { ref: d.id });
+    sel.clear(); save(); render();
+    if (w.free || inStash) { const el = inStash ? stash.querySelector(`.chip[data-id="${d.id}"] b`) : elOf(d.id)?.querySelector('.dtitle'); if (el) editInline(el, (v) => { if (v) { renameDoc(d, v); render(); } }); }
+    else openEditor(d.id);
   } else if (kind === 'shape') {
     const g = { id: uid(), x: Math.round(w.x - 80), y: Math.round(w.y - 55), w: 160, h: 110, z: topZ(), form: 'round', color: SHAPE_COLORS[(S.shapes.length) % 8] };
     S.shapes.push(g); sel.clear(); sel.add(g.id); log('crear', 'Forma', { ref: g.id }); save(); render();
@@ -1262,7 +1275,7 @@ function restoreFrom(h) {
 async function docAction(a, d) {
   if (a === 'read') { const el = elOf(d.id); if (el) { mountInline(el); $('#editpill').dataset.id = d.id; $('#editpill b').textContent = d.name; $('#editpill').classList.add('on'); } return; }
   if (a === 'edit') return openEditor(d.id);
-  if (a === 'copy') { await navigator.clipboard.writeText(readable(d.text)); return toast(`Copiado «${d.name}»`); }
+  if (a === 'copy') { await navigator.clipboard.writeText(d.book ? `# ${d.name}\n\n${bookText(d)}` : readable(d.text)); return toast(`Copiado «${d.name}»`); }
   let clip;
   try { clip = (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'); } catch { return toast('El navegador no deja leer el portapapeles'); }
   if (!clip) return toast('El portapapeles está vacío');
@@ -2015,6 +2028,7 @@ const TOOLS = [
   ['postit', '🗒️', 'Post-it', '#fff1b8', 'Se escribe encima; no se abre'],
   ['idea', '💡', 'Idea', '#cdeedd', 'Una idea que puedes pegar en el plano y dentro de documentos'],
   ['tarea', '☑️', 'Tarea', '#cfe5fb', 'Una tarea que puedes pegar en el plano y dentro de documentos'],
+  ['book', '📓', 'Libreta', '#fde2c8', 'Como un documento, pero con sus propias pestañas dentro'],
   ['text', 'Aa', 'Texto', '#f1eef4', 'Texto suelto, escrito directamente en el plano'],
   ['shape', '◆', 'Forma', '#f6c1d6', 'Una forma de color: rectángulo, círculo, triángulo o rombo'],
   ['frame', '⬚', 'Marco', '#e3d9f7', 'Un marco para agrupar lo que hay suelto'],
@@ -2204,7 +2218,7 @@ function mapHTML() {
   const want = (k) => !mapKinds.size || mapKinds.has(k);
   const label = (n) => n.k === 'f' ? (n.o.title || 'Marco sin título') : n.k === 'd' ? n.o.name : (n.o.text || '').split('\n')[0] || (n.k === 'p' ? 'Post-it' : n.k === 'x' ? 'Texto' : n.k === 'g' ? 'Forma' : '…');
   const TOOLK = { f: 'frame', d: 'doc', p: 'postit', i: 'idea', t: 'tarea', x: 'text', g: 'shape' };
-  const icon = (n) => { const t = TOOLS.find((q) => q[0] === TOOLK[n.k]); return `<span class="mk mk-${n.k}${n.k === 't' && n.o.done ? ' done' : ''}" style="--c:${n.k === 'g' && n.o.color ? n.o.color : t[3]}">${n.k === 't' ? (n.o.done ? '✔' : '') : t[1]}</span>`; };
+  const icon = (n) => { const t = TOOLS.find((q) => q[0] === (n.k === 'd' && n.o.book ? 'book' : TOOLK[n.k])); return `<span class="mk mk-${n.k}${n.k === 't' && n.o.done ? ' done' : ''}" style="--c:${n.k === 'g' && n.o.color ? n.o.color : t[3]}">${n.k === 't' ? (n.o.done ? '✔' : '') : t[1]}</span>`; };
   const order = (a, b) => 'itdpxgf'.indexOf(a.k) - 'itdpxgf'.indexOf(b.k) || (a.o.y || 0) - (b.o.y || 0) || (a.o.x || 0) - (b.o.x || 0);
   const childrenOf = (n) => {
     const own = [...(kids.get(n.o.id) || [])];
@@ -2365,7 +2379,8 @@ const edApi = {
   onChange(text) {
     const d = docById(curId); if (!d || d.text === text) return;
     d.text = text; d.updated = Date.now();
-    const t = titleOf(text); if (t && t !== d.name) { d.name = t; if (document.activeElement !== $('#ed-name')) $('#ed-name').value = t; }
+    if (d.book) { const p = d.pages?.find((x) => x.id === d.page); if (p) p.text = text; }
+    const t = !d.book && titleOf(text); if (t && t !== d.name) { d.name = t; if (document.activeElement !== $('#ed-name')) $('#ed-name').value = t; }
     save();
     clearTimeout(edApi.t); edApi.t = setTimeout(backlinks, 500);
   },
@@ -2417,9 +2432,48 @@ function openEditor(id, push = true) {
   const tint = docTint(d); $('#ed').classList.toggle('tinted', !!tint); if (tint) $('#ed').style.setProperty('--tint', tint); else $('#ed').style.removeProperty('--tint');
   fillHead(); ed.focus();
 }
+function renderBookTabs() {
+  const d = docById(curId), bar = $('#ed-tabs'); if (!bar) return;
+  if (!d?.book) { bar.hidden = true; bar.innerHTML = ''; return; }
+  bar.hidden = false;
+  bar.innerHTML = d.pages.map((p) => `<div class="bt${p.id === d.page ? ' on' : ''}" data-pg="${p.id}"><span class="bt-t">${esc(p.title)}</span>${p.id === d.page && d.pages.length > 1 ? '<button class="bt-x" title="Borrar esta pestaña">×</button>' : ''}</div>`).join('')
+    + '<button class="bt-add" title="Nueva pestaña">＋</button>';
+}
+function switchPage(d, id) {
+  if (!d.book || d.page === id) return;
+  const cur = d.pages.find((p) => p.id === d.page); if (cur) cur.text = d.text;
+  const nx = d.pages.find((p) => p.id === id); if (!nx) return;
+  d.page = id; d.text = nx.text || ''; save();
+  ed.setDoc(d.text); renderBookTabs(); render(); ed.focus();
+}
+$('#ed-tabs')?.addEventListener('click', (e) => {
+  const d = docById(curId); if (!d?.book) return;
+  if (e.target.closest('.bt-add')) {
+    snap(); const cur = d.pages.find((p) => p.id === d.page); if (cur) cur.text = d.text;
+    const p = { id: uid(), title: `Página ${d.pages.length + 1}`, text: '' }; d.pages.push(p); save();
+    switchPage(d, p.id);
+    const t = $(`#ed-tabs .bt[data-pg="${p.id}"] .bt-t`); if (t) editInline(t, (v) => { if (v) { p.title = v; save(); renderBookTabs(); render(); } }, true);
+    return;
+  }
+  const x = e.target.closest('.bt-x');
+  if (x) {
+    const p = d.pages.find((q) => q.id === d.page);
+    const drop = () => { snap(); const i = d.pages.indexOf(p); d.pages.splice(i, 1); const nx = d.pages[Math.max(0, i - 1)]; d.page = nx.id; d.text = nx.text || ''; save(); ed.setDoc(d.text); renderBookTabs(); render(); toast('Pestaña borrada', [['Deshacer', doUndo]]); };
+    if (!(d.text || '').trim()) return drop();
+    return askChoice(x, `¿Borrar la pestaña «${esc(p.title)}»?`, 'Se borra lo que tiene escrito. Las otras pestañas no se tocan.', [{ label: 'Borrar la pestaña y su texto', danger: true, run: drop }]);
+  }
+  const t = e.target.closest('.bt');
+  if (t) switchPage(d, t.dataset.pg);
+});
+$('#ed-tabs')?.addEventListener('dblclick', (e) => {
+  const d = docById(curId), t = e.target.closest('.bt'); if (!d?.book || !t) return;
+  const p = d.pages.find((q) => q.id === t.dataset.pg), el = t.querySelector('.bt-t');
+  editInline(el, (v) => { if (v && v !== p.title) { snap(); p.title = v; save(); } renderBookTabs(); render(); }, true);
+});
 function fillHead() {
   const d = docById(curId); if (!d) return;
-  $('#ed-ico').textContent = '📄';
+  $('#ed-ico').textContent = d.book ? '📓' : '📄';
+  renderBookTabs();
   $('#ed-name').value = d.name;
   $('#ed-prev').hidden = !hist.length;
   renderCrumbs();
