@@ -2,6 +2,7 @@
 // that can sit on the plane and inside any document at once), frames, a stash at the bottom left, and a panel on the
 // right with every task, every idea and the history.
 import { createEditor, LINK_RE, TAG_RE, TOKEN_RE } from './editor.bundle.js';
+import { measure, flip, grow, EASE, DUR } from './motion.js';
 
 const PASTEL = ['#fff1b8', '#ffd9c2', '#f9d0e3', '#e3d9f7', '#cfe5fb', '#cdeedd', '#e4ebd3', '#eceef2'];
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -176,9 +177,15 @@ const frameHTML = (f) => `<div class="frame${sel.has(f.id) ? ' sel' : ''}" data-
   <div class="edge e-t"></div><div class="edge e-b"></div><div class="edge e-l"></div><div class="edge e-r"></div><div class="rs"></div></div>`;
 function itemHTML(it) {
   const k = it.kind === 'idea' ? 'i' : 't', uses = docsUsing(it).length;
+  if (!it.dock) {                                   // loose: a small circle with its icon; a click reads it
+    return `<div class="item circle ${it.kind}${it.done ? ' done' : ''}${sel.has(it.id) ? ' sel' : ''}" data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
+      <span class="cico">${it.kind === 'idea' ? '💡' : it.done ? '✔' : ''}</span>
+      <button class="x" title="${uses ? 'Quitar del plano (sigue en sus documentos)' : 'Borrar'}">×</button>
+      <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button>${ZB}</div>${PRS}</div>`;
+  }
   const lead = it.kind === 'idea' ? '<span class="iico">💡</span>' : `<button class="chk" title="${it.done ? 'Reabrir' : 'Hecha'}">${it.done ? '✔' : ''}</button>`;
-  return `<div class="item ${it.kind}${it.done ? ' done' : ''}${it.dock ? ' docked' : ''}${sel.has(it.id) ? ' sel' : ''}" data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
-    ${lead}<span class="itext">${esc(it.text) || '…'}</span>${uses ? `<span class="uses" title="Está en ${uses} documento${uses > 1 ? 's' : ''}">📄${uses}</span>` : ''}
+  return `<div class="item ${it.kind}${it.done ? ' done' : ''} docked${sel.has(it.id) ? ' sel' : ''}" data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
+    ${lead}<span class="itext">${esc(it.text) || '…'}</span>
     <button class="x" title="${uses ? 'Quitar del plano (sigue en sus documentos)' : 'Borrar'}">×</button>
     <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button>${ZB}</div>${PRS}</div>`;
 }
@@ -219,7 +226,9 @@ function addSignsToHosts() {
     el.insertAdjacentHTML('beforeend', html);
   }
 }
+let firstRender = true;
 function renderItems() {
+  const before = firstRender ? null : measure(world);
   peeked = []; clearTimeout(peekT);
   framesEl.innerHTML = [...S.frames].sort((a, b) => b.w * b.h - a.w * a.h).map(frameHTML).join('');
   itemsEl.innerHTML = S.docs.map((d, i) => (d.place === 'canvas' ? docHTML(d, i + 1) : '')).join('')
@@ -229,11 +238,14 @@ function renderItems() {
   S.signs = (S.signs || []).filter((g) => find(g.host));
   addSignsToHosts();
   layoutDocks();
+  layoutPins();
+  flip(world, before, (el) => S.view.z * (find(el.dataset.id)?.o.s || 1));
+  firstRender = false;
 }
 // ---- tasks docked under a document: stacked in order, as wide as the document, moving and scaling with it ----------
-const docked = (d) => S.tasks.filter((t) => t.onCanvas && t.dock === d.id).sort((a, b) => (a.dockAt ?? 0) - (b.dockAt ?? 0));
+const docked = (d) => [...S.ideas, ...S.tasks].filter((t) => t.onCanvas && t.dock === d.id).sort((a, b) => (a.dockAt ?? 0) - (b.dockAt ?? 0));
 function layoutDocks() {
-  for (const t of S.tasks) if (t.dock && !t.riding && !S.docs.some((d) => d.id === t.dock && d.place === 'canvas')) delete t.dock;
+  for (const t of [...S.ideas, ...S.tasks]) if (t.dock && !t.riding && !S.docs.some((d) => d.id === t.dock && d.place === 'canvas')) delete t.dock;
   for (const d of S.docs) {
     if (d.place !== 'canvas') continue;
     const list = docked(d); if (!list.length) continue;
@@ -246,6 +258,44 @@ function layoutDocks() {
       y += el.offsetHeight * sc + 6 * sc;
     });
   }
+}
+// ---- circles pinned to a thing: on a document's or post-it's left or right edge (centred on the line, spread around
+// its middle), or in a row right of a frame's tab. They move and scale with it; dragged away, they come loose. ------
+const pinnedTo = (id) => [...S.ideas, ...S.tasks].filter((t) => t.onCanvas && !t.dock && t.pin?.host === id);
+function layoutPins() {
+  for (const t of [...S.ideas, ...S.tasks]) if (t.pin && !t.riding && !find(t.pin.host)) delete t.pin;
+  const hosts = new Set([...S.ideas, ...S.tasks].filter((t) => t.pin && t.onCanvas && !t.riding).map((t) => t.pin.host));
+  for (const id of hosts) {
+    const f = find(id), hel = elOf(id); if (!f || !hel) continue;
+    const h = f.o, sc = f.k === 'f' ? 1 : h.s || 1;
+    for (const side of ['left', 'right', 'tab']) {
+      const list = pinnedTo(id).filter((t) => t.pin.side === side).sort((a, b) => (a.pin.at ?? 0) - (b.pin.at ?? 0));
+      list.forEach((t, i) => {
+        t.s = sc; const r = 19 * sc, gap = 44 * sc;
+        if (side === 'tab') {
+          const tab = hel.querySelector('.ftab'), tw = tab ? tab.offsetWidth : 90, th = tab ? tab.offsetHeight : 30;
+          t.x = Math.round(h.x + 16 + tw + 10 + i * gap); t.y = Math.round(h.y - th / 2 - r);
+        } else {
+          const [w, hh] = sizeOf(hel, h);
+          const cx = side === 'left' ? h.x : h.x + w, cy = h.y + hh / 2 + (i - (list.length - 1) / 2) * gap;
+          t.x = Math.round(cx - r); t.y = Math.round(cy - r);
+        }
+        t.z = Math.max(t.z || 0, (h.z || 0) + 1);
+        const el = elOf(t.id); if (!el) return;
+        Object.assign(el.style, { left: t.x + 'px', top: t.y + 'px', zIndex: t.z }); el.style.setProperty('--s', t.s);
+      });
+    }
+  }
+}
+// What a dropped circle pins to: the document, post-it or frame under the pointer (not itself).
+function pinTarget(it, e) {
+  const me = elOf(it.id);
+  const under = document.elementsFromPoint(e.clientX, e.clientY).map((x) => x.closest?.('[data-k]')).find((x) => x && x !== me && ['d', 'p', 'f'].includes(x.dataset.k));
+  if (!under) return null;
+  const k = under.dataset.k, r = under.getBoundingClientRect();
+  if (k === 'f') return { host: under.dataset.id, side: 'tab', at: 99 };
+  const side = e.clientX < r.left + r.width / 2 ? 'left' : 'right';
+  return { host: under.dataset.id, side, at: e.clientY };
 }
 // Where a dropped task docks: under a document, if it lands in the strip below it (or among the tasks already there).
 function dockTarget(t) {
@@ -438,10 +488,7 @@ function create(kind, w, inStash) {
   } else {
     const it = newItem(kind, '', { x: w.x - 90, y: w.y - 18 });
     sel.clear(); sel.add(it.id); save(); render();
-    editInline(elOf(it.id).querySelector('.itext'), (v) => {
-      if (!v) { listOf(kind).splice(listOf(kind).indexOf(it), 1); render(); save(); return; }
-      it.text = v; log('crear', `${kind === 'idea' ? 'Idea' : 'Tarea'} «${v}»`, { ref: it.id }); changed();
-    });
+    writeInline(it, true);
   }
 }
 
@@ -521,6 +568,69 @@ function dropSign(e) {
   openSign(g, true);
 }
 // The reader: a big panel over everything. Editing happens here too.
+function closeReader() {
+  const box = $('#reader'); if (!box.classList.contains('open') || box.classList.contains('closing')) return;
+  box.classList.add('closing');
+  setTimeout(() => { box.classList.remove('open', 'editing', 'closing', 'is-item'); box.onclose?.(); box.onclose = null; }, 200);
+}
+// An idea or a task in the reader: read it, edit it, tick it, delete it. «fresh»: just created, empty means it goes.
+function writeInline(it, fresh = false) {
+  const el = elOf(it.id); if (!el) return;
+  const w0 = el.offsetWidth;
+  el.classList.add('writing');
+  const span = document.createElement('span'); span.className = 'wtext'; span.contentEditable = 'true'; span.spellcheck = false;
+  span.textContent = it.text || '';
+  el.append(span); span.focus();
+  const r = document.createRange(); r.selectNodeContents(span); r.collapse(false); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(r);
+  grow(el, w0);
+  let done = false;
+  const finish = (ok) => {
+    if (done) return; done = true;
+    const v = span.textContent.replace(/\s+/g, ' ').trim();
+    if (fresh && (!v || !ok)) { listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1); render(); save(); return; }
+    if (ok && v && fresh) { it.text = v; log('crear', `${it.kind === 'idea' ? 'Idea' : 'Tarea'} «${v}»`, { ref: it.id }); changed(); return; }
+    if (ok && v && v !== it.text) return setItemText(it, v);
+    renderItems(); paintSel();
+  };
+  span.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+    e.stopPropagation();
+  });
+  span.addEventListener('input', () => { el.style.width = 'auto'; });
+  span.addEventListener('blur', () => finish(true), { once: true });
+}
+function openItem(it, editing = false, fresh = false) {
+  if (!it) return;
+  const box = $('#reader'), name = it.kind === 'idea' ? 'Idea' : 'Tarea';
+  const where = docsUsing(it).map((d) => `«${d.name}»`).join(', ');
+  box.classList.add('is-item');
+  box.querySelector('.rd-where').textContent = name + (it.kind === 'tarea' ? (it.done ? ' · hecha' : ' · pendiente') : '') + (where ? ` · en ${where}` : '');
+  box.querySelector('.rd-panel').style.setProperty('--sc', it.kind === 'idea' ? '#cdeedd' : '#cfe5fb');
+  const done = box.querySelector('[data-rd="done"]');
+  done.hidden = it.kind !== 'tarea'; done.textContent = it.done ? '↺ Reabrir' : '✔ Hecha';
+  const text = box.querySelector('.rd-text'), area = box.querySelector('.rd-edit');
+  area.placeholder = it.kind === 'idea' ? 'Escribe la idea… (Ctrl+Enter guarda)' : 'Escribe la tarea… (Ctrl+Enter guarda)';
+  const show = (ed) => { box.classList.toggle('editing', ed); text.textContent = it.text || 'Sin texto todavía.'; area.value = it.text || ''; if (ed) setTimeout(() => area.focus(), 30); };
+  const drop = () => { if (fresh && !it.text) { listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1); render(); save(); } };
+  box.onclose = drop;
+  const saveIt = () => {
+    const v = area.value.replace(/\s+$/, '');
+    if (fresh && !it.text && v) { it.text = v; log('crear', `${name} «${v}»`, { ref: it.id }); changed(); fresh = false; }
+    else setItemText(it, v);
+    show(false);
+  };
+  box.onclick = (e) => {
+    const a = e.target.closest('[data-rd]')?.dataset.rd;
+    if (e.target === box.querySelector('.rd-back') || a === 'close') closeReader();
+    else if (a === 'edit') show(true);
+    else if (a === 'save') saveIt();
+    else if (a === 'done') { toggleTask(it); done.textContent = it.done ? '↺ Reabrir' : '✔ Hecha'; box.querySelector('.rd-where').textContent = name + (it.done ? ' · hecha' : ' · pendiente'); }
+    else if (a === 'del') { box.onclose = null; closeReader(); removeIds([it.id]); }
+  };
+  area.onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) saveIt(); if (e.key === 'Escape') { e.stopPropagation(); if (area.value.trim() && area.value !== (it.text || '')) saveIt(); closeReader(); } };
+  box.classList.remove('closing'); box.classList.add('open'); show(editing);
+}
 function openSign(g, editing = false) {
   if (!g) return;
   const host = find(g.host)?.o;
@@ -543,8 +653,10 @@ function openSign(g, editing = false) {
     else if (a === 'del') { snap(); S.signs = S.signs.filter((x) => x !== g); save(); renderItems(); paintSel(); close(); toast('Etiqueta quitada', [['Deshacer', doUndo]]); }
   };
   area.onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) box.querySelector('[data-rd="save"]').click(); if (e.key === 'Escape') { e.stopPropagation(); if (!g.text && !area.value) { S.signs = S.signs.filter((x) => x !== g); save(); renderItems(); } close(); } };
-  const close = () => { box.classList.remove('open', 'editing'); };
-  box.classList.add('open'); show(editing);
+  const close = () => closeReader();
+  box.classList.remove('is-item'); box.onclose = null;
+  box.querySelector('[data-rd="done"]').hidden = true;
+  box.classList.remove('closing'); box.classList.add('open'); show(editing);
 }
 function setItemText(it, v) {
   if (v == null || v === it.text) return;
@@ -628,7 +740,7 @@ vp.addEventListener('pointerdown', (e) => {
     act = { k: 'sign', g: S.signs.find((x) => x.id === sgEl.dataset.sign), el: sgEl, sx: e.clientX, sy: e.clientY, moved: false };
     return;
   }
-  if (e.target.closest('.acts, .x, .pal, .chk, .f-add, [contenteditable="true"]')) return;
+  if (e.target.closest('.acts, .x, .pal, .chk, .f-add, .wtext, [contenteditable="true"]')) return;
   const it = e.target.closest('[data-k]');
   // pan: dragging the empty grid (the common thing), or middle/right button, or Space + drag; Ctrl + drag selects a group
   if (e.button === 1 || e.button === 2 || (e.button === 0 && (space || (!it && !e.ctrlKey && !e.metaKey)))) {
@@ -687,7 +799,7 @@ function collectMoving(alone) {
       if (cx > fr.x && cx < fr.x + fr.w && cy > fr.y && cy < fr.y + fr.h) add(el.dataset.id);
     }
   }
-  for (const m of [...out.values()]) if (m.k === 'd') for (const t of docked(m.o)) add(t.id);
+  for (const m of [...out.values()]) { if (m.k === 'd') for (const t of docked(m.o)) add(t.id); for (const t of pinnedTo(m.o.id)) add(t.id); }
   const boxes = [...itemsEl.querySelectorAll('[data-k]')].map((el) => {
     const { k, o } = find(el.dataset.id), [w, h] = sizeOf(el, o); return { id: o.id, k, x: o.x, y: o.y, w, h, z: o.z || 0 };
   });
@@ -788,10 +900,18 @@ addEventListener('pointerup', (e) => {
   else if (a.k === 'move' && a.moved) {
     const movedDocs = new Set(a.moving.filter((m) => m.k === 'd').map((m) => m.o.id));
     for (const m of a.moving) {
-      if (m.k !== 't' || !sel.has(m.o.id) || (m.o.dock && movedDocs.has(m.o.dock))) continue;
+      if ((m.k !== 't' && m.k !== 'i') || !sel.has(m.o.id) || (m.o.dock && movedDocs.has(m.o.dock))) continue;
       const tg = dockTarget(m.o);
-      if (tg) { tg.others.splice(tg.at, 0, m.o); tg.others.forEach((x, i) => { x.dock = tg.d.id; x.dockAt = i; }); }
-      else if (m.o.dock) { delete m.o.dock; delete m.o.dockAt; m.o.s = 1; }
+      if (tg) { delete m.o.pin; tg.others.splice(tg.at, 0, m.o); tg.others.forEach((x, i) => { x.dock = tg.d.id; x.dockAt = i; }); continue; }
+      if (m.o.dock) { delete m.o.dock; delete m.o.dockAt; m.o.s = 1; }
+      const pt = pinTarget(m.o, e);
+      if (pt) {
+        m.o.pin = pt;
+        // order on that side by where things were dropped
+        const list = pinnedTo(pt.host).filter((x) => x.pin.side === pt.side && x !== m.o);
+        const idx = pt.side === 'tab' ? list.length : list.filter((x) => (elOf(x.id)?.getBoundingClientRect().top ?? 0) + 19 < e.clientY).length;
+        list.splice(idx, 0, m.o); list.forEach((x, i) => { x.pin.at = i; });
+      } else if (m.o.pin) { delete m.o.pin; m.o.s = 1; }
     }
     const tray = trayAt;
     endFit(a, !!tray);
@@ -808,6 +928,8 @@ addEventListener('pointerup', (e) => {
     const f = find(a.id).o;                              // one click on a frame's or a document's title edits it
     if (a.kind === 'd') editInline(a.title, (v) => { if (v) { renameDoc(f, v); render(); } });
     else editInline(a.title, (v) => { if (v !== null) { f.title = v; save(); render(); } }, true);
+  } else if (a.k === 'move' && !a.toggle && (a.kind === 'i' || a.kind === 't')) {
+    openItem(find(a.id).o);                             // a click on an idea or a task reads it
   } else if (a.k === 'move' && !a.toggle) {
     clearTimeout(clickT); clickT = setTimeout(() => focusOn(a.id), 240);   // a click brings it close; a double click opens
   } else if (a.k === 'box') {
@@ -841,7 +963,7 @@ vp.addEventListener('dblclick', (e) => {
   const pt = e.target.closest('.postit');
   if (pt) return editPostit(find(pt.dataset.id).o);
   const itx = e.target.closest('.item');
-  if (itx) { const it = find(itx.dataset.id).o; return editInline(itx.querySelector('.itext'), (v) => setItemText(it, v)); }
+  if (itx) { const it = find(itx.dataset.id).o; return it.dock ? openItem(it, true) : writeInline(it); }
   const ft = e.target.closest('.ftab');
   if (ft) { const f = find(ft.closest('.frame').dataset.id).o; return editInline(ft.querySelector('.ftitle'), (v) => { if (v !== null) { f.title = v; save(); render(); } }, true); }
 });
@@ -1233,7 +1355,7 @@ function locate(it) {
 const typing = (e) => e.target.closest?.('input, textarea, select, [contenteditable="true"], .cm-editor');
 addEventListener('keydown', (e) => {
   document.body.classList.toggle('ctrl', e.ctrlKey || e.metaKey);
-  if ($('#reader').classList.contains('open')) { if (e.key === 'Escape') $('#reader').classList.remove('open', 'editing'); return; }
+  if ($('#reader').classList.contains('open')) { if (e.key === 'Escape') closeReader(); return; }
   if (edOpen()) { if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('.pop')) closeEditor(); return; }
   if (typing(e)) return;
   const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
