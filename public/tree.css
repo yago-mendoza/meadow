@@ -881,3 +881,46 @@ body.drag-hang .drop-on, body.drag-draw .drop-on { outline: 2px solid color-mix(
 .fr-pic .dw-th:hover { transform: scale(1.2); box-shadow: 0 0 0 1px rgba(60, 40, 70, .12), 0 4px 10px rgba(60, 40, 70, .18); }
 .fr.has-pic { margin-top: 64px; }
 .fr { z-index: 0; }   /* each frame its own layer, so a drawing tab tucks under its own frame (also nested ones) */
+/* choosing figures on the sheet */
+.dw-sels { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.dw-selb { position: absolute; border: 1.5px dashed #2f2735; border-radius: 3px; box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .8); }
+.dw-marq { position: absolute; border: 1.5px dashed var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 2px; }
+#dw-c.picking { cursor: default; }
+#draw [data-shape="select"] svg { fill: #fff; stroke: #4a3f4d; }
+.dw-center { display: flex; align-items: center; gap: 5px; margin-right: 6px; font: 600 12px "Segoe UI", sans-serif; color: #7a6f80; cursor: pointer; white-space: nowrap; }
+.dw-center input { accent-color: var(--accent); width: 15px; height: 15px; }
+
+/* a frame's drawing peeks out from behind it: its own rounded border, the frame's top edge running in front, nothing on hover */
+.fr-pic { bottom: calc(100% - 6px); padding: 5px 5px 10px; border-radius: 11px 11px 0 0; box-shadow: none;
+  border: 1.5px solid color-mix(in srgb, var(--bg) 75%, #6a5070 18%); border-bottom: 0; background: color-mix(in srgb, var(--bg) 60%, #fff); }
+.fr-pic .dw-th, .fr-pic .dw-th:hover { transform: none; box-shadow: 0 0 0 1px rgba(60, 40, 70, .07); position: static; }
+.fr.has-pic::before { content: ''; position: absolute; left: 10px; right: 10px; top: -1.5px; height: 1.5px; z-index: 1; pointer-events: none;
+  background: color-mix(in srgb, var(--bg) 75%, #6a5070 18%); }
+.fr.has-pic { margin-top: 60px; }
+/* the frame's edge runs in front of its drawing tab, only along the tab */
+.fr.has-pic::before { right: auto; left: 12px; width: 104px; }
+
+/* dragging something new from the bar above: where it can go glows softly */
+@keyframes can-go { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 22%, transparent); } }
+body.mk-frame #stage .grid, body.mk-frame #stage .fr-body,
+body.mk-doc #stage .grid, body.mk-doc #stage .fr-body, body.mk-doc #areas .ar-col,
+body.mk-idea #stage .fr, body.mk-idea #stage .dc, body.mk-idea #areas .ar-col,
+body.mk-tarea #stage .fr, body.mk-tarea #stage .dc, body.mk-tarea #areas .ar:not(.ar-doc),
+body.mk-dibujo #stage .fr, body.mk-dibujo #stage .dc { animation: can-go 1.4s ease-in-out infinite; outline: 1.5px dashed color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+body.drag-make #stage .grid { border-radius: 14px; }
+body.drag-make .drop-on { animation: none !important; outline: 2.5px solid var(--accent) !important; box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent) !important; }
+/* the frame's drawing is itself the tab: rounded on top, straight below, the frame's own thin edge, peeking from behind */
+.fr-pic { padding: 0; background: none; border: 0; border-radius: 0; bottom: calc(100% - 4px); }
+.fr-pic .dw-th, .fr-pic .dw-th:hover { width: 84px; height: 56px; border-radius: 10px 10px 0 0; box-shadow: none;
+  border: 1.5px solid color-mix(in srgb, var(--bg) 75%, #6a5070 18%); border-bottom: 0; display: block; }
+.fr.has-pic::before { left: 14px; width: 90px; }
+.fr.has-pic { margin-top: 56px; }
+/* settings */
+#settings { position: fixed; top: 60px; right: 60px; z-index: 90; min-width: 260px; padding: 10px 14px 12px; background: #fff; border-radius: 14px; border: 1px solid #e6dde9;
+  box-shadow: 0 12px 30px -10px rgba(60, 35, 70, .3); display: flex; flex-direction: column; gap: 8px; }
+#settings[hidden] { display: none; }
+.st-h { font: 700 11px "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #a397a5; }
+#settings label { display: flex; align-items: center; gap: 8px; font: 13px "Segoe UI", sans-serif; color: #4a3f4d; cursor: pointer; }
+#settings input { accent-color: var(--accent); width: 15px; height: 15px; }
+body.no-pics .fr-pic, body.no-pics .dw-th { display: none !important; }
+body.no-pics .fr.has-pic { margin-top: 0; } body.no-pics .fr.has-pic::before { display: none; }

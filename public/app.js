@@ -346,7 +346,7 @@ function renderAreas(peek) {
   }
   const btn = (k, i) => { const a = nd(k), g = isGroup(a); if (a.kind === 'doc') return `<div role="button" tabindex="0" class="ar ar-doc sheet" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Clic: abrirlo · doble clic: renombrar"><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el documento o guardarlo en el cajón">×</b></div>`; return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
-  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}" data-pid="${c.pid}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b>${nb(k)}</span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.filter((k) => nd(k).kind !== 'doc').map(btn).join('')}${c.ids.some((k) => nd(k).kind === 'doc') ? `<div class="ar-docs">${c.ids.filter((k) => nd(k).kind === 'doc').map(btn).join('')}</div>` : ''}${S.ideas.filter((x) => x.at === c.pid).map((x) => `<div class="ar-idea st-${stOf(x)}" data-it="${x.id}" data-drag="item:${x.id}" title="Idea · clic para abrirla"><span>💡</span><span class="ar-t">${esc(x.text || '…')}</span></div>`).join('')}<span class="ar-adds"><button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button><button class="ar-addidea" data-pid="${c.pid}" title="Una idea en esta columna (sobre cómo organizar esto)">＋💡</button></span>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
+  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}" data-pid="${c.pid}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b>${nb(k)}</span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.filter((k) => nd(k).kind !== 'doc').map(btn).join('')}${c.ids.some((k) => nd(k).kind === 'doc') ? `<div class="ar-docs">${c.ids.filter((k) => nd(k).kind === 'doc').map(btn).join('')}</div>` : ''}${S.ideas.filter((x) => x.at === c.pid).map((x) => `<div class="ar-idea st-${stOf(x)}" data-it="${x.id}" data-drag="item:${x.id}" title="Idea · clic para abrirla"><span>💡</span><span class="ar-t">${esc(x.text || '…')}</span></div>`).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; paintHov(); }   // unchanged: leave it (keeps hover, double clicks)
   arPids = cols.map((c) => c.pid);
   if (!peek) document.documentElement.style.setProperty('--areas-w', (cols.length - 1) * 48 + 172 + 'px');   // folded strips + the open column, whatever is hovered
@@ -519,7 +519,7 @@ addEventListener('pointermove', (e) => {
   if (!drag.on) {
     if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
     drag.on = true; drag.src = srcOf(drag.key);
-    ghost.textContent = labelOf(drag.src); ghost.classList.add('on'); document.body.classList.add('dragging'); if (drag.src.item || drag.src.make === 'idea' || drag.src.make === 'tarea') document.body.classList.add('drag-hang');
+    ghost.textContent = labelOf(drag.src); ghost.classList.add('on'); document.body.classList.add('dragging'); if (drag.src.make) document.body.classList.add('drag-make', 'mk-' + drag.src.make); if (drag.src.item || drag.src.make === 'idea' || drag.src.make === 'tarea') document.body.classList.add('drag-hang');
     if (drag.src.make === 'dibujo') document.body.classList.add('drag-draw');
     drag.el.classList.add('lifted'); $('#drawer').classList.add('near');
   }
@@ -532,7 +532,7 @@ addEventListener('pointerup', () => {
   const d = drag; drag = null;
   if (!d.on) return;
   justDragged = true; setTimeout(() => { justDragged = false; }, 0);
-  ghost.classList.remove('on'); document.body.classList.remove('dragging', 'drag-hang', 'drag-draw'); d.el.classList.remove('lifted'); $('#drawer').classList.remove('near');
+  ghost.classList.remove('on'); document.body.classList.remove('dragging', 'drag-hang', 'drag-draw', 'drag-make', 'mk-frame', 'mk-doc', 'mk-idea', 'mk-tarea', 'mk-dibujo'); d.el.classList.remove('lifted'); $('#drawer').classList.remove('near');
   paintTarget(null);
   if (d.t?.ok) drop(d.src, d.t);
 });
@@ -804,9 +804,25 @@ function itemClick(id, el) {
 function setItemText(it, v) {
   if (v == null) return;
   snap();
-  if (!v) { if (docsUsing(it).length) it.at = null; else listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1); toast('Quitada', [['Deshacer', doUndo]]); }
+  if (!v) { dropItem(it); toast('Quitada', [['Deshacer', doUndo]]); }
   else it.text = v;
   save(); renderAll(); ed?.refresh?.();
+}
+// removing an idea or a task takes it out everywhere: its list, where it hung and its line in any text
+function dropItem(it) {
+  const tok = token(it);
+  for (const n of Object.values(S.nodes)) if (n.kind === 'dtab' && (n.text || '').includes(tok)) {
+    const out = [];
+    for (const l of n.text.split('\n')) {
+      if (!l.includes(tok)) { out.push(l); continue; }
+      const rest = l.split(tok).join('').replace(/[ \t]{2,}/g, ' ').replace(/\s+$/, '');
+      if (rest.trim() || !l.trim().startsWith(tok)) out.push(rest);    // a line that was only the chip goes away
+    }
+    n.text = out.join('\n');
+    if (n.id === curTab && ed) ed.replaceText(n.text);
+  }
+  const L = listOf(it.kind), i = L.indexOf(it); if (i >= 0) L.splice(i, 1);
+  for (const t of S.tasks) if (t.blockedBy?.includes(it.id)) t.blockedBy = t.blockedBy.filter((x) => x !== it.id);
 }
 function toggleTask(it) { if (!it) return; if (stOf(it) === 'bloqueada' && activeBlockers(it).length) return toast('La bloquean tareas sin hacer'); snap(); setState(it, it.done ? 'pendiente' : 'hecha'); save(); renderAll(); ed?.refresh?.(); if (taskOpen) paintTask(); }
 // Deleting asks when there is something inside; «al cajón» keeps it aside
@@ -940,7 +956,7 @@ peekBox.addEventListener('click', (e) => {
   const it = [...S.ideas, ...S.tasks].find((x) => x.id === peekBox.dataset.id); if (!it) return;
   if (bt.dataset.ip === 'done') { toggleTask(it); const el = $(`.it[data-it="${it.id}"]`); return el ? showPeek(el) : hidePeek(); }
   peekBox.classList.remove('on');
-  snap(); if (docsUsing(it).length) it.at = null; else listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);
+  snap(); dropItem(it);
   save(); renderAll(); ed?.refresh?.(); toast('Quitada', [['Deshacer', doUndo]]);
 });
 
@@ -1087,7 +1103,7 @@ $('#task').addEventListener('click', (e) => {
   const gd = t.closest('[data-go-doc]'); if (gd) { closeTask(); return openDoc(gd.dataset.goDoc); }
   if (t.closest('.tk-rm')) {
     taskOpen = null; $('#task').hidden = true;
-    snap(); if (docsUsing(it).length) it.at = null; else listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);
+    snap(); dropItem(it);
     save(); renderAll(); ed?.refresh?.(); return toast(it.kind === 'idea' ? 'Idea quitada' : 'Tarea quitada', [['Deshacer', doUndo]]);
   }
 });
@@ -1220,7 +1236,7 @@ const DW_COLORS = {
   left: ['#2f2735', '#3d5a80', '#7a2e3a', '#2e6b4a', '#8a5a2b', '#6b6670'],
   right: ['#e0607e', '#f0954a', '#e8c547', '#56b37f', '#4a9fd8', '#8f78d6'],
 };
-const DW_SHAPES = [['rect', 'Rectángulo'], ['ellipse', 'Círculo'], ['tri', 'Triángulo'], ['diamond', 'Rombo'], ['line', 'Línea']];
+const DW_SHAPES = [['select', 'Elegir y mover: clic en una figura o una caja alrededor; arrástralas; Ctrl+C / Ctrl+V; Supr'], ['rect', 'Rectángulo'], ['ellipse', 'Círculo'], ['tri', 'Triángulo'], ['diamond', 'Rombo'], ['line', 'Línea']];
 const drawsAt = (id) => (S.drawings || []).filter((d) => d.at === id);
 const darker = (hex, k = 0.72) => { const n = parseInt(hex.slice(1), 16); const c = (v) => Math.round(v * k).toString(16).padStart(2, '0'); return '#' + c(n >> 16) + c((n >> 8) & 255) + c(n & 255); };
 // is a point inside a figure (in sheet units)
@@ -1265,17 +1281,17 @@ const thumbs = (id) => drawsAt(id).map((d) => `<img class="dw-th" data-draw="${d
 // the sheet
 let dwOpen = null, dwColor = DW_COLORS.top[4], dwShape = 'rect', dwSnapped = false, dwHollow = false;
 const dwNow = () => (S.drawings || []).find((d) => d.id === dwOpen);
-const shapeIco = (t) => `<svg viewBox="0 0 20 20" width="18" height="18">${{ rect: '<rect x="3" y="5" width="14" height="10"/>', ellipse: '<circle cx="10" cy="10" r="7"/>', tri: '<path d="M10 3 L17 16 L3 16 Z"/>', diamond: '<path d="M10 2 L18 10 L10 18 L2 10 Z"/>', line: '<path d="M3 17 L17 3" stroke-width="2.4" fill="none"/>' }[t]}</svg>`;
+const shapeIco = (t) => `<svg viewBox="0 0 20 20" width="18" height="18">${{ rect: '<rect x="3" y="5" width="14" height="10"/>', ellipse: '<circle cx="10" cy="10" r="7"/>', tri: '<path d="M10 3 L17 16 L3 16 Z"/>', diamond: '<path d="M10 2 L18 10 L10 18 L2 10 Z"/>', line: '<path d="M3 17 L17 3" stroke-width="2.4" fill="none"/>', select: '<path d="M5 3 L15 11 L10.5 11.6 L13 17 L11 18 L8.6 12.6 L5 15.5 Z" stroke-width="1"/>' }[t]}</svg>`;
 function openDrawing(d) {
   if (!d) return;
-  dwOpen = d.id; dwSnapped = false;
+  dwOpen = d.id; dwSnapped = false; dwHist = []; dwSel = new Set();
   const box = $('#draw');
   box.querySelector('.dw-top').innerHTML = DW_COLORS.top.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
   box.querySelector('.dw-left').innerHTML = DW_COLORS.left.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
   box.querySelector('.dw-right').innerHTML = DW_COLORS.right.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
   box.querySelector('.dw-shapes').innerHTML = DW_SHAPES.map(([t, name]) => `<b data-shape="${t}" title="${name}">${shapeIco(t)}</b>`).join('') + '<span class="dw-sep"></span><b data-fill="1" title="Rellena"><i class="dw-fill"></i></b><b data-fill="0" title="Solo el borde"><i class="dw-hollow"></i></b>';
   box.querySelector('.dw-where').textContent = nestPath(d.at) || '';
-  box.hidden = false; dwPaint(); dwPickColor(dwColor); dwPickShape(dwShape); dwPickFill(dwHollow);
+  box.hidden = false; box.querySelector('.dw-center input').checked = d.center !== false; dwPaint(); dwPickColor(dwColor); dwPickShape(dwShape); dwPickFill(dwHollow);
   box.querySelector('.dw-in').animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
 }
 function closeDrawing() {
@@ -1287,13 +1303,40 @@ function closeDrawing() {
 function dwPaint(preview) {
   const d = dwNow(); if (!d) return;
   paintShapes($('#dw-c').getContext('2d'), preview ? [...d.shapes.map((s) => ({ ...s })), preview] : d.shapes, d.base || 192);
+  dwPaintSel();
 }
-function dwPickColor(c) { dwColor = c; for (const el of document.querySelectorAll('#draw [data-col]')) el.classList.toggle('on', el.dataset.col === c); dwBrush(); for (const el of document.querySelectorAll('#draw [data-shape]')) el.style.color = c; }
-function dwBrush() { const b = $('#draw .dw-cur'); b.innerHTML = shapeIco(dwShape); b.style.color = dwColor; b.classList.toggle('hollow', dwHollow); }
-function dwPickFill(h) { dwHollow = h; for (const el of document.querySelectorAll('#draw [data-fill]')) el.classList.toggle('on', (el.dataset.fill === '0') === h); dwBrush(); }
-function dwPickShape(t) { dwShape = t; for (const el of document.querySelectorAll('#draw [data-shape]')) el.classList.toggle('on', el.dataset.shape === t); dwBrush(); }
-function dwEdit(fn) { if (!dwSnapped) { snap(); dwSnapped = true; } fn(); const d = dwNow(); d.v = (d.v || 0) + 1; save(); dwPaint(); }
-// colours and figures are taken by passing over them, no click
+function dwPickColor(c) {
+  dwColor = c; for (const el of document.querySelectorAll('#draw [data-col]')) el.classList.toggle('on', el.dataset.col === c); dwBrush();
+  for (const el of document.querySelectorAll('#draw [data-shape]')) el.style.color = el.dataset.shape === 'select' ? '' : c;
+  const d = dwNow(); if (d && dwShape === 'select' && dwSel.size) dwEdit(() => dwSel.forEach((i) => { if (d.shapes[i]) d.shapes[i].c = c; }));   // recolour what is chosen
+}
+function dwBrush() { const b = $('#draw .dw-cur'); b.innerHTML = shapeIco(dwShape); b.style.color = dwShape === 'select' ? '#4a3f4d' : dwColor; b.classList.toggle('hollow', dwHollow && dwShape !== 'select'); }
+function dwPickFill(h) {
+  dwHollow = h; for (const el of document.querySelectorAll('#draw [data-fill]')) el.classList.toggle('on', (el.dataset.fill === '0') === h); dwBrush();
+  const d = dwNow(); if (d && dwShape === 'select' && dwSel.size) dwEdit(() => dwSel.forEach((i) => { const s = d.shapes[i]; if (s && s.t !== 'line' && s.t !== 'path') s.hollow = h || undefined; }));
+}
+function dwPickShape(t) {
+  dwShape = t; for (const el of document.querySelectorAll('#draw [data-shape]')) el.classList.toggle('on', el.dataset.shape === t); dwBrush();
+  $('#dw-c').classList.toggle('picking', t === 'select'); if (t !== 'select') { dwSel.clear(); dwPaintSel(); }
+}
+// every change is kept, so «Deshacer» / Ctrl+Z goes back one step (adding, moving, pasting, deleting…)
+let dwHist = [];
+function dwEdit(fn) {
+  if (!dwSnapped) { snap(); dwSnapped = true; }
+  const d = dwNow(); dwHist.push(JSON.stringify(d.shapes)); if (dwHist.length > 80) dwHist.shift();
+  fn(); if (d.center !== false) dwCenter(d); d.v = (d.v || 0) + 1; save(); dwPaint();
+}
+// «Centrado» (on unless unticked): the whole drawing sits in the middle of the sheet, both ways
+function dwCenter(d) {
+  if (!d.shapes.length) return;
+  const base = d.base || 192, k = base / DW_W, W = base, H = base * DW_H / DW_W;
+  const bs = d.shapes.map(sBox), x0 = Math.min(...bs.map((b) => b.x)), y0 = Math.min(...bs.map((b) => b.y)), x1 = Math.max(...bs.map((b) => b.x + b.w)), y1 = Math.max(...bs.map((b) => b.y + b.h));
+  const dx = Math.round(((W - (x1 - x0)) / 2 - x0) / k) * k, dy = Math.round(((H - (y1 - y0)) / 2 - y0) / k) * k;
+  if (dx || dy) d.shapes.forEach((s) => moveShape(s, dx, dy));
+}
+$('#draw').addEventListener('change', (e) => { if (!e.target.closest('.dw-center')) return; const d = dwNow(); if (!d) return; d.center = e.target.checked; if (d.center) dwEdit(() => {}); else save(); });
+function dwUndo() { const d = dwNow(); if (!d || !dwHist.length) return; d.shapes = JSON.parse(dwHist.pop()); dwSel.clear(); d.v = (d.v || 0) + 1; save(); dwPaint(); }
+// colours, figures, filled/outline and the pointer are taken by passing over them, no click
 let dwHoverT = null;
 $('#draw').addEventListener('pointerover', (e) => {
   const sw = e.target.closest('[data-col]'), sh = e.target.closest('[data-shape]'); clearTimeout(dwHoverT);
@@ -1301,9 +1344,35 @@ $('#draw').addEventListener('pointerover', (e) => {
   if (sh) dwHoverT = setTimeout(() => dwPickShape(sh.dataset.shape), 90);
   const fl = e.target.closest('[data-fill]'); if (fl) dwHoverT = setTimeout(() => dwPickFill(fl.dataset.fill === '0'), 90);
 });
-// a figure is put on the sheet by dragging its box (a line: from where you press to where you let go)
+
+// ---- choosing figures on the sheet: click one, drag a box around several, then move, copy, paste, delete ----
+let dwSel = new Set(), dwClip = [];
+const sBox = (s) => {
+  if (s.t === 'line') return { x: Math.min(s.x1, s.x2), y: Math.min(s.y1, s.y2), w: Math.abs(s.x2 - s.x1), h: Math.abs(s.y2 - s.y1) };
+  if (s.t === 'path') { const xs = s.pts.map((p) => p[0]), ys = s.pts.map((p) => p[1]); return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }; }
+  return { x: s.x, y: s.y, w: s.w, h: s.h };
+};
+const moveShape = (s, dx, dy) => {
+  if (s.t === 'line') { s.x1 += dx; s.x2 += dx; s.y1 += dy; s.y2 += dy; }
+  else if (s.t === 'path') s.pts = s.pts.map(([x, y]) => [x + dx, y + dy]);
+  else { s.x += dx; s.y += dy; }
+};
+function hitShape(d, x, y, k) {
+  for (let i = d.shapes.length - 1; i >= 0; i--) {
+    const s = d.shapes[i], b = sBox(s);
+    if (s.t === 'line' ? segDist(x, y, s.x1, s.y1, s.x2, s.y2) <= 2.5 * k : x >= b.x - k && x <= b.x + b.w + k && y >= b.y - k && y <= b.y + b.h + k) return i;
+  }
+  return -1;
+}
+function dwPaintSel(box) {   // dashed boxes over what is chosen (and the box being dragged), drawn above the pixels
+  const d = dwNow(), host = $('#draw .dw-sels'); if (!d || !host) return;
+  const r = $('#dw-c').getBoundingClientRect(), cw = r.width / DW_W, k = (d.base || 192) / DW_W;
+  const div = (b, cls) => `<i class="${cls}" style="left:${b.x / k * cw - 3}px;top:${b.y / k * cw - 3}px;width:${b.w / k * cw + 6}px;height:${b.h / k * cw + 6}px"></i>`;
+  host.innerHTML = [...dwSel].filter((i) => d.shapes[i]).map((i) => div(sBox(d.shapes[i]), 'dw-selb')).join('') + (box ? div(box, 'dw-marq') : '');
+}
 $('#dw-c').addEventListener('pointermove', (e) => {
   const r = e.currentTarget.getBoundingClientRect(), px = $('#draw .dw-px'), cw = r.width / DW_W;
+  if (dwShape === 'select') { px.hidden = true; return; }
   const gx = Math.floor((e.clientX - r.left) / cw), gy = Math.floor((e.clientY - r.top) / cw);
   Object.assign(px.style, { left: gx * cw + 'px', top: gy * cw + 'px', width: cw + 'px', height: cw + 'px', background: dwColor }); px.hidden = false;
 });
@@ -1313,33 +1382,69 @@ $('#dw-c').addEventListener('pointerdown', (e) => {
   const c = e.currentTarget, r = c.getBoundingClientRect(), k = (d.base || 192) / DW_W;   // figures are kept in the drawing's own units
   const at = (ev) => [Math.max(0, Math.min(DW_W, Math.round((ev.clientX - r.left) * DW_W / r.width))), Math.max(0, Math.min(DW_H, Math.round((ev.clientY - r.top) * DW_H / r.height)))];
   const p0 = at(e); c.setPointerCapture(e.pointerId);
-  const fig = (p1) => {
-    if (dwShape === 'line') return { t: 'line', x1: p0[0] * k, y1: p0[1] * k, x2: p1[0] * k, y2: p1[1] * k, c: dwColor };
-    const x = Math.min(p0[0], p1[0]), y = Math.min(p0[1], p1[1]);
-    return { t: dwShape, hollow: dwHollow || undefined, x: x * k, y: y * k, w: Math.abs(p1[0] - p0[0]) * k, h: Math.abs(p1[1] - p0[1]) * k, c: dwColor };
-  };
-  let last = p0;
-  const mv = (ev) => { last = at(ev); dwPaint(fig(last)); };
-  const up = () => {
-    c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', up);
-    const s = fig(last), big = s.t === 'line' ? Math.hypot(s.x2 - s.x1, s.y2 - s.y1) >= k : s.w >= k && s.h >= k;
-    if (!big) return dwPaint();
-    dwEdit(() => dwNow().shapes.push(s));
-  };
-  c.addEventListener('pointermove', mv); c.addEventListener('pointerup', up);
+  let mv, up;
+  if (dwShape === 'select') {
+    const i = hitShape(d, p0[0] * k, p0[1] * k, k), add = e.shiftKey || e.ctrlKey || e.metaKey;
+    if (i >= 0) {                                       // on a figure: choose it and drag what is chosen
+      if (!dwSel.has(i)) { if (!add) dwSel.clear(); dwSel.add(i); } else if (add) { dwSel.delete(i); return dwPaint(); }
+      const orig = new Map([...dwSel].map((j) => [j, JSON.stringify(d.shapes[j])])), before = JSON.stringify(d.shapes);
+      let moved = false;
+      mv = (ev) => { const p = at(ev), dx = (p[0] - p0[0]) * k, dy = (p[1] - p0[1]) * k; if (!dx && !dy && !moved) return; moved = true;
+        for (const [j, o] of orig) { const s = JSON.parse(o); moveShape(s, dx, dy); d.shapes[j] = s; } dwPaint(); };
+      up = () => { if (moved) { const after = d.shapes; d.shapes = JSON.parse(before); dwEdit(() => { d.shapes = after; }); } else dwPaint(); };
+    } else {                                            // on the empty sheet: a box chooses what it touches
+      if (!add) dwSel.clear();
+      const box = (p) => ({ x: Math.min(p0[0], p[0]) * k, y: Math.min(p0[1], p[1]) * k, w: Math.abs(p[0] - p0[0]) * k, h: Math.abs(p[1] - p0[1]) * k });
+      let last = p0;
+      mv = (ev) => { last = at(ev); dwPaintSel(box(last)); };
+      up = () => { const b = box(last); d.shapes.forEach((s, j) => { const q = sBox(s); if (q.x <= b.x + b.w && q.x + q.w >= b.x && q.y <= b.y + b.h && q.y + q.h >= b.y && (b.w || b.h)) dwSel.add(j); }); dwPaint(); };
+    }
+  } else {
+    // a figure is put on the sheet by dragging its box (a line: from where you press to where you let go)
+    const fig = (p1) => {
+      if (dwShape === 'line') return { t: 'line', x1: p0[0] * k, y1: p0[1] * k, x2: p1[0] * k, y2: p1[1] * k, c: dwColor };
+      const x = Math.min(p0[0], p1[0]), y = Math.min(p0[1], p1[1]);
+      return { t: dwShape, hollow: dwHollow || undefined, x: x * k, y: y * k, w: Math.abs(p1[0] - p0[0]) * k, h: Math.abs(p1[1] - p0[1]) * k, c: dwColor };
+    };
+    let last = p0;
+    mv = (ev) => { last = at(ev); dwPaint(fig(last)); };
+    up = () => {
+      const s = fig(last), big = s.t === 'line' ? Math.hypot(s.x2 - s.x1, s.y2 - s.y1) >= k : s.w >= k && s.h >= k;
+      if (!big) return dwPaint();
+      dwEdit(() => dwNow().shapes.push(s));
+    };
+  }
+  const end = () => { c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', end); up(); };
+  c.addEventListener('pointermove', mv); c.addEventListener('pointerup', end);
 });
 $('#draw').addEventListener('click', (e) => {
   const d = dwNow(); if (!d) return; const t = e.target;
   if (t === $('#draw') || t.closest('.dw-close')) return closeDrawing();
-  if (t.closest('.dw-undo')) return d.shapes.length && dwEdit(() => d.shapes.pop());
-  if (t.closest('.dw-clear')) return d.shapes.length && dwEdit(() => { d.shapes = []; });
+  if (t.closest('.dw-undo')) return dwUndo();
+  if (t.closest('.dw-clear')) return d.shapes.length && dwEdit(() => { d.shapes = []; dwSel.clear(); });
   if (t.closest('.dw-rm')) { dwOpen = null; $('#draw').hidden = true; snap(); S.drawings.splice(S.drawings.indexOf(d), 1); save(); renderAll(); return toast('Dibujo quitado', [['Deshacer', doUndo]]); }
 });
 addEventListener('keydown', (e) => {
   if (!dwOpen) return;
-  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeDrawing(); }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.stopPropagation(); const d = dwNow(); if (d.shapes.length) dwEdit(() => d.shapes.pop()); }
+  const d = dwNow(), ctrl = e.ctrlKey || e.metaKey, key = e.key.toLowerCase(), k = (d.base || 192) / DW_W;
+  const stop = () => { e.preventDefault(); e.stopPropagation(); };
+  if (e.key === 'Escape') { stop(); if (dwSel.size) { dwSel.clear(); return dwPaint(); } return closeDrawing(); }
+  if (ctrl && key === 'z') { stop(); return dwUndo(); }
+  if (ctrl && key === 'a') { stop(); dwPickShape('select'); d.shapes.forEach((s, i) => dwSel.add(i)); return dwPaint(); }
+  if (ctrl && key === 'c' && dwSel.size) { stop(); dwClip = [...dwSel].sort((a, b) => a - b).map((i) => JSON.stringify(d.shapes[i])); dwClipK = k; return toast(dwClip.length === 1 ? 'Figura copiada' : `${dwClip.length} figuras copiadas`); }
+  if (ctrl && key === 'x' && dwSel.size) { stop(); dwClip = [...dwSel].sort((a, b) => a - b).map((i) => JSON.stringify(d.shapes[i])); dwClipK = k; const out = new Set(dwSel); dwSel.clear(); return dwEdit(() => { d.shapes = d.shapes.filter((s, i) => !out.has(i)); }); }
+  if (ctrl && key === 'v' && dwClip.length) {          // pasted a little to the right and down, chosen, ready to drag
+    stop(); dwPickShape('select');
+    const f = k / dwClipK, step = 6 * k;
+    dwEdit(() => { dwSel.clear(); for (const o of dwClip) { const s = JSON.parse(o); for (const p of ['x', 'y', 'w', 'h', 'x1', 'y1', 'x2', 'y2']) if (s[p] != null) s[p] *= f; if (s.pts) s.pts = s.pts.map(([x, y]) => [x * f, y * f]); moveShape(s, step, step); d.shapes.push(s); dwSel.add(d.shapes.length - 1); } });
+    dwClip = [...dwSel].map((i) => JSON.stringify(d.shapes[i])); dwClipK = k;                    // pasting again goes further
+    return;
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && dwSel.size) { stop(); const out = new Set(dwSel); dwSel.clear(); return dwEdit(() => { d.shapes = d.shapes.filter((s, i) => !out.has(i)); }); }
+  const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (arrows[e.key] && dwSel.size) { stop(); const [ax, ay] = arrows[e.key], n = e.shiftKey ? 5 : 1; return dwEdit(() => dwSel.forEach((i) => moveShape(d.shapes[i], ax * n * k, ay * n * k))); }
 }, true);
+let dwClipK = 1;
 // a new drawing, on the container it was dropped on (only frames and documents)
 function newDrawing(at) {
   let n = nd(at); if (n?.kind === 'ftab') n = parent(at); if (n?.kind === 'dtab') n = parent(at);
@@ -1349,6 +1454,14 @@ function newDrawing(at) {
   S.drawings.push(d); save(); renderAll(); openDrawing(d);
 }
 addEventListener('click', (e) => { const th = e.target.closest('.dw-th'); if (!th || selMode) return; e.preventDefault(); e.stopPropagation(); openDrawing((S.drawings || []).find((d) => d.id === th.dataset.draw)); }, true);
+
+// ---- settings (kept on this computer) ----
+const SET = Object.assign({ pics: true }, JSON.parse(localStorage.getItem('meadow.set') || '{}'));
+function applySet() { document.body.classList.toggle('no-pics', !SET.pics); for (const el of document.querySelectorAll('#settings [data-set]')) el.checked = !!SET[el.dataset.set]; }
+$('#set-btn').onclick = (e) => { e.stopPropagation(); $('#settings').hidden = !$('#settings').hidden; applySet(); };
+$('#settings').addEventListener('change', (e) => { const k = e.target.dataset.set; if (!k) return; SET[k] = e.target.checked; localStorage.setItem('meadow.set', JSON.stringify(SET)); applySet(); });
+addEventListener('pointerdown', (e) => { if (!e.target.closest('#settings, #set-btn')) $('#settings').hidden = true; }, true);
+applySet();
 
 // ---- the editor: a document, its tabs (pages), the writing ----------------------------------------------------------
 let ed = null, cur = null, curTab = null;
