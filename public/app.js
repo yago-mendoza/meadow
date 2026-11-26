@@ -268,9 +268,27 @@ function dockTarget(t) {
 const TRAY_COLORS = ['#f6c1d6', '#bfdcf7', '#c6ead2', '#f8dca8', '#d9ccf3', '#f3c9b8'];
 const MAX_TRAYS = 4;
 let traysShown = localStorage.getItem('meadow.trays') === 'shown';
-function showTrays(on) { traysShown = on; localStorage.setItem('meadow.trays', on ? 'shown' : 'tucked'); stash.classList.toggle('tucked', !on); }
+function showTrays(on) { traysShown = on; localStorage.setItem('meadow.trays', on ? 'shown' : 'tucked'); stash.classList.toggle('tucked', !on); sizeSkin(true); }
+// The shape takes the size of what it shows: the chest when tucked, the open drawers otherwise.
+function sizeSkin(animate = true) {
+  const skin = stash.querySelector('.st-skin'); if (!skin) return;
+  const open = !stash.classList.contains('tucked') || stash.classList.contains('dragopen');
+  const tgt = stash.querySelector(open ? '.st-open' : '.st-chest');
+  const w = tgt.offsetWidth, h = tgt.offsetHeight;
+  skin.classList.toggle('is-open', open);
+  if (!animate) { skin.style.transition = 'none'; skin.style.width = w + 'px'; skin.style.height = h + 'px'; skin.offsetHeight; skin.style.transition = ''; return; }
+  skin.style.width = w + 'px'; skin.style.height = h + 'px';
+}
+// While open, the shape follows its drawers when one opens or closes inside it.
+new ResizeObserver(() => {
+  const skin = stash.querySelector('.st-skin'); if (!skin || !skin.classList.contains('is-open')) return;
+  const o = stash.querySelector('.st-open'); skin.style.transition = 'none'; skin.style.height = o.offsetHeight + 'px'; skin.style.width = o.offsetWidth + 'px';
+  requestAnimationFrame(() => { skin.style.transition = ''; });
+}).observe(stash);
+// A click anywhere else puts them away again (when you opened them).
+addEventListener('pointerdown', (e) => { if (traysShown && !e.target.closest('#stash, #ed, #reader')) showTrays(false); }, true);
 // while a document is dragged the trays come out by themselves, and go back when it is dropped
-const dragTrays = (on) => stash.classList.toggle('dragopen', on);
+const dragTrays = (on) => { if (stash.classList.contains('dragopen') === on) return; stash.classList.toggle('dragopen', on); sizeSkin(true); };
 function nearTrays(e) {
   if (stash.classList.contains('dragopen')) {
     const r = stash.getBoundingClientRect();
@@ -294,15 +312,16 @@ function renderStash() {
   const total = S.docs.filter((d) => d.place === 'stash').length;
   const pill = `<button class="t-pill" title="Abrir los cajones"><span class="cab">${S.trays.map((t) => {
     const n = S.docs.filter((d) => d.place === 'stash' && trayOf(d) === t).length;
-    return `<span class="drw" style="--t:${t.color}"><i class="hdl"></i><b>${n || ''}</b></span>`; }).join('')}</span><span class="cab-l">Cajones</span></button>`;
+    return `<span class="drw" data-tray="${t.id}" style="--t:${t.color}" title="${esc(t.name)}"><i class="hdl"></i><b>${n || ''}</b></span>`; }).join('')}</span></button>`;
   const tools = `<div class="t-tools" style="--i:${S.trays.length};--n:${S.trays.length}">${S.trays.length < MAX_TRAYS ? '<button class="t-add" title="Nuevo cajón">＋</button>' : ''}
     <button class="t-hide" title="Cerrar los cajones (Esc)">▾ Recoger</button></div>`;
-  stash.innerHTML = `<div class="t-pillwrap"><div>${pill}</div></div><div class="t-stack"><div class="t-stack-in">${html}${tools}</div></div>`;
+  stash.innerHTML = `<div class="st-skin"><div class="st-chest">${pill}</div><div class="st-open">${tools}<div class="st-trays">${html}</div></div></div>`;
   stash.classList.toggle('tucked', !traysShown);
   stash.dataset.total = total;
   // never over the tools: the trays get the height left under the sidebar
   const side = $('#side').getBoundingClientRect();
   stash.style.maxHeight = Math.max(160, innerHeight - side.bottom - 26) + 'px';
+  sizeSkin(false);
 }
 // Which tray is under the pointer (its id), or null.
 function overStash(e) {
@@ -711,6 +730,7 @@ addEventListener('pointermove', (e) => {
     if (act.moving.some((m) => m.k === 'd')) dragTrays(nearTrays(e));
     const dx = (e.clientX - act.sx) / z, dy = (e.clientY - act.sy) / z;
     for (const m of act.moving) { m.o.x = Math.round(m.x0 + dx); m.o.y = Math.round(m.y0 + dy); m.el.style.left = m.o.x + 'px'; m.el.style.top = m.o.y + 'px'; }
+    liveFit(act);
     hotTray(e, act.moving.some((m) => m.k === 'd'));
   } else if (act.k === 'box') {
     if (!act.moved && Math.hypot(e.clientX - act.sx, e.clientY - act.sy) < 3) return;
@@ -774,6 +794,7 @@ addEventListener('pointerup', (e) => {
       else if (m.o.dock) { delete m.o.dock; delete m.o.dockAt; m.o.s = 1; }
     }
     const tray = trayAt;
+    endFit(a, !!tray);
     if (tray) {
       const ds = a.moving.filter((m) => m.k === 'd');
       for (const m of a.moving) { m.o.x = m.x0; m.o.y = m.y0; }
@@ -886,6 +907,47 @@ $('#backpill').onclick = () => {
   if (backView) animateView(backView);
   backView = null; clearTimeout(backT); $('#backpill').classList.remove('on');
 };
+
+// ---- frames make room: dragging things into a frame grows it, and the frames that hold it, to keep them inside -----
+const FIT_PAD = 26;
+function liveFit(a) {
+  if (a.moving.some((m) => m.k === 'f')) return;                        // a whole frame being moved makes no room
+  const things = a.moving.filter((m) => m.k !== 'f'); if (!things.length) return;
+  a.fitOrig ||= new Map();
+  for (const [f, o] of a.fitOrig) { Object.assign(f, o); paintFrame(f); }        // start from how they were
+  const movingFrames = new Set(a.moving.filter((m) => m.k === 'f').map((m) => m.o));
+  const box = things.reduce((r, m) => {
+    const [w, h] = sizeOf(m.el, m.o);
+    return r ? { x0: Math.min(r.x0, m.o.x), y0: Math.min(r.y0, m.o.y), x1: Math.max(r.x1, m.o.x + w), y1: Math.max(r.y1, m.o.y + h) }
+      : { x0: m.o.x, y0: m.o.y, x1: m.o.x + w, y1: m.o.y + h };
+  }, null);
+  const cx = (box.x0 + box.x1) / 2, cy = (box.y0 + box.y1) / 2;
+  const holds = (f, x, y) => x > f.x && x < f.x + f.w && y > f.y && y < f.y + f.h;
+  const host = S.frames.filter((f) => !movingFrames.has(f) && holds(f, cx, cy)).sort((p, q) => p.w * p.h - q.w * q.h)[0];
+  if (!host) return;
+  // the host and the frames around it that hold it, inner to outer
+  const chain = [host, ...S.frames.filter((f) => f !== host && !movingFrames.has(f) && f.x <= host.x && f.y <= host.y
+    && f.x + f.w >= host.x + host.w && f.y + f.h >= host.y + host.h).sort((p, q) => p.w * p.h - q.w * q.h)];
+  let inner = box;
+  for (const f of chain) {
+    if (!a.fitOrig.has(f)) a.fitOrig.set(f, { x: f.x, y: f.y, w: f.w, h: f.h });
+    const x0 = Math.min(f.x, inner.x0 - FIT_PAD), y0 = Math.min(f.y, inner.y0 - FIT_PAD);
+    const x1 = Math.max(f.x + f.w, inner.x1 + FIT_PAD), y1 = Math.max(f.y + f.h, inner.y1 + FIT_PAD);
+    Object.assign(f, { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0) });
+    paintFrame(f, true);
+    inner = { x0: f.x - 34, y0: f.y - 34, x1: f.x + f.w, y1: f.y + f.h };    // the next frame out also keeps this one's tab inside
+  }
+}
+function paintFrame(f, smooth = false) {
+  const el = elOf(f.id); if (!el) return;
+  el.classList.toggle('fit', smooth);
+  Object.assign(el.style, { left: f.x + 'px', top: f.y + 'px', width: f.w + 'px', height: f.h + 'px' });
+}
+// On drop the grown frames stay (into a drawer: they go back as they were).
+function endFit(a, undoIt) {
+  if (!a.fitOrig) return;
+  for (const [f, o] of a.fitOrig) { if (undoIt) Object.assign(f, o); paintFrame(f); }
+}
 
 // ---- viewer: zoomed out too far to read, the thing under the pointer says its title at the bottom ------------------
 const VIEWER_BELOW = 0.6;
@@ -1003,6 +1065,8 @@ stash.addEventListener('pointerdown', (e) => {
   e.preventDefault(); startGhost(e, { kind: 'chip', id: c.dataset.id, label: c.innerHTML.replace(/<button[\s\S]*<\/button>/, '') });
 });
 stash.addEventListener('click', (e) => {
+  const dr = e.target.closest('.drw');
+  if (dr) { for (const o of S.trays) o.open = o.id === dr.dataset.tray; for (const el of stash.querySelectorAll('.tray')) el.classList.toggle('open', el.dataset.tray === dr.dataset.tray); save(); return showTrays(true); }
   if (e.target.closest('.t-pill')) return showTrays(true);
   if (e.target.closest('.t-hide')) return showTrays(false);
   const dot = e.target.closest('.t-dot');

@@ -126,27 +126,6 @@ body.dragging .acts, body.dragging .x, body.dragging .pal, body.dragging .f-add 
 .tool .ico { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font-size: 18px; background: var(--c, #f2eef4);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .04); }
 .sep { height: 1px; background: var(--line); margin: 6px 8px; }
-
-/* ---- trays (stash): stacked at the bottom left, one open, the rest folded to a coloured strip ---- */
-#stash { position: fixed; left: 12px; bottom: 12px; width: 480px; z-index: 11; display: flex; flex-direction: column-reverse; gap: 6px; }
-.tray { background: rgba(255, 255, 255, .95); backdrop-filter: blur(8px); border-radius: 16px; box-shadow: var(--shadow-up); overflow: hidden;
-  border: 1.5px solid transparent; border-left: 6px solid var(--t); transition: transform .25s var(--spring), border-color .15s, background .15s; flex: none; }
-.tray header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; }
-.tray:not(.open) header { padding: 6px 12px; }
-.t-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--t); }
-.t-name { font-weight: 650; color: var(--ink); outline: none; }
-.t-name[contenteditable="true"] { cursor: text; user-select: text; background: #fff; padding: 0 4px; border-radius: 4px; }
-.t-n { font: 600 11px Consolas, monospace; background: color-mix(in srgb, var(--t) 50%, #fff); border-radius: 8px; padding: 0 6px; }
-.t-n:empty { display: none; }
-.t-x { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; color: #a99; opacity: 0; transition: opacity .15s; }
-.tray header:hover .t-x { opacity: 1; }
-.t-x:hover { background: #fdecea; color: #c0392b; }
-.t-list { display: flex; flex-wrap: wrap; gap: 7px; padding: 2px 12px 12px; }
-.t-empty { flex: 1; display: grid; place-items: center; min-height: 64px; color: var(--muted); font-size: 12.5px; border: 1.5px dashed var(--line); border-radius: 12px; }
-.tray.hot { border-color: var(--accent); border-style: dashed; border-left: 6px solid var(--t); background: #fbf6fa; transform: translateY(-3px); }
-
-.t-add { flex: none; width: 30px; height: 30px; border-radius: 10px; background: #fff; box-shadow: var(--shadow); color: var(--accent); font-size: 16px; }
-.t-add:hover { background: var(--accent); color: #fff; }
 .chip { position: relative; display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 8px; background: #fff; border-radius: 10px;
   box-shadow: var(--shadow); border-left: 4px solid var(--t, #ddd); font-size: 12.5px; cursor: grab; max-width: 210px; }
 .chip b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; outline: none; }
@@ -415,21 +394,6 @@ body.dragging .sign:not(.preview) { pointer-events: none; }
 #reader:not(.editing) .rd-edit-only { display: none; }
 #reader.editing .rd-edit { display: block; }
 
-/* trays tucked away: only a pill; they come out when shown or while a document is dragged */
-.t-pill { display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 14px; background: #fff; box-shadow: var(--shadow);
-  font-size: 12.5px; font-weight: 600; color: var(--accent); }
-.t-pill:hover { box-shadow: var(--shadow-up); }
-.t-pdot { min-width: 12px; height: 16px; padding: 0 5px; border-radius: 8px; background: var(--t); font: 600 10.5px Consolas, monospace; color: #4a3d48;
-  display: inline-grid; place-items: center; }
-@keyframes rise { from { transform: translateY(14px); opacity: 0; } }
-.t-tools { display: flex; gap: 6px; align-items: center; }
-.t-hide { padding: 6px 11px; border-radius: 10px; background: #fff; box-shadow: var(--shadow); font-size: 12px; font-weight: 600; color: #7a7180; }
-.t-hide:hover { color: var(--accent); }
-.t-dot { cursor: pointer; transition: transform .15s var(--spring); }
-.t-dot:hover { transform: scale(1.4); }
-.t-out { width: 22px; height: 22px; border-radius: 6px; color: #9d8a99; font-size: 13px; }
-.t-out:hover { background: var(--accent-soft); color: var(--accent); }
-
 /* panel: filter and groups by frame */
 .filt { display: flex; gap: 4px; padding: 4px 2px 8px; }
 .filt button { flex: 1; padding: 5px 6px; border-radius: 9px; font-size: 12px; font-weight: 600; color: #7a7180; background: #f6f3f6; }
@@ -443,21 +407,6 @@ details.grp summary::before { content: "▾"; font-size: 10px; color: #b5a9b3; t
 details.grp:not([open]) summary::before { transform: rotate(-90deg); }
 details.grp summary span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 details.grp summary i { font: 600 10.5px Consolas, monospace; font-style: normal; background: #f1ebf0; border-radius: 7px; padding: 0 6px; }
-
-/* trays move smoothly: heights animate through grid rows (0fr ↔ 1fr), nothing jumps */
-#stash { gap: 0; }
-.t-pillwrap, .t-stack, .t-body { display: grid; transition: grid-template-rows .42s cubic-bezier(.22, 1, .36, 1), opacity .3s ease, transform .42s cubic-bezier(.22, 1, .36, 1); }
-.t-pillwrap > div, .t-stack-in, .t-body > .t-list { min-height: 0; overflow: hidden; }
-.t-pillwrap { grid-template-rows: 0fr; opacity: 0; }
-#stash.tucked:not(.dragopen) .t-pillwrap { grid-template-rows: 1fr; opacity: 1; }
-.t-stack { grid-template-rows: 1fr; opacity: 1; }
-#stash.tucked:not(.dragopen) .t-stack { grid-template-rows: 0fr; opacity: 0; transform: translateY(12px); pointer-events: none; }
-.t-stack-in { display: flex; flex-direction: column-reverse; gap: 6px; padding: 8px 2px 2px; }
-.t-body { grid-template-rows: 0fr; }
-.tray.open .t-body, .tray.hot .t-body { grid-template-rows: 1fr; }
-.tray { transition: transform .3s var(--spring), border-color .2s, background .2s, box-shadow .2s; }
-.tray header { transition: padding .3s ease; }
-.t-pillwrap > div { padding: 2px; }
 
 /* section buttons: at the right edge (no columns any more), solid, so each division reads at a glance */
 .mw-bar-tools { right: 14px !important; opacity: 1 !important; background: #fff; box-shadow: 0 1px 2px rgba(60, 40, 70, .08), 0 3px 10px rgba(60, 40, 70, .10); }
@@ -479,49 +428,12 @@ details.grp summary i { font: 600 10.5px Consolas, monospace; font-style: normal
 .ib.fmt.on { background: var(--accent-soft); color: var(--accent); }
 .ib.fmt:not(.on) { text-decoration: line-through; text-decoration-thickness: 1.5px; }
 
-/* closed trays: the list is clipped by a wrapper without padding, so nothing peeks out */
-.t-body > .t-clip { min-height: 0; overflow: hidden; }
-.t-body > .t-list { overflow: visible; }
-
-/* the cascade: trays grow from the bottom-left corner, up and to the right, one after another; closing runs back down */
-.t-stack-in > .tray, .t-stack-in > .t-tools { transform-origin: 0 100%;
-  transition: transform .55s cubic-bezier(.22, 1.2, .36, 1), opacity .35s ease, border-color .2s, background .2s, box-shadow .2s;
-  transition-delay: calc(var(--i, 0) * 70ms); }
-#stash.tucked:not(.dragopen) .t-stack-in > .tray, #stash.tucked:not(.dragopen) .t-stack-in > .t-tools {
-  transform: translate(-6px, 18px) scale(.18, .3); opacity: 0; transition-delay: calc((var(--n, 1) - var(--i, 0)) * 55ms);
-  transition-duration: .38s, .28s, .2s, .2s, .2s; }
-.t-stack { transition: grid-template-rows .5s cubic-bezier(.22, 1, .36, 1), opacity .3s ease; }
-#stash.tucked:not(.dragopen) .t-stack { transform: none; transition: grid-template-rows .45s cubic-bezier(.65, 0, .35, 1) .18s, opacity .3s ease .2s; }
-.t-pillwrap { transition: grid-template-rows .4s cubic-bezier(.22, 1, .36, 1), opacity .3s ease; }
-#stash.tucked:not(.dragopen) .t-pillwrap { transition-delay: .3s; }
-.t-pill { transform-origin: 0 100%; transition: transform .4s cubic-bezier(.34, 1.56, .64, 1); }
-#stash:not(.tucked) .t-pill, #stash.dragopen .t-pill { transform: scale(.6); }
-
 /* back to where you were */
 #backpill { position: fixed; left: 50%; bottom: 78px; z-index: 55; transform: translate(-50%, 180px); padding: 9px 18px; border-radius: 22px;
   background: #3b3341; color: #fff; font-weight: 600; font-size: 13px; box-shadow: var(--shadow-up); transition: transform .45s cubic-bezier(.34, 1.56, .64, 1); }
 #backpill.on { transform: translate(-50%, 0); }
 #backpill:hover { background: var(--accent); }
 #backpill kbd { margin-left: 8px; padding: 1px 7px; border-radius: 6px; background: rgba(255, 255, 255, .18); font: 600 11px "Segoe UI", sans-serif; }
-
-/* «Recoger» only when you opened the drawers yourself; while a drag brings them out, no tools */
-#stash.tucked.dragopen .t-tools { display: none; }
-
-/* collapsed: a small chest of drawers, one front per drawer (bottom first), each with a handle and its count */
-.t-pill { padding: 6px 10px 6px 6px; gap: 8px; border-radius: 10px; background: linear-gradient(#fbf7f2, #f1e9df); box-shadow: 0 1px 2px rgba(90, 60, 30, .12), 0 6px 14px rgba(90, 60, 30, .12); color: #6e5a4a; }
-.cab { display: flex; flex-direction: column-reverse; gap: 3px; padding: 3px; border-radius: 6px; background: #e7dccd; box-shadow: inset 0 0 0 1px rgba(110, 80, 50, .12); }
-.drw { position: relative; display: flex; align-items: center; justify-content: center; width: 58px; height: 15px; border-radius: 3px;
-  background: linear-gradient(color-mix(in srgb, var(--t) 70%, #fff), var(--t)); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .08), 0 1px 1px rgba(90, 60, 30, .15); }
-.drw .hdl { width: 16px; height: 3px; border-radius: 2px; background: rgba(90, 60, 30, .45); box-shadow: 0 1px 0 rgba(255, 255, 255, .5); }
-.drw b { position: absolute; right: 4px; font: 700 9px Consolas, monospace; color: rgba(70, 45, 25, .7); }
-.cab-l { font-size: 12px; font-weight: 650; }
-.t-pill:hover .drw:first-child { transform: translateX(3px); transition: transform .2s; }
-
-/* shown: each closed drawer is a front with a handle; the open one is pulled out */
-.tray header { position: relative; }
-.tray header .hdl { position: absolute; left: 50%; top: 50%; width: 26px; height: 4px; margin: -2px 0 0 -13px; border-radius: 2px;
-  background: color-mix(in srgb, var(--t) 55%, #5a3c24); opacity: .45; pointer-events: none; }
-.tray.open header .hdl { opacity: .25; }
 
 /* the toolbar: horizontal, at the top, small */
 #side { top: 12px; left: 50%; bottom: auto; width: auto; transform: translateX(-50%); flex-direction: row; align-items: center; gap: 2px;
@@ -540,13 +452,6 @@ details.grp summary i { font: 600 10.5px Consolas, monospace; font-style: normal
 
 /* tags sit above a document's hover area, so the one on its bottom edge can always be picked up */
 .sign { z-index: 2; }
-/* drawers: neutral, no golden tone */
-.t-pill { background: #fff; box-shadow: var(--shadow); color: #6a6270; }
-.cab { background: #efedf3; box-shadow: inset 0 0 0 1px rgba(60, 50, 80, .08); }
-.drw { box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .06), 0 1px 1px rgba(60, 50, 80, .12); }
-.drw .hdl { background: rgba(60, 50, 80, .38); box-shadow: 0 1px 0 rgba(255, 255, 255, .55); }
-.drw b { color: rgba(50, 40, 60, .65); }
-.tray header .hdl { background: color-mix(in srgb, var(--t) 50%, #4a4058); }
 
 /* fold chevrons: no browser padding (it pushed the arrow off-centre); folded reads soft, not a dark disc */
 .mw-fold, .mw-foldall { padding: 0; line-height: 0; }
@@ -574,19 +479,6 @@ button.cr:hover { background: #fff; color: var(--accent); box-shadow: var(--shad
 .pk-b div { padding: 0 14px; white-space: pre-wrap; word-break: break-word; }
 .pk-b .here { background: #fdf3c8; color: #3b3341; box-shadow: inset 3px 0 0 #e7c34a; }
 
-/* drawers, final say: open → no handles; tucked → only the little chest (no word); the collapse is elastic and lands
-   straight on the chest, with no empty moment in between */
-.tray header .hdl { display: none; }
-.cab-l { display: none; }
-.t-pill { padding: 5px; gap: 0; }
-#stash.tucked:not(.dragopen) .t-stack-in > .tray, #stash.tucked:not(.dragopen) .t-stack-in > .t-tools {
-  transform: translate(0, 10px) scale(.12, .2); opacity: 0;
-  transition: transform .42s cubic-bezier(.6, -.28, .74, .05), opacity .3s ease .1s;
-  transition-delay: calc((var(--n, 1) - var(--i, 0)) * 35ms); }
-#stash.tucked:not(.dragopen) .t-stack { transition: grid-template-rows .42s cubic-bezier(.65, 0, .35, 1), opacity .25s ease .15s; }
-#stash.tucked:not(.dragopen) .t-pillwrap { transition: grid-template-rows .45s cubic-bezier(.34, 1.56, .64, 1), opacity .2s ease; transition-delay: 0s; }
-#stash.tucked:not(.dragopen) .t-pill { transform: none; transition: transform .5s cubic-bezier(.34, 1.56, .64, 1) .12s; }
-
 /* the viewer: when zoomed out too far to read, the title of what is under the pointer, at the bottom */
 #viewer { position: fixed; left: 50%; bottom: 22px; z-index: 54; display: flex; align-items: center; gap: 8px; max-width: 60vw; padding: 8px 16px;
   border-radius: 14px; background: rgba(255, 255, 255, .96); box-shadow: var(--shadow-up); font-size: 14px; color: var(--ink);
@@ -596,3 +488,55 @@ button.cr:hover { background: #fff; color: var(--accent); box-shadow: var(--shad
 #viewer i { font-style: normal; font-size: 12px; color: var(--muted); }
 #backpill { bottom: 74px; }
 #toasts { bottom: 122px; }
+
+
+/* ---- drawers («cajones»): ONE shape anchored at the bottom left that changes size, like the site assistant on
+   InfraPhysics. Opening: the width leads, then the height; closing: the height goes down first, then the width.
+   Its two contents (the little chest, the open drawers) are only clipped by it, never scaled. ---- */
+#stash { position: fixed; left: 12px; bottom: 12px; z-index: 11; }
+.st-skin { position: relative; overflow: hidden; border-radius: 14px; background: rgba(255, 255, 255, .97); box-shadow: var(--shadow-up);
+  transition: height .3s cubic-bezier(.4, 0, .2, 1), width .3s cubic-bezier(.4, 0, .2, 1) .09s, border-radius .3s; }
+.st-skin.is-open { border-radius: 16px; transition: width .32s cubic-bezier(.2, .9, .3, 1.08), height .38s cubic-bezier(.2, .9, .3, 1.06) .09s, border-radius .3s; }
+.st-chest, .st-open { position: absolute; left: 0; bottom: 0; transition: opacity .16s ease; }
+.st-open { width: 470px; padding: 8px; display: flex; flex-direction: column; gap: 4px; opacity: 0; pointer-events: none; }
+.st-skin.is-open .st-open { opacity: 1; pointer-events: auto; transition-delay: .08s; }
+.st-skin.is-open .st-chest { opacity: 0; pointer-events: none; }
+
+/* the little chest: one front per drawer (first at the bottom); the one under the pointer slides out a little */
+.t-pill { display: block; padding: 6px; border: 0; background: none; cursor: pointer; }
+.cab { display: flex; flex-direction: column-reverse; gap: 3px; padding: 3px; border-radius: 7px; background: #efedf3; box-shadow: inset 0 0 0 1px rgba(60, 50, 80, .08); }
+.drw { position: relative; display: flex; align-items: center; justify-content: center; width: 62px; height: 16px; border-radius: 3px;
+  background: linear-gradient(color-mix(in srgb, var(--t) 70%, #fff), var(--t)); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .06), 0 1px 1px rgba(60, 50, 80, .12);
+  transition: transform .22s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s; }
+.drw:hover { transform: translateX(7px); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .06), -3px 2px 6px rgba(60, 50, 80, .22); }
+.drw .hdl { width: 16px; height: 3px; border-radius: 2px; background: rgba(60, 50, 80, .38); box-shadow: 0 1px 0 rgba(255, 255, 255, .55); }
+.drw b { position: absolute; right: 4px; font: 700 9px Consolas, monospace; color: rgba(50, 40, 60, .65); }
+
+/* the open drawers: rows of one panel, the open one pulled out */
+.t-tools { display: flex; gap: 6px; align-items: center; justify-content: flex-end; padding: 0 2px 2px; }
+.t-add, .t-hide { padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #7a7180; background: #f5f2f6; }
+.t-add:hover, .t-hide:hover { color: var(--accent); background: var(--accent-soft); }
+#stash.tucked.dragopen .t-tools { visibility: hidden; }
+.st-trays { display: flex; flex-direction: column-reverse; gap: 4px; }
+.tray { border-radius: 10px; border-left: 5px solid var(--t); background: color-mix(in srgb, var(--t) 14%, #fff); transition: background .2s, box-shadow .2s; }
+.tray.open { background: color-mix(in srgb, var(--t) 22%, #fff); }
+.tray.hot { box-shadow: 0 0 0 2px var(--accent); background: #fbf6fa; }
+.tray header { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; font-size: 13px; }
+.tray header .hdl { display: none; }
+.t-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--t); cursor: pointer; }
+.t-name { font-weight: 650; color: var(--ink); outline: none; cursor: text; }
+.t-name[contenteditable="true"] { user-select: text; background: #fff; padding: 0 4px; border-radius: 4px; }
+.t-n { font: 600 11px Consolas, monospace; background: color-mix(in srgb, var(--t) 55%, #fff); border-radius: 8px; padding: 0 6px; }
+.t-n:empty { display: none; }
+.t-out, .t-x { width: 22px; height: 22px; border-radius: 6px; color: #9d8a99; font-size: 13px; }
+.t-out { margin-left: auto; }
+.t-x { opacity: 0; } .tray header:hover .t-x { opacity: 1; }
+.t-out:hover { background: var(--accent-soft); color: var(--accent); } .t-x:hover { background: #fdecea; color: #c0392b; }
+.t-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s cubic-bezier(.22, 1, .36, 1); }
+.tray.open .t-body, .tray.hot .t-body { grid-template-rows: 1fr; }
+.t-clip { min-height: 0; overflow: hidden; }
+.t-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 10px 10px; }
+.t-empty { flex: 1; display: grid; place-items: center; min-height: 54px; color: var(--muted); font-size: 12.5px; border: 1.5px dashed var(--line); border-radius: 10px; }
+
+/* a frame making room for what is dragged into it grows smoothly */
+.frame.fit { transition: left .2s cubic-bezier(.22, 1, .36, 1), top .2s cubic-bezier(.22, 1, .36, 1), width .2s cubic-bezier(.22, 1, .36, 1), height .2s cubic-bezier(.22, 1, .36, 1); }

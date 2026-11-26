@@ -20,11 +20,12 @@ A zoomable grid (pastel, dotted) of documents, post-its, ideas, tasks, frames an
   what lies on a document that is not moving. The corner handle scales a thing as a whole, with what it carries.
 - Hover something partly covered: it comes forward (with what lies on it) while the pointer is over it. «Al frente» / «Al fondo» keep it there.
 - **Tasks dropped just under a document** dock to it: stacked, as wide as the page, moving and scaling with it.
-- **Frames**: dropped near loose things they wrap them; «＋» on the tab makes a frame inside; square corners.
+- **Frames**: dropped near loose things they wrap them; dragging something into a frame makes it (and the frames holding it) grow to fit, live, and back if you pull it out; «＋» on the tab makes a frame inside; square corners.
 - **Tags** («etiquetas»): a paper tag tied with a string to the nearest edge of what you drop it on, with a scribble; a click reads it.
-- **Drawers** («cajones», bottom left): tucked away as a little chest of drawers; they come out when a dragged document reaches
-  their corner, and go back when it leaves. One open at a time, up to four, each with its colour (click its dot), rename (click
-  its name), «⤢» puts all its documents on the plane. «Recoger» only shows when you opened them yourself.
+- **Drawers** («cajones», bottom left): one shape that changes size, like the InfraPhysics site assistant (opening: width then
+  height; closing: height down, then width). Tucked, a little chest: the drawer under the pointer slides out, a click opens that
+  drawer, a click anywhere else puts them away. They also come out when a dragged document reaches their corner. Up to four,
+  each with its colour (click its dot), rename (click its name), «⤢» puts all its documents on the plane.
 - **Panel** (right): tasks (pending / done / all) and ideas, grouped by the frame they are in; history with «Restaurar»,
   «Volver a como estaba» for documents, and «Ir» / «Abrir» for pieces that still exist.
 - Zoomed out too far to read, the thing under the pointer shows its title in a viewer at the bottom.
