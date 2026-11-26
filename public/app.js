@@ -1,44 +1,50 @@
-// Meadow: a zoomable grid of documents, post-its and frames, a stash at the bottom left, and a Notepad-like editor.
-import { createEditor, LINK_RE, TAG_RE } from './editor.bundle.js';
+// Meadow: a zoomable grid with documents (pages that open), post-its (written on the spot), ideas and tasks (one object
+// that can sit on the plane and inside any document at once), frames, a stash at the bottom left, and a panel on the
+// right with every task, every idea and the history.
+import { createEditor, LINK_RE, TAG_RE, TOKEN_RE } from './editor.bundle.js';
 
-const TYPES = [
-  { id: 'nota', name: 'Nota', icon: '📝', color: '#fff1b8' },
-  { id: 'idea', name: 'Idea', icon: '💡', color: '#cdeedd' },
-  { id: 'tarea', name: 'Tarea', icon: '☑️', color: '#cfe5fb' },
-  { id: 'ref', name: 'Referencia', icon: '📎', color: '#e3d9f7' },
-  { id: 'diario', name: 'Diario', icon: '📓', color: '#ffd9c2' },
-  { id: 'borrador', name: 'Borrador', icon: '✏️', color: '#eceef2' },
-];
 const PASTEL = ['#fff1b8', '#ffd9c2', '#f9d0e3', '#e3d9f7', '#cfe5fb', '#cdeedd', '#e4ebd3', '#eceef2'];
-const T = (id) => TYPES.find((t) => t.id === id) || TYPES[0];
 const uid = () => Math.random().toString(36).slice(2, 10);
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const CARD_W = 230;
+const DOC_W = 200;
 
-let S = { docs: [], postits: [], frames: [], view: { x: 140, y: 80, z: 1 } };
+let S = { docs: [], postits: [], frames: [], ideas: [], tasks: [], seq: { idea: 0, tarea: 0 }, history: [], view: { x: 140, y: 80, z: 1 } };
 let rev = 0;
 const sel = new Set();
 const vp = $('#vp'), grid = $('#grid'), world = $('#world'), itemsEl = $('#items'), framesEl = $('#frames');
-const stash = $('#stash'), stashList = $('#stash-list');
+const stash = $('#stash');
 
 const N = (d) => S.docs.indexOf(d) + 1;
 const docById = (id) => S.docs.find((d) => d.id === id);
+const listOf = (kind) => (kind === 'idea' ? S.ideas : S.tasks);
+const getItem = (kind, n) => listOf(kind).find((x) => x.n === n);
+const token = (it) => `{${it.kind} ${it.n}}`;
 function find(id) {
-  for (const [k, list] of [['d', S.docs], ['p', S.postits], ['f', S.frames]]) {
+  for (const [k, list] of [['d', S.docs], ['p', S.postits], ['f', S.frames], ['i', S.ideas], ['t', S.tasks]]) {
     const o = list.find((x) => x.id === id); if (o) return { k, o };
   }
   return null;
 }
 const elOf = (id) => world.querySelector(`[data-id="${id}"]`);
+// a thing's size on the plane (its layout size times its own scale)
+const sizeOf = (el, o) => [el.offsetWidth * (o.s || 1), el.offsetHeight * (o.s || 1)];
+// Text as a person reads it: links show their label, ideas and tasks their text.
+const readable = (t) => (t || '')
+  .replace(LINK_RE, (m, label) => label)
+  .replace(TOKEN_RE, (m, kind, n) => { const it = getItem(kind, +n); return it ? `${kind === 'idea' ? '💡' : it.done ? '☑' : '☐'} ${it.text}` : ''; });
+const docsUsing = (it) => S.docs.filter((d) => (d.text || '').includes(token(it)));
 
 // ---- saving --------------------------------------------------------------------------------------------------------
 async function load() {
   const j = await (await fetch('/api/state')).json();
   rev = j.rev || 0;
   if (j.state) S = { ...S, ...j.state };
-  else S.view = { x: Math.round(innerWidth / 2 - 115), y: Math.round(innerHeight / 2 - 120), z: 1 };
-  S.postits ||= []; S.frames ||= [];
+  else S.view = { x: Math.round(innerWidth / 2 - 100), y: Math.round(innerHeight / 2 - 140), z: 1 };
+  for (const k of ['postits', 'frames', 'ideas', 'tasks', 'history', 'signs']) S[k] ||= [];
+  S.seq ||= { idea: 0, tarea: 0 };
+  if (!S.trays?.length) S.trays = [{ id: 'b1', name: 'Bandeja', color: TRAY_COLORS[0], open: true }];
+  for (const d of S.docs) if (d.place === 'stash' && !S.trays.some((t) => t.id === d.tray)) d.tray = S.trays[0].id;
   render();
 }
 let saveT = null, dirty = false;
@@ -52,17 +58,28 @@ async function flush() {
   } catch { dirty = true; toast('No se pudo guardar; reintento en 2 s'); setTimeout(flush, 2000); }
 }
 addEventListener('beforeunload', () => {
+  closeSession();
   if (dirty) navigator.sendBeacon('/api/state?rev=' + rev, new Blob([JSON.stringify(S)], { type: 'application/json' }));
 });
 
 const undo = [];
-function snap() { undo.push(JSON.stringify({ docs: S.docs, postits: S.postits, frames: S.frames })); if (undo.length > 80) undo.shift(); }
+function snap() {
+  undo.push(JSON.stringify({ docs: S.docs, postits: S.postits, frames: S.frames, ideas: S.ideas, tasks: S.tasks, signs: S.signs }));
+  if (undo.length > 80) undo.shift();
+}
 function doUndo() {
   const s = undo.pop(); if (!s) return toast('Nada que deshacer');
   Object.assign(S, JSON.parse(s)); sel.clear();
   if (curId) { const d = docById(curId); if (!d) closeEditor(); else { ed.replaceText(d.text || ''); fillHead(); } }
-  render(); save();
+  changed();
 }
+
+// ---- history -------------------------------------------------------------------------------------------------------
+function log(kind, msg, extra = {}) {
+  S.history.unshift({ t: Date.now(), kind, msg, ...extra });
+  if (S.history.length > 400) S.history.length = 400;
+}
+const ICON = { crear: '＋', borrar: '🗑', editar: '✎', hecha: '✔', reabrir: '↺', restaurar: '⟲', renombrar: '✎', bandeja: '📥' };
 
 // ---- view, zoom and grid -------------------------------------------------------------------------------------------
 function applyView() {
@@ -78,14 +95,17 @@ function drawGrid() {
   c.fillStyle = '#f7f7fb'; c.fillRect(0, 0, w, h);
   const { x, y, z } = S.view;
   let step = 1; const seq = [2, 2.5, 2]; let k = 0;
-  while (step * z < 14) step *= seq[k++ % 3];
-  const lines = (s, col) => {
-    c.strokeStyle = col; c.lineWidth = 1; c.beginPath();
-    for (let wx = Math.floor(-x / z / s) * s; wx * z + x <= w; wx += s) { const sx = Math.round(wx * z + x) + 0.5; c.moveTo(sx, 0); c.lineTo(sx, h); }
-    for (let wy = Math.floor(-y / z / s) * s; wy * z + y <= h; wy += s) { const sy = Math.round(wy * z + y) + 0.5; c.moveTo(0, sy); c.lineTo(w, sy); }
-    c.stroke();
+  while (step * z < 16) step *= seq[k++ % 3];
+  // a grid of small dots (lines would be mistaken for frames): every fifth one a little bigger
+  const dots = (st, r, col) => {
+    c.fillStyle = col;
+    const x0 = Math.floor(-x / z / st) * st, y0 = Math.floor(-y / z / st) * st;
+    for (let wx = x0; wx * z + x <= w + 2; wx += st) {
+      const sx = wx * z + x;
+      for (let wy = y0; wy * z + y <= h + 2; wy += st) c.fillRect(sx - r / 2, wy * z + y - r / 2, r, r);
+    }
   };
-  lines(step, '#ececf3'); lines(step * 5, '#dedce8');
+  dots(step, 1.6, '#d6d2e0'); dots(step * 5, 2.6, '#bdb6cc');
   c.strokeStyle = 'rgba(113,75,103,.28)'; c.lineWidth = 1.5; c.beginPath();
   c.moveTo(x - 10, y); c.lineTo(x + 10, y); c.moveTo(x, y - 10); c.lineTo(x, y + 10); c.stroke();
 }
@@ -102,19 +122,26 @@ vp.addEventListener('wheel', (e) => {
   zoomAt(e.clientX, e.clientY, Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0018)));
 }, { passive: false });
 const toWorld = (cx, cy) => ({ x: (cx - S.view.x) / S.view.z, y: (cy - S.view.y) / S.view.z });
-const centerWorld = () => toWorld(innerWidth / 2 + 50, innerHeight / 2 - 60);
+const centerWorld = () => toWorld(innerWidth / 2 - 100, innerHeight / 2 - 60);
 addEventListener('resize', drawGrid);
+let mouse = { x: innerWidth / 2, y: innerHeight / 2 };
+addEventListener('pointermove', (e) => { mouse = { x: e.clientX, y: e.clientY }; }, true);
 
+function centerOn(o, el) {
+  const [w, h] = el ? sizeOf(el, o) : [200, 120];
+  S.view.x = innerWidth / 2 - 150 - (o.x + w / 2) * S.view.z;
+  S.view.y = innerHeight / 2 - (o.y + h / 2) * S.view.z;
+  applyView(); saveView();
+}
 $('#z-val').onclick = () => zoomAt(innerWidth / 2, innerHeight / 2, 1 / S.view.z);
 $('#z-fit').onclick = () => {
-  const boxes = [];
-  for (const d of S.docs) if (d.place === 'canvas') { const el = elOf(d.id); boxes.push([d.x, d.y, CARD_W, el ? el.offsetHeight : 120]); }
-  for (const p of S.postits) boxes.push([p.x, p.y, 170, 160]);
-  for (const f of S.frames) boxes.push([f.x, f.y - 34, f.w, f.h + 34]);
+  const boxes = [...world.querySelectorAll('[data-k]')].map((el) => {
+    const o = find(el.dataset.id).o; if (el.dataset.k === 'f') return [o.x, o.y - 34, o.w, o.h + 34]; const [w, h] = sizeOf(el, o); return [o.x, o.y, w, h];
+  });
   if (!boxes.length) return;
   const x0 = Math.min(...boxes.map((b) => b[0])), y0 = Math.min(...boxes.map((b) => b[1]));
   const x1 = Math.max(...boxes.map((b) => b[0] + b[2])), y1 = Math.max(...boxes.map((b) => b[1] + b[3]));
-  const aw = innerWidth - 150, ah = innerHeight - 220;
+  const aw = innerWidth - 470, ah = innerHeight - 220;
   const z = Math.min(2, aw / (x1 - x0 + 80), ah / (y1 - y0 + 80));
   S.view = { z, x: 120 + (aw - (x1 - x0) * z) / 2 - x0 * z, y: 20 + (ah - (y1 - y0) * z) / 2 - y0 * z };
   applyView(); saveView();
@@ -122,73 +149,240 @@ $('#z-fit').onclick = () => {
 
 // ---- rendering -----------------------------------------------------------------------------------------------------
 const palHTML = () => `<div class="pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</div>`;
-function cardHTML(d, n) {
-  const t = T(d.type);
-  const preview = (d.text || '').split('\n').slice(0, 9).join('\n');
-  const len = (d.text || '').length, stack = len > 600 ? ' s2' : len > 0 ? ' s1' : '';
-  return `<div class="card${stack}${sel.has(d.id) ? ' sel' : ''}" data-id="${d.id}" data-k="d" style="left:${d.x}px;top:${d.y}px;--c:${t.color}">
-    <div class="sheet">
-      <div class="tab"><span class="ico">${t.icon}</span><span class="name">${esc(d.name)}</span><span class="num">${n}</span></div>
-      <div class="body">${d.text ? esc(preview) : '<em>en blanco</em>'}</div>
+function docHTML(d, n) {
+  const text = readable(d.text);
+  const words = (text.match(/\S+/g) || []).length;
+  return `<div class="doc${sel.has(d.id) ? ' sel' : ''}" data-id="${d.id}" data-k="d" style="left:${d.x}px;top:${d.y}px;z-index:${d.z || 0};--s:${d.s || 1}">
+    <div class="page">
+      <div class="dtitle">${esc(d.name)}</div>
+      <div class="dbody">${text ? esc(text.split('\n').slice(0, 14).join('\n')) : '<em>en blanco</em>'}</div>
+      <div class="dfoot"><span>📄</span><span>${words ? words + (words === 1 ? ' palabra' : ' palabras') : ''}</span></div>
     </div>
     <button class="x" title="Borrar">×</button>
     <div class="acts">
-      <button data-a="copy">⧉<b>Copiar</b></button>
-      <button data-a="add">＋<b>Añadir lo copiado</b></button><button data-a="replace">⇄<b>Reemplazar</b></button>
-    </div></div>`;
+      <button data-a="copy">⧉<b>Copiar</b></button><button data-a="add">＋<b>Añadir lo copiado</b></button><button data-a="replace">⇄<b>Reemplazar</b></button>${ZB}
+    </div>${PRS}</div>`;
 }
-const postitHTML = (p) => `<div class="postit${sel.has(p.id) ? ' sel' : ''}" data-id="${p.id}" data-k="p" style="left:${p.x}px;top:${p.y}px;--bg:${p.color}">
-  <div class="ptext">${esc(p.text)}</div><button class="x" title="Borrar">×</button>${palHTML()}</div>`;
+const PRS = '<div class="prs" title="Arrastra: más grande o más pequeño (con lo que lleva encima; Alt: solo esto)"></div>';
+const ZB = '<button data-a="front">⤒<b>Al frente</b></button><button data-a="back">⤓<b>Al fondo</b></button>';
+const postitHTML = (p) => `<div class="postit${sel.has(p.id) ? ' sel' : ''}" data-id="${p.id}" data-k="p" style="left:${p.x}px;top:${p.y}px;z-index:${p.z || 0};--bg:${p.color};--s:${p.s || 1}">
+  <div class="ptext">${esc(p.text)}</div><button class="x" title="Borrar">×</button>${palHTML()}<div class="acts">${ZB}</div>${PRS}</div>`;
 const frameHTML = (f) => `<div class="frame${sel.has(f.id) ? ' sel' : ''}" data-id="${f.id}" data-k="f" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;--bg:${f.color}">
-  <div class="ftab"><span class="ftitle">${esc(f.title)}</span><button class="x" title="Borrar el marco (no lo de dentro)">×</button>${palHTML()}</div>
+  <div class="ftab"><span class="ftitle">${esc(f.title)}</span><button class="f-add" title="Crear un marco dentro">＋</button><button class="x" title="Borrar el marco (no lo de dentro)">×</button>${palHTML()}</div>
   <div class="edge e-t"></div><div class="edge e-b"></div><div class="edge e-l"></div><div class="edge e-r"></div><div class="rs"></div></div>`;
-
+function itemHTML(it) {
+  const k = it.kind === 'idea' ? 'i' : 't', uses = docsUsing(it).length;
+  const lead = it.kind === 'idea' ? '<span class="iico">💡</span>' : `<button class="chk" title="${it.done ? 'Reabrir' : 'Hecha'}">${it.done ? '✔' : ''}</button>`;
+  return `<div class="item ${it.kind}${it.done ? ' done' : ''}${it.dock ? ' docked' : ''}${sel.has(it.id) ? ' sel' : ''}" data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
+    ${lead}<span class="itext">${esc(it.text) || '…'}</span>${uses ? `<span class="uses" title="Está en ${uses} documento${uses > 1 ? 's' : ''}">📄${uses}</span>` : ''}
+    <button class="x" title="${uses ? 'Quitar del plano (sigue en sus documentos)' : 'Borrar'}">×</button>
+    <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button>${ZB}</div>${PRS}</div>`;
+}
+// ---- signs: a tab standing out of an edge of a document, post-it, idea, task or frame; a click reads it -------------
+const signsOf = (id) => (S.signs || []).filter((g) => g.host === id);
+// A scribble that means nothing, always the same for one sign.
+function scribble(seed) {
+  let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const rnd = () => ((h = (h * 1103515245 + 12345) >>> 0) / 4294967296);
+  let d = '';
+  for (let row = 0; row < 2; row++) {
+    const y = 10 + row * 9; let x = 6; d += `M${x} ${y}`;
+    while (x < 40 - row * 8) { const nx = x + 3 + rnd() * 4; d += ` Q${(x + nx) / 2} ${y - 3 - rnd() * 4} ${nx} ${y + (rnd() - .5) * 2}`; x = nx; }
+  }
+  return `<svg viewBox="0 0 46 28" width="46" height="28"><path d="${d}" fill="none" stroke="#5b3a1f" stroke-width="1.6" stroke-linecap="round" opacity=".8"/></svg>`;
+}
+const signHTML = (g, extra = '') => `<div class="sign e-${g.edge}${extra}" data-sign="${g.id}" style="--t:${(g.t * 100).toFixed(1)}%" title="Clic para leer">
+  <i class="plank"></i><span class="board">${scribble(g.id)}</span></div>`;
+function signsHTML(id) { return signsOf(id).map((g) => signHTML(g)).join(''); }
+// Where a sign dropped at the pointer would stand: the edge of the thing under it nearest to the pointer.
+function signSpot(e) {
+  const hostEl = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('[data-k]');
+  if (!hostEl) return null;
+  const r = hostEl.getBoundingClientRect();
+  const d = { top: e.clientY - r.top, bottom: r.bottom - e.clientY, left: e.clientX - r.left, right: r.right - e.clientX };
+  const edge = Object.entries(d).sort((a, b) => a[1] - b[1])[0][0];
+  const t = edge === 'top' || edge === 'bottom' ? (e.clientX - r.left) / r.width : (e.clientY - r.top) / r.height;
+  return { hostEl, edge, t: Math.min(.92, Math.max(.06, t)) };
+}
+function addSignsToHosts() {
+  for (const el of world.querySelectorAll('[data-k]')) {
+    const html = signsHTML(el.dataset.id); if (!html) continue;
+    el.insertAdjacentHTML('beforeend', html);
+  }
+}
 function renderItems() {
-  framesEl.innerHTML = S.frames.map(frameHTML).join('');
-  itemsEl.innerHTML = S.docs.map((d, i) => (d.place === 'canvas' ? cardHTML(d, i + 1) : '')).join('') + S.postits.map(postitHTML).join('');
-  $('#empty').classList.toggle('on', !S.frames.length && !S.postits.length && !S.docs.some((d) => d.place === 'canvas'));
+  peeked = []; clearTimeout(peekT);
+  framesEl.innerHTML = [...S.frames].sort((a, b) => b.w * b.h - a.w * a.h).map(frameHTML).join('');
+  itemsEl.innerHTML = S.docs.map((d, i) => (d.place === 'canvas' ? docHTML(d, i + 1) : '')).join('')
+    + S.postits.map(postitHTML).join('')
+    + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas).map(itemHTML).join('');
+  $('#empty').classList.toggle('on', !itemsEl.children.length && !S.frames.length);
+  S.signs = (S.signs || []).filter((g) => find(g.host));
+  addSignsToHosts();
+  layoutDocks();
 }
+// ---- tasks docked under a document: stacked in order, as wide as the document, moving and scaling with it ----------
+const docked = (d) => S.tasks.filter((t) => t.onCanvas && t.dock === d.id).sort((a, b) => (a.dockAt ?? 0) - (b.dockAt ?? 0));
+function layoutDocks() {
+  for (const t of S.tasks) if (t.dock && !S.docs.some((d) => d.id === t.dock && d.place === 'canvas')) delete t.dock;
+  for (const d of S.docs) {
+    if (d.place !== 'canvas') continue;
+    const list = docked(d); if (!list.length) continue;
+    const del = elOf(d.id); if (!del) continue;
+    const sc = d.s || 1; let y = d.y + del.offsetHeight * sc + 8 * sc;
+    list.forEach((t, i) => {
+      t.dockAt = i; t.x = d.x; t.y = Math.round(y); t.s = sc; t.z = Math.max(t.z || 0, (d.z || 0));
+      const el = elOf(t.id); if (!el) return;
+      Object.assign(el.style, { left: t.x + 'px', top: t.y + 'px', zIndex: t.z }); el.style.setProperty('--s', sc);
+      y += el.offsetHeight * sc + 6 * sc;
+    });
+  }
+}
+// Where a dropped task docks: under a document, if it lands in the strip below it (or among the tasks already there).
+function dockTarget(t) {
+  const el = elOf(t.id); if (!el) return null;
+  const [w, h] = sizeOf(el, t), cx = t.x + w / 2, cy = t.y + h / 2;
+  for (const d of S.docs) {
+    if (d.place !== 'canvas' || d.id === t.dock && false) continue;
+    const de = elOf(d.id); if (!de) continue;
+    const [dw, dh] = sizeOf(de, d);
+    const stack = docked(d).filter((x) => x !== t).reduce((acc, x) => { const xe = elOf(x.id); return acc + (xe ? xe.offsetHeight * (x.s || 1) + 6 : 0); }, 0);
+    if (cx > d.x && cx < d.x + dw && cy > d.y + dh - 24 && cy < d.y + dh + stack + 70) {
+      const others = docked(d).filter((x) => x !== t);
+      const at = others.filter((x) => x.y + 10 < t.y).length;           // its place in the stack, by where it was dropped
+      return { d, at, others };
+    }
+  }
+  return null;
+}
+// ---- trays: documents waiting, at the bottom left. One is open at a time; the others fold to a coloured strip. -------
+const TRAY_COLORS = ['#f6c1d6', '#bfdcf7', '#c6ead2', '#f8dca8', '#d9ccf3', '#f3c9b8'];
+const MAX_TRAYS = 4;
+let traysShown = localStorage.getItem('meadow.trays') === 'shown';
+function showTrays(on) { traysShown = on; localStorage.setItem('meadow.trays', on ? 'shown' : 'tucked'); stash.classList.toggle('tucked', !on); }
+// while a document is dragged the trays come out by themselves, and go back when it is dropped
+const dragTrays = (on) => stash.classList.toggle('dragopen', on);
+const trayOf = (d) => S.trays.find((t) => t.id === d.tray) || S.trays[0];
+const openTray = () => S.trays.find((t) => t.open) || S.trays[0];
 function renderStash() {
-  const ds = S.docs.map((d, i) => [d, i + 1]).filter(([d]) => d.place === 'stash');
-  $('#stash-n').textContent = ds.length || '';
-  stashList.innerHTML = ds.map(([d, n]) => `<div class="chip" data-id="${d.id}" style="--c:${T(d.type).color}" title="Clic para abrir · arrástralo al plano">
-    <span>${T(d.type).icon}</span><b>${esc(d.name)}</b><i>*${n}</i><button class="x" title="Borrar">×</button></div>`).join('');
-  stash.classList.toggle('empty', !ds.length);
+  const html = S.trays.map((t) => {
+    const ds = S.docs.map((d, i) => [d, i + 1]).filter(([d]) => d.place === 'stash' && trayOf(d) === t);
+    return `<div class="tray${t.open ? ' open' : ''}" data-tray="${t.id}" style="--t:${t.color};--i:${S.trays.indexOf(t)};--n:${S.trays.length}">
+      <header><i class="t-dot" title="Cambiar el color"></i><b class="t-name" title="Doble clic para renombrar">${esc(t.name)}</b><span class="t-n">${ds.length || ''}</span>
+        ${ds.length ? '<button class="t-out" title="Sacar todos sus documentos al plano">⤢</button>' : ''}
+        ${S.trays.length > 1 ? '<button class="t-x" title="Quitar la bandeja (sus documentos pasan a otra)">×</button>' : ''}</header>
+      <div class="t-body"><div class="t-clip"><div class="t-list">${ds.map(([d, n]) => `<div class="chip" data-id="${d.id}" title="Clic para abrir · arrástralo al plano o a otra bandeja">
+        <span>📄</span><b>${esc(d.name)}</b><button class="x" title="Borrar">×</button></div>`).join('')
+        || '<div class="t-empty">Suelta aquí documentos para dejarlos en espera</div>'}</div></div></div></div>`;
+  }).join('');
+  const total = S.docs.filter((d) => d.place === 'stash').length;
+  const pill = `<button class="t-pill" title="Mostrar las bandejas">📥 Bandejas ${S.trays.map((t) => {
+    const n = S.docs.filter((d) => d.place === 'stash' && trayOf(d) === t).length;
+    return `<span class="t-pdot" style="--t:${t.color}">${n || ''}</span>`; }).join('')}</button>`;
+  const tools = `<div class="t-tools" style="--i:${S.trays.length};--n:${S.trays.length}">${S.trays.length < MAX_TRAYS ? '<button class="t-add" title="Nueva bandeja">＋</button>' : ''}
+    <button class="t-hide" title="Recoger las bandejas (Esc)">▾ Recoger</button></div>`;
+  stash.innerHTML = `<div class="t-pillwrap"><div>${pill}</div></div><div class="t-stack"><div class="t-stack-in">${html}${tools}</div></div>`;
+  stash.classList.toggle('tucked', !traysShown);
+  stash.dataset.total = total;
+  // never over the tools: the trays get the height left under the sidebar
+  const side = $('#side').getBoundingClientRect();
+  stash.style.maxHeight = Math.max(160, innerHeight - side.bottom - 26) + 'px';
 }
-function render() { renderItems(); renderStash(); applyView(); }
-function paintSel() { for (const el of world.querySelectorAll('[data-k]')) el.classList.toggle('sel', sel.has(el.dataset.id)); }
+// Which tray is under the pointer (its id), or null.
+function overStash(e) {
+  const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.tray');
+  if (el) return el.dataset.tray;
+  const r = stash.getBoundingClientRect();
+  return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom ? openTray().id : null;
+}
+function hotTray(e, on) {
+  const id = on ? overStash(e) : null;
+  for (const el of stash.querySelectorAll('.tray')) el.classList.toggle('hot', el.dataset.tray === id);
+}
+function putInTray(docs, trayId) {
+  // (renderStash redraws after this; the open tray is the one that received them)
+  const t = S.trays.find((x) => x.id === trayId) || openTray();
+  for (const d of docs) { d.place = 'stash'; d.tray = t.id; sel.delete(d.id); }
+  for (const x of S.trays) x.open = x === t;
+  return t;
+}
+function render() { renderItems(); renderStash(); renderPanel(); paintSelBar(); applyView(); }
+function changed() { save(); render(); ed?.refresh(); }
+function paintSel() { for (const el of world.querySelectorAll('[data-k]')) el.classList.toggle('sel', sel.has(el.dataset.id)); paintSelBar(); }
+
+// ---- selection bar: copy all of a group at once -------------------------------------------------------------------
+function paintSelBar() {
+  const bar = $('#selbar'), n = [...sel].filter((id) => find(id)).length;
+  bar.classList.toggle('on', n >= 2);
+  if (n >= 2) $('#selbar-n').textContent = `${n} seleccionados`;
+}
+function groupText() {
+  const parts = [];
+  const ids = [...sel].map(find).filter(Boolean).sort((a, b) => (a.o.y - b.o.y) || (a.o.x - b.o.x));
+  for (const { k, o } of ids) {
+    if (k === 'd') parts.push(`# ${o.name}\n${readable(o.text)}`);
+    else if (k === 'p') parts.push(o.text);
+    else if (k === 'i') parts.push(`💡 ${o.text}`);
+    else if (k === 't') parts.push(`- [${o.done ? 'x' : ' '}] ${o.text}`);
+  }
+  return parts.filter((p) => p.trim()).join('\n\n');
+}
+$('#selbar-copy').onclick = async () => { await navigator.clipboard.writeText(groupText()); toast('Copiado todo el grupo'); };
+$('#selbar-del').onclick = () => removeIds([...sel]);
 
 // ---- creating ------------------------------------------------------------------------------------------------------
-function nextName(base) {
+function nextName() {
   const names = new Set(S.docs.map((d) => d.name)); let i = 1;
-  while (names.has(`${base} ${i}`)) i++;
-  return `${base} ${i}`;
+  while (names.has(`Documento ${i}`)) i++;
+  return `Documento ${i}`;
 }
-function newDoc({ name, type = 'nota', place = 'canvas', x = 0, y = 0, text = '' }) {
-  const d = { id: uid(), name: name || nextName(T(type).name), type, text, x: Math.round(x), y: Math.round(y), place, created: Date.now(), updated: Date.now() };
+function newDoc({ name, place = 'canvas', x = 0, y = 0, text = '' }) {
+  const d = { id: uid(), name: name || nextName(), text, x: Math.round(x), y: Math.round(y), z: topZ(), place, created: Date.now(), updated: Date.now() };
   S.docs.push(d); return d;
 }
-function create(kind, type, w, inStash) {
+function newItem(kind, text, at) {
+  const n = ++S.seq[kind];
+  const it = { id: (kind === 'idea' ? 'i' : 't') + n, kind, n, text, created: Date.now(), done: false, onCanvas: !!at, x: at ? Math.round(at.x) : 0, y: at ? Math.round(at.y) : 0, z: topZ() };
+  listOf(kind).push(it);
+  if (text) log('crear', `${kind === 'idea' ? 'Idea' : 'Tarea'} «${text}»`, { ref: it.id });
+  return it;
+}
+function create(kind, w, inStash) {
   snap();
-  if (kind === 'type') {
-    const d = newDoc({ type, place: inStash ? 'stash' : 'canvas', x: w.x - CARD_W / 2, y: w.y - 24 });
-    sel.clear(); if (!inStash) sel.add(d.id);
-    save(); render();
-    const el = inStash ? stashList.querySelector(`[data-id="${d.id}"] b`) : elOf(d.id)?.querySelector('.name');
-    if (el) editInline(el, (v) => { if (v) { d.name = v; save(); render(); } });
+  if (kind === 'doc') {
+    const d = newDoc({ place: inStash ? 'stash' : 'canvas', x: w.x - DOC_W / 2, y: w.y - 30 });
+    if (inStash) putInTray([d], inStash);
+    log('crear', `Documento «${d.name}»`, { ref: d.id });
+    sel.clear(); save(); render();
+    if (w.free || inStash) {                       // dragged onto the plane or a tray: placed, not opened; its name ready to type
+      const el = inStash ? stash.querySelector(`.chip[data-id="${d.id}"] b`) : elOf(d.id)?.querySelector('.dtitle');
+      if (el) editInline(el, (v) => { if (v) { d.name = v; save(); render(); } });
+    } else { openEditor(d.id); setTimeout(() => { $('#ed-name').focus(); $('#ed-name').select(); }, 30); }
   } else if (kind === 'postit') {
-    const p = { id: uid(), x: Math.round(w.x - 85), y: Math.round(w.y - 75), text: '', color: PASTEL[0] };
+    const p = { id: uid(), x: Math.round(w.x - 85), y: Math.round(w.y - 75), z: topZ(), text: '', color: PASTEL[0] };
     S.postits.push(p); sel.clear(); sel.add(p.id); save(); render(); editPostit(p);
+  } else if (kind === 'frame' && !w.free && [...sel].map(find).some((x) => x?.k === 'f')) {
+    return frameInside([...sel].map(find).find((x) => x?.k === 'f').o);
   } else if (kind === 'frame') {
-    const f = { id: uid(), x: Math.round(w.x - 220), y: Math.round(w.y - 140), w: 440, h: 300, title: '', color: PASTEL[4] };
+    const f = { id: uid(), x: Math.round(w.x - 220), y: Math.round(w.y - 140), w: 440, h: 300, title: '', color: PASTEL[(S.frames.length + 4) % PASTEL.length] };
+    const fitted = fitFrame(f, { x: w.x - 260, y: w.y - 200, w: 520, h: 400 });
     S.frames.push(f); sel.clear(); sel.add(f.id); save(); render();
+    if (fitted) elOf(f.id)?.animate([{ opacity: 0, transform: 'scale(1.06)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.34,1.56,.64,1)' });
     editInline(elOf(f.id).querySelector('.ftitle'), (v) => { f.title = v; save(); render(); }, true);
+  } else {
+    const it = newItem(kind, '', { x: w.x - 90, y: w.y - 18 });
+    sel.clear(); sel.add(it.id); save(); render();
+    editInline(elOf(it.id).querySelector('.itext'), (v) => {
+      if (!v) { listOf(kind).splice(listOf(kind).indexOf(it), 1); render(); save(); return; }
+      it.text = v; log('crear', `${kind === 'idea' ? 'Idea' : 'Tarea'} «${v}»`, { ref: it.id }); changed();
+    });
   }
 }
 
-// Inline text editing (names, frame titles). onDone gets the trimmed text, or null when cancelled.
+// Inline text editing. onDone gets the trimmed text, or null when cancelled.
 function editInline(el, onDone, allowEmpty = false) {
-  const before = el.textContent;
+  const before = el.textContent === '…' ? '' : el.textContent;
+  el.textContent = before;
   el.contentEditable = 'true'; el.focus();
   const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
   let done = false;
@@ -196,8 +390,8 @@ function editInline(el, onDone, allowEmpty = false) {
     if (done) return; done = true;
     el.contentEditable = 'false';
     const v = el.textContent.replace(/\s+/g, ' ').trim();
-    if (!ok) { el.textContent = before; onDone(null); return; }
-    if (!v && !allowEmpty) { el.textContent = before; onDone(null); return; }
+    if (!ok) { el.textContent = before; onDone(before ? null : ''); return; }
+    if (!v && !allowEmpty && before) { el.textContent = before; onDone(null); return; }
     onDone(v);
   };
   el.addEventListener('keydown', (e) => {
@@ -217,42 +411,142 @@ function editPostit(p) {
     if (v !== p.text) { snap(); p.text = v; save(); }
   }, { once: true });
 }
+// Stacking: what is on the plane has a z; new things and «Al frente» go on top, «Al fondo» under everything.
+const stackable = () => [...S.docs.filter((d) => d.place === 'canvas'), ...S.postits, ...S.ideas, ...S.tasks];
+const topZ = () => Math.max(0, ...stackable().map((o) => o.z || 0)) + 1;
+function restack(objs, front) {
+  objs = objs.filter((o) => !('w' in o && 'title' in o));        // frames always stay behind
+  if (!objs.length) return;
+  snap();
+  if (front) { let z = topZ(); for (const o of objs) o.z = z++; }
+  else { const set = new Set(objs); for (const o of stackable()) if (!set.has(o)) o.z = (o.z || 0) + objs.length; objs.forEach((o, i) => { o.z = i; }); }
+  save(); renderItems(); paintSel();
+}
+// A frame dropped near loose things wraps them: it takes their outline plus a margin.
+function fitFrame(f, near) {
+  const R = near || { x: f.x - 60, y: f.y - 60, w: f.w + 120, h: f.h + 120 };
+  const boxes = [];
+  for (const el of itemsEl.querySelectorAll('[data-k]')) {
+    const o = find(el.dataset.id).o, [w, h] = sizeOf(el, o);
+    if (o.x + w > R.x && o.x < R.x + R.w && o.y + h > R.y && o.y < R.y + R.h) boxes.push([o.x, o.y, w, h]);
+  }
+  if (!boxes.length) return false;
+  const pad = 28;
+  const x0 = Math.min(...boxes.map((b) => b[0])), y0 = Math.min(...boxes.map((b) => b[1]));
+  const x1 = Math.max(...boxes.map((b) => b[0] + b[2])), y1 = Math.max(...boxes.map((b) => b[1] + b[3]));
+  f.x = Math.round(x0 - pad); f.y = Math.round(y0 - pad); f.w = Math.round(x1 - x0 + pad * 2); f.h = Math.round(y1 - y0 + pad * 2);
+  return true;
+}
+function frameInside(outer) {
+  snap();
+  const f = { id: uid(), x: outer.x + 28, y: outer.y + 48, w: Math.max(180, Math.round(outer.w * 0.5)), h: Math.max(120, Math.round(outer.h * 0.45)), title: '',
+    color: PASTEL[(PASTEL.indexOf(outer.color) + 2) % PASTEL.length] };
+  S.frames.push(f); sel.clear(); sel.add(f.id); save(); render();
+  elOf(f.id)?.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 280, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  editInline(elOf(f.id).querySelector('.ftitle'), (v) => { f.title = v || ''; save(); render(); }, true);
+}
+const SIGN_COLORS = ['#ffd9c2', '#f9d0e3', '#cfe5fb', '#cdeedd', '#fff1b8', '#e3d9f7'];
+function dropSign(e) {
+  const sp = signSpot(e);
+  if (!sp) return toast('Suéltalo junto al borde de un documento, post-it, idea, tarea o marco');
+  snap();
+  const g = { id: uid(), host: sp.hostEl.dataset.id, edge: sp.edge, t: sp.t, text: '', color: SIGN_COLORS[S.signs.length % SIGN_COLORS.length] };
+  S.signs.push(g); save(); renderItems(); paintSel();
+  openSign(g, true);
+}
+// The reader: a big panel over everything. Editing happens here too.
+function openSign(g, editing = false) {
+  if (!g) return;
+  const host = find(g.host)?.o;
+  const where = host ? (host.name || host.title || host.text || '').split('\n')[0].slice(0, 40) : '';
+  const box = $('#reader');
+  box.querySelector('.rd-where').textContent = where ? `Letrero en «${where}»` : 'Letrero';
+  box.querySelector('.rd-panel').style.setProperty('--sc', g.color);
+  const text = box.querySelector('.rd-text'), area = box.querySelector('.rd-edit');
+  const show = (ed) => {
+    box.classList.toggle('editing', ed);
+    text.textContent = g.text || 'Sin texto todavía.';
+    area.value = g.text || '';
+    if (ed) setTimeout(() => area.focus(), 30);
+  };
+  box.onclick = (e) => {
+    const a = e.target.closest('[data-rd]')?.dataset.rd;
+    if (e.target === box.querySelector('.rd-back') || a === 'close') close();
+    else if (a === 'edit') show(true);
+    else if (a === 'save') { snap(); g.text = area.value.replace(/\s+$/, ''); save(); renderItems(); paintSel(); show(false); }
+    else if (a === 'del') { snap(); S.signs = S.signs.filter((x) => x !== g); save(); renderItems(); paintSel(); close(); toast('Letrero quitado', [['Deshacer', doUndo]]); }
+  };
+  area.onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) box.querySelector('[data-rd="save"]').click(); if (e.key === 'Escape') { e.stopPropagation(); if (!g.text && !area.value) { S.signs = S.signs.filter((x) => x !== g); save(); renderItems(); } close(); } };
+  const close = () => { box.classList.remove('open', 'editing'); };
+  box.classList.add('open'); show(editing);
+}
+function setItemText(it, v) {
+  if (v == null || v === it.text) return;
+  snap(); log('renombrar', `«${it.text}» → «${v}»`, { ref: it.id }); it.text = v; changed();
+}
+function toggleTask(it) {
+  snap(); it.done = !it.done; it.doneAt = it.done ? Date.now() : null;
+  log(it.done ? 'hecha' : 'reabrir', `Tarea «${it.text}»`, { item: it.id });
+  changed();
+}
 
-// ---- deleting (document numbers close the gap, as if the deleted one never existed) ---------------------------------
+// ---- deleting ------------------------------------------------------------------------------------------------------
+// Document numbers close the gap, as if the deleted one never existed. An idea or task that is still inside a document
+// only leaves the plane; deleted for good, it stays in those documents as plain text.
 function renumber(text, k) {
-  return (text || '').replace(LINK_RE, (m, label, n) => {
-    n = +n;
-    if (n === k) return `[${label}]`;
-    return n > k ? `[${label}*${n - 1}]` : m;
-  });
+  return (text || '').replace(LINK_RE, (m, label, n) => { n = +n; if (n === k) return `[${label}]`; return n > k ? `[${label}*${n - 1}]` : m; });
+}
+function deleteItemForGood(it) {
+  const plain = `${it.kind === 'idea' ? '💡' : it.done ? '☑' : '☐'} ${it.text}`;
+  for (const d of S.docs) d.text = (d.text || '').split(token(it)).join(plain);
+  listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);
 }
 function removeIds(ids) {
-  if (!ids.length) return;
+  ids = ids.filter((id) => find(id)); if (!ids.length) return;
   snap();
-  const set = new Set(ids);
+  const set = new Set(ids); let left = 0;
   const idx = S.docs.map((d, i) => (set.has(d.id) ? i : -1)).filter((i) => i >= 0).sort((a, b) => b - a);
   for (const i of idx) {
-    S.docs.splice(i, 1);
-    for (const d of S.docs) d.text = renumber(d.text, i + 1);
+    const [d] = S.docs.splice(i, 1);
+    log('borrar', `Documento «${d.name}»`, { restore: { k: 'd', o: d } });
+    for (const o of S.docs) o.text = renumber(o.text, i + 1);
   }
+  for (const p of S.postits.filter((p) => set.has(p.id))) log('borrar', `Post-it «${(p.text || '').slice(0, 40)}»`, { restore: { k: 'p', o: p } });
+  for (const f of S.frames.filter((f) => set.has(f.id))) log('borrar', `Marco «${f.title || 'sin título'}»`, { restore: { k: 'f', o: f } });
+  S.signs = (S.signs || []).filter((g) => !set.has(g.host));
   S.postits = S.postits.filter((p) => !set.has(p.id));
   S.frames = S.frames.filter((f) => !set.has(f.id));
+  for (const it of [...S.ideas, ...S.tasks].filter((x) => set.has(x.id))) {
+    if (docsUsing(it).length) { it.onCanvas = false; left++; continue; }
+    log('borrar', `${it.kind === 'idea' ? 'Idea' : 'Tarea'} «${it.text}»`, { restore: { k: it.kind, o: { ...it } } });
+    deleteItemForGood(it);
+  }
   for (const id of ids) sel.delete(id);
   if (curId) { const d = docById(curId); if (!d) closeEditor(); else { ed.replaceText(d.text || ''); fillHead(); } }
-  save(); render();
-  toast(ids.length === 1 ? 'Borrado' : `${ids.length} elementos borrados`, [['Deshacer', doUndo]]);
+  changed();
+  toast(left && left === ids.length ? 'Quitado del plano: sigue en sus documentos' : ids.length === 1 ? 'Borrado' : `${ids.length} elementos borrados`, [['Deshacer', doUndo]]);
+}
+function restoreFrom(h) {
+  const { k, o } = h.restore;
+  if (k === 'd') { S.docs.push({ ...o }); }
+  else if (k === 'p') S.postits.push({ ...o });
+  else if (k === 'f') S.frames.push({ ...o });
+  else { if (getItem(k, o.n)) return toast('Ya está'); listOf(k).push({ ...o, onCanvas: true }); }
+  log('restaurar', h.msg, { ref: o.id }); h.restored = true; changed(); toast('Restaurado');
 }
 
-// ---- card actions --------------------------------------------------------------------------------------------------
-async function cardAction(a, d, btn) {
-  if (a === 'open') return openEditor(d.id);
-  if (a === 'copy') { await navigator.clipboard.writeText(d.text || ''); return toast(`Copiado «${d.name}»`); }
+// ---- actions on the plane ------------------------------------------------------------------------------------------
+async function docAction(a, d) {
+  if (a === 'copy') { await navigator.clipboard.writeText(readable(d.text)); return toast(`Copiado «${d.name}»`); }
   let clip;
   try { clip = (await navigator.clipboard.readText()).replace(/\r\n/g, '\n'); } catch { return toast('El navegador no deja leer el portapapeles'); }
   if (!clip) return toast('El portapapeles está vacío');
   snap();
+  const before = d.text;
   d.text = a === 'add' ? (d.text ? d.text.replace(/\n*$/, '\n') + clip : clip) : clip;
-  d.updated = Date.now(); save(); render();
+  d.updated = Date.now();
+  log('editar', `${a === 'add' ? 'Añadiste a' : 'Reemplazaste'} «${d.name}»`, { docId: d.id, before });
+  changed();
   toast(a === 'add' ? `Añadido al final de «${d.name}»` : `«${d.name}» reemplazado`, [['Deshacer', doUndo]]);
 }
 
@@ -260,47 +554,89 @@ async function cardAction(a, d, btn) {
 let act = null, space = false;
 vp.addEventListener('contextmenu', (e) => e.preventDefault());
 vp.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.acts, .x, .pal, [contenteditable="true"]')) return;
-  if (e.button === 1 || e.button === 2 || (e.button === 0 && space)) {
+  if (e.target.closest('.sign')) return;
+  if (e.target.closest('.acts, .x, .pal, .chk, .f-add, [contenteditable="true"]')) return;
+  const it = e.target.closest('[data-k]');
+  // pan: middle or right button, Space + drag, or Ctrl + drag on empty grid
+  if (e.button === 1 || e.button === 2 || (e.button === 0 && (space || (e.ctrlKey && !it)))) {
     e.preventDefault();
     act = { k: 'pan', sx: e.clientX, sy: e.clientY, vx: S.view.x, vy: S.view.y }; vp.classList.add('panning'); return;
   }
   if (e.button !== 0) return;
   document.activeElement?.blur?.();
   const rs = e.target.closest('.rs');
-  if (rs) { const f = find(rs.closest('.frame').dataset.id).o; act = { k: 'resize', f, sx: e.clientX, sy: e.clientY, w: f.w, h: f.h, el: rs.closest('.frame') }; return; }
-  const it = e.target.closest('[data-k]');
+  const prs = e.target.closest('.prs');
+  if (prs) {
+    const host = prs.closest('[data-k]'), p = find(host.dataset.id).o;
+    const keep = new Set(sel); sel.clear(); sel.add(p.id);
+    const deps = collectMoving(e.altKey).filter((m) => m.o !== p).map((m) => ({ ...m, s0: m.o.s || 1, w0: m.o.w, h0: m.o.h }));
+    sel.clear(); for (const id of keep) sel.add(id); sel.add(p.id); paintSel();
+    act = { k: 'scale', p, sx: e.clientX, s0: p.s || 1, w0: host.offsetWidth, el: host, deps }; return;
+  }
+  if (rs) {
+    const f = find(rs.closest('.frame').dataset.id).o;
+    const keep = new Set(sel); sel.clear(); sel.add(f.id);
+    const deps = e.altKey ? [] : collectMoving(false).filter((m) => m.o !== f).map((m) => ({ ...m, s0: m.o.s || 1, w0: m.o.w, h0: m.o.h }));
+    sel.clear(); for (const id of keep) sel.add(id);
+    act = { k: 'resize', f, sx: e.clientX, sy: e.clientY, w: f.w, h: f.h, el: rs.closest('.frame'), deps }; return;
+  }
   if (it) {
-    const id = it.dataset.id;
-    if (e.shiftKey) { sel.has(id) ? sel.delete(id) : sel.add(id); }
+    const id = it.dataset.id, toggle = e.shiftKey || e.ctrlKey || e.metaKey;
+    if (toggle) { sel.has(id) ? sel.delete(id) : sel.add(id); }
     else if (!sel.has(id)) { sel.clear(); sel.add(id); }
     paintSel();
-    act = { k: 'move', sx: e.clientX, sy: e.clientY, moving: collectMoving(e.altKey), moved: false, id, kind: it.dataset.k, shift: e.shiftKey };
+    act = { k: 'move', sx: e.clientX, sy: e.clientY, moving: collectMoving(e.altKey), moved: false, id, kind: it.dataset.k, toggle, title: e.target.closest('.ftitle, .dtitle') };
     return;
   }
   act = { k: 'box', sx: e.clientX, sy: e.clientY, add: e.shiftKey, base: new Set(sel), moved: false };
 });
 
-// What moves with the selection: the selected items, and whatever sits inside a selected frame (Alt: the frame alone).
-function collectMoving(frameAlone) {
+// What moves with the selection: the selected things, and whatever sits inside a selected frame (Alt: the frame alone).
+// What moves with the selection (Alt: the selection alone):
+// · a frame carries what has its centre inside it, and the frames wholly inside it (nested, any depth);
+// · a document carries the post-its, ideas and tasks lying on it (one lying on two documents goes with the upper one);
+// · a post-it, idea or task carries the small things it touches, and those theirs, except what lies on a document
+//   that is not moving: that belongs to the document.
+const RANK = { f: 4, d: 3, p: 2, i: 2, t: 2 };
+function collectMoving(alone) {
   const out = new Map();
-  const add = (id) => { const f = find(id), el = elOf(id); if (f && el && (f.k !== 'd' || f.o.place === 'canvas')) out.set(id, { k: f.k, o: f.o, el, x0: f.o.x, y0: f.o.y }); };
+  const add = (id) => { const f = find(id), el = elOf(id); if (f && el && !out.has(id)) out.set(id, { k: f.k, o: f.o, el, x0: f.o.x, y0: f.o.y }); };
   for (const id of sel) add(id);
-  if (!frameAlone) {
-    for (const id of sel) {
-      const f = find(id); if (!f || f.k !== 'f') continue;
-      const fr = f.o;
-      for (const el of itemsEl.querySelectorAll('[data-k]')) {
-        const o = find(el.dataset.id).o;
-        const cx = o.x + el.offsetWidth / 2, cy = o.y + el.offsetHeight / 2;
-        if (cx > fr.x && cx < fr.x + fr.w && cy > fr.y && cy < fr.y + fr.h) add(el.dataset.id);
+  if (alone) return [...out.values()];
+  const inside = (p, q) => p !== q && p.x >= q.x && p.y >= q.y && p.x + p.w <= q.x + q.w && p.y + p.h <= q.y + q.h;
+  for (const id of sel) {
+    const f = find(id); if (!f || f.k !== 'f') continue;
+    const fr = f.o;
+    for (const g of S.frames) if (inside(g, fr)) add(g.id);
+    for (const el of itemsEl.querySelectorAll('[data-k]')) {
+      const o = find(el.dataset.id).o;
+      const [w, h] = sizeOf(el, o), cx = o.x + w / 2, cy = o.y + h / 2;
+      if (cx > fr.x && cx < fr.x + fr.w && cy > fr.y && cy < fr.y + fr.h) add(el.dataset.id);
+    }
+  }
+  for (const m of [...out.values()]) if (m.k === 'd') for (const t of docked(m.o)) add(t.id);
+  const boxes = [...itemsEl.querySelectorAll('[data-k]')].map((el) => {
+    const { k, o } = find(el.dataset.id), [w, h] = sizeOf(el, o); return { id: o.id, k, x: o.x, y: o.y, w, h, z: o.z || 0 };
+  });
+  const over = (p, q) => p.x < q.x + q.w && q.x < p.x + p.w && p.y < q.y + q.h && q.y < p.y + p.h;
+  const queue = boxes.filter((x) => out.has(x.id));
+  while (queue.length) {
+    const X = queue.shift();
+    for (const Y of boxes) {
+      if (out.has(Y.id) || !over(X, Y)) continue;
+      const rx = RANK[X.k], ry = RANK[Y.k];
+      if (ry > rx || (ry === rx && rx !== 2)) continue;          // never carries a bigger thing, nor a document another
+      const under = boxes.filter((D) => D.k === 'd' && D.id !== Y.id && over(D, Y));
+      if (under.length) {
+        if (X.k === 'd') { const top = under.reduce((m, D) => (D.z > m.z ? D : m)); if (top.id !== X.id) continue; }
+        else if (under.some((D) => !out.has(D.id))) continue;    // it lies on a document that stays: it stays
       }
+      add(Y.id); queue.push(Y);
     }
   }
   return [...out.values()];
 }
-const overStash = (e) => { const r = stash.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
-const overCanvas = (e) => { const el = document.elementFromPoint(e.clientX, e.clientY); return !!el && !el.closest('#side, #stash, #zoom, #ed') && !!el.closest('#vp'); };
+const overCanvas = (e) => { const el = document.elementFromPoint(e.clientX, e.clientY); return !!el && !el.closest('#side, #stash, #zoom, #ed, #panel, #selbar') && !!el.closest('#vp'); };
 
 addEventListener('pointermove', (e) => {
   if (gh) return moveGhost(e);
@@ -309,10 +645,10 @@ addEventListener('pointermove', (e) => {
   if (act.k === 'pan') { S.view.x = act.vx + e.clientX - act.sx; S.view.y = act.vy + e.clientY - act.sy; applyView(); }
   else if (act.k === 'move') {
     if (!act.moved && Math.hypot(e.clientX - act.sx, e.clientY - act.sy) < 3) return;
-    if (!act.moved) { act.moved = true; snap(); document.body.classList.add('dragging'); }
+    if (!act.moved) { act.moved = true; snap(); document.body.classList.add('dragging'); if (act.moving.some((m) => m.k === 'd')) dragTrays(true); }
     const dx = (e.clientX - act.sx) / z, dy = (e.clientY - act.sy) / z;
     for (const m of act.moving) { m.o.x = Math.round(m.x0 + dx); m.o.y = Math.round(m.y0 + dy); m.el.style.left = m.o.x + 'px'; m.el.style.top = m.o.y + 'px'; }
-    stash.classList.toggle('hot', overStash(e) && act.moving.some((m) => m.k === 'd'));
+    hotTray(e, act.moving.some((m) => m.k === 'd'));
   } else if (act.k === 'box') {
     if (!act.moved && Math.hypot(e.clientX - act.sx, e.clientY - act.sy) < 3) return;
     act.moved = true;
@@ -327,47 +663,191 @@ addEventListener('pointermove', (e) => {
       if (hit) sel.add(el.dataset.id);
     }
     paintSel();
+  } else if (act.k === 'scale') {
+    if (!act.snapped) { act.snapped = true; snap(); document.body.classList.add('dragging'); }
+    const ns = Math.round(Math.min(4, Math.max(0.25, act.s0 * (1 + (e.clientX - act.sx) / z / (act.w0 * act.s0)))) * 100) / 100;
+    const f = ns / act.s0, p = act.p;
+    p.s = ns; act.el.style.setProperty('--s', ns);
+    scaleDeps(act.deps, p.x, p.y, f, f);
   } else if (act.k === 'resize') {
-    if (!act.snapped) { act.snapped = true; snap(); }
+    if (!act.snapped) { act.snapped = true; snap(); document.body.classList.add('dragging'); }
     act.f.w = Math.max(160, Math.round(act.w + (e.clientX - act.sx) / z));
     act.f.h = Math.max(100, Math.round(act.h + (e.clientY - act.sy) / z));
     act.el.style.width = act.f.w + 'px'; act.el.style.height = act.f.h + 'px';
+    scaleDeps(act.deps, act.f.x, act.f.y, act.f.w / act.w, act.f.h / act.h);
   }
 });
+// What a thing carries follows its scaling: positions stretch from the corner, sizes grow by the same factor.
+function scaleDeps(deps, ox, oy, fx, fy) {
+  const f = Math.min(fx, fy);
+  for (const m of deps) {
+    m.o.x = Math.round(ox + (m.x0 - ox) * fx); m.o.y = Math.round(oy + (m.y0 - oy) * fy);
+    m.el.style.left = m.o.x + 'px'; m.el.style.top = m.o.y + 'px';
+    if (m.k === 'f') { m.o.w = Math.round(m.w0 * fx); m.o.h = Math.round(m.h0 * fy); m.el.style.width = m.o.w + 'px'; m.el.style.height = m.o.h + 'px'; }
+    else { m.o.s = Math.round(m.s0 * f * 100) / 100; m.el.style.setProperty('--s', m.o.s); }
+  }
+}
 addEventListener('pointerup', (e) => {
   if (gh) return dropGhost(e);
   if (!act) return;
   const a = act; act = null;
-  vp.classList.remove('panning'); document.body.classList.remove('dragging'); stash.classList.remove('hot');
+  const trayAt = overStash(e);                     // read it before the trays tuck away
+  vp.classList.remove('panning'); document.body.classList.remove('dragging'); hotTray(e, false); dragTrays(false);
   if (a.k === 'pan') saveView();
   else if (a.k === 'move' && a.moved) {
-    if (overStash(e)) {
+    const movedDocs = new Set(a.moving.filter((m) => m.k === 'd').map((m) => m.o.id));
+    for (const m of a.moving) {
+      if (m.k !== 't' || !sel.has(m.o.id) || (m.o.dock && movedDocs.has(m.o.dock))) continue;
+      const tg = dockTarget(m.o);
+      if (tg) { tg.others.splice(tg.at, 0, m.o); tg.others.forEach((x, i) => { x.dock = tg.d.id; x.dockAt = i; }); }
+      else if (m.o.dock) { delete m.o.dock; delete m.o.dockAt; m.o.s = 1; }
+    }
+    const tray = trayAt;
+    if (tray) {
       const ds = a.moving.filter((m) => m.k === 'd');
-      for (const m of ds) { m.o.x = m.x0; m.o.y = m.y0; m.o.place = 'stash'; sel.delete(m.o.id); }
-      if (ds.length) toast(ds.length === 1 ? `«${ds[0].o.name}» en la bandeja` : `${ds.length} documentos en la bandeja`);
+      for (const m of ds) { m.o.x = m.x0; m.o.y = m.y0; }
+      if (ds.length) { const t = putInTray(ds.map((m) => m.o), tray); toast(ds.length === 1 ? `«${ds[0].o.name}» en «${t.name}»` : `${ds.length} documentos en «${t.name}»`); }
+    } else if (a.moving.length === 1 && a.moving[0].k === 'f') {
+      const f = a.moving[0].o, before = { ...f };
+      if (fitFrame(f)) toast('Marco ajustado a lo que tiene cerca', [['Deshacer', () => { Object.assign(f, before); save(); render(); }]]);
     }
     save(); render();
-  } else if (a.k === 'move' && a.kind === 'd' && !a.shift) {
-    sel.clear(); paintSel(); openEditor(a.id);          // a click on a document opens it
+  } else if (a.k === 'move' && a.title && !a.toggle) {
+    const f = find(a.id).o;                              // one click on a frame's or a document's title edits it
+    if (a.kind === 'd') editInline(a.title, (v) => { if (v) { f.name = v; save(); render(); } });
+    else editInline(a.title, (v) => { if (v !== null) { f.title = v; save(); render(); } }, true);
+  } else if (a.k === 'move' && !a.toggle) {
+    clearTimeout(clickT); clickT = setTimeout(() => focusOn(a.id), 240);   // a click brings it close; a double click opens
   } else if (a.k === 'box') {
     $('#selrect').style.display = 'none';
     if (!a.moved && !a.add) { sel.clear(); paintSel(); }
-  } else if (a.k === 'resize') save();
+  } else if (a.k === 'resize' || a.k === 'scale') save();
 });
 
 vp.addEventListener('click', (e) => {
+  const sg = e.target.closest('.sign');
+  if (sg) return openSign(S.signs.find((g) => g.id === sg.dataset.sign));
   const b = e.target.closest('.acts button');
-  if (b) return cardAction(b.dataset.a, docById(b.closest('.card').dataset.id), b);
+  if (b) {
+    const host = b.closest('[data-k]'), f = find(host.dataset.id);
+    if (b.dataset.a === 'front' || b.dataset.a === 'back') return restack(sel.has(f.o.id) ? [...sel].map(find).filter(Boolean).map((x) => x.o) : [f.o], b.dataset.a === 'front');
+    if (f.k === 'd') return docAction(b.dataset.a, f.o);
+    if (b.dataset.a === 'ref') { navigator.clipboard.writeText(token(f.o)); return toast('Copiada. Pégala en un documento o en otro sitio del plano (Ctrl+V)'); }
+  }
+  const chk = e.target.closest('.chk');
+  if (chk) return toggleTask(find(chk.closest('[data-k]').dataset.id).o);
+  const fa = e.target.closest('.f-add');
+  if (fa) return frameInside(find(fa.closest('.frame').dataset.id).o);
   const x = e.target.closest('.x');
   if (x) return removeIds([x.closest('[data-k]').dataset.id]);
   const dot = e.target.closest('.pal i');
   if (dot) { const f = find(dot.closest('[data-k]').dataset.id); snap(); f.o.color = dot.dataset.c; save(); render(); }
 });
 vp.addEventListener('dblclick', (e) => {
+  clearTimeout(clickT);
+  const dc = e.target.closest('.doc');
+  if (dc && !e.target.closest('.dtitle, .acts, .x, .prs, .sign')) return openEditor(dc.dataset.id);
   const pt = e.target.closest('.postit');
   if (pt) return editPostit(find(pt.dataset.id).o);
+  const itx = e.target.closest('.item');
+  if (itx) { const it = find(itx.dataset.id).o; return editInline(itx.querySelector('.itext'), (v) => setItemText(it, v)); }
   const ft = e.target.closest('.ftab');
   if (ft) { const f = find(ft.closest('.frame').dataset.id).o; return editInline(ft.querySelector('.ftitle'), (v) => { if (v !== null) { f.title = v; save(); render(); } }, true); }
+});
+
+// Ctrl+V on the plane: a copied idea or task appears here; any other text becomes a post-it.
+addEventListener('paste', (e) => {
+  if (edOpen() || typing(e)) return;
+  const t = (e.clipboardData?.getData('text/plain') || '').replace(/\r\n/g, '\n');
+  if (!t.trim()) return;
+  e.preventDefault();
+  const w = overCanvas({ clientX: mouse.x, clientY: mouse.y }) ? toWorld(mouse.x, mouse.y) : centerWorld();
+  const m = t.trim().match(/^\{(idea|tarea) (\d+)\}$/);
+  snap();
+  if (m) {
+    const it = getItem(m[1], +m[2]); if (!it) return toast('Esa ya no existe');
+    it.onCanvas = true; it.x = Math.round(w.x - 90); it.y = Math.round(w.y - 18); it.z = topZ();
+    sel.clear(); sel.add(it.id); changed(); return;
+  }
+  const p = { id: uid(), x: Math.round(w.x - 85), y: Math.round(w.y - 75), z: topZ(), text: t, color: PASTEL[0] };
+  S.postits.push(p); sel.clear(); sel.add(p.id); changed(); toast('Pegado como post-it');
+});
+
+// ---- focus: a click centres a thing and brings it close; a pill takes you back to where you were ----------------
+let clickT = null, backView = null, backT = null;
+const ease = (t) => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+let viewAnim = 0;
+function animateView(to, ms = 560) {
+  const from = { ...S.view }, id = ++viewAnim, t0 = performance.now();
+  const area = visibleArea(), cx = (area.l + area.r) / 2, cy = (area.t + area.b) / 2;
+  const c0 = { x: (cx - from.x) / from.z, y: (cy - from.y) / from.z }, c1 = { x: (cx - to.x) / to.z, y: (cy - to.y) / to.z };
+  const step = (now) => {
+    if (id !== viewAnim) return;
+    const k = ease(Math.min(1, (now - t0) / ms));
+    const z = Math.exp(Math.log(from.z) + (Math.log(to.z) - Math.log(from.z)) * k);
+    const wx = c0.x + (c1.x - c0.x) * k, wy = c0.y + (c1.y - c0.y) * k;
+    S.view = { x: cx - wx * z, y: cy - wy * z, z };
+    applyView();
+    if (k < 1) requestAnimationFrame(step); else { S.view = { ...to }; applyView(); saveView(); }
+  };
+  requestAnimationFrame(step);
+}
+function visibleArea() {
+  const panelOpen = !$('#panel').classList.contains('closed');
+  return { l: 120, r: innerWidth - (panelOpen ? 340 : 24), t: 20, b: innerHeight - 20 };
+}
+function focusOn(id) {
+  const f = find(id), el = elOf(id); if (!f || !el) return;
+  const [w, h] = f.k === 'f' ? [f.o.w, f.o.h + 34] : sizeOf(el, f.o);
+  const area = visibleArea(), aw = area.r - area.l, ah = area.b - area.t;
+  const z = Math.min(3, (aw * 0.62) / w, (ah * 0.7) / h);
+  const ox = f.o.x + w / 2, oy = f.o.y - (f.k === 'f' ? 34 : 0) + h / 2;
+  const to = { z, x: (area.l + area.r) / 2 - ox * z, y: (area.t + area.b) / 2 - oy * z };
+  if (Math.abs(to.z - S.view.z) < 0.02 && Math.hypot(to.x - S.view.x, to.y - S.view.y) < 4) return;
+  if (!backView) backView = { ...S.view };
+  animateView(to);
+  showBack();
+}
+function showBack() {
+  const p = $('#backpill'); p.classList.add('on');
+  clearTimeout(backT); backT = setTimeout(() => { p.classList.remove('on'); backView = null; }, 7000);
+}
+$('#backpill').onclick = () => {
+  if (backView) animateView(backView);
+  backView = null; clearTimeout(backT); $('#backpill').classList.remove('on');
+};
+
+// ---- peek: hovering something that is partly covered brings it forward for a moment, with what lies on it ----------
+let peekT = null, peeked = [];
+function unpeek() {
+  for (const el of peeked) { const f = find(el.dataset.id); el.style.zIndex = f ? f.o.z || 0 : ''; el.classList.remove('peek'); }
+  peeked = [];
+}
+function covered(el, group) {
+  const me = find(el.dataset.id).o, r = el.getBoundingClientRect();
+  return [...itemsEl.querySelectorAll('[data-k]')].some((o) => {
+    if (o === el || group.has(o)) return false;
+    const x = find(o.dataset.id).o; if ((x.z || 0) < (me.z || 0)) return false;
+    const q = o.getBoundingClientRect();
+    return q.left < r.right && r.left < q.right && q.top < r.bottom && r.top < q.bottom;
+  });
+}
+function peek(el) {
+  if (act || gh || !el.isConnected) return;
+  const keep = new Set(sel); sel.clear(); sel.add(el.dataset.id);
+  const group = collectMoving(false); sel.clear(); for (const id of keep) sel.add(id);
+  if (!covered(el, new Set(group.map((m) => m.el)))) return;     // only when something else covers it
+  unpeek();
+  group.sort((a, b) => (a.o.z || 0) - (b.o.z || 0)).forEach((m, i) => { m.el.style.zIndex = 10000 + i; m.el.classList.add('peek'); peeked.push(m.el); });
+}
+itemsEl.addEventListener('pointerover', (e) => {
+  const el = e.target.closest('[data-k]'); if (!el || peeked.includes(el)) return;
+  clearTimeout(peekT); peekT = setTimeout(() => peek(el), 280);
+});
+addEventListener('pointermove', (e) => {
+  if (!peeked.length) return;
+  const el = e.target.closest?.('[data-k]');
+  if (!el || !peeked.includes(el)) { if (!el) clearTimeout(peekT); unpeek(); }
 });
 
 // ---- dragging from the sidebar and the stash (a ghost follows the pointer) ------------------------------------------
@@ -376,48 +856,226 @@ const ghost = $('#ghost');
 function startGhost(e, info) { gh = { ...info, sx: e.clientX, sy: e.clientY, moved: false }; }
 function moveGhost(e) {
   if (!gh.moved && Math.hypot(e.clientX - gh.sx, e.clientY - gh.sy) < 4) return;
-  if (!gh.moved) { gh.moved = true; ghost.innerHTML = gh.label; ghost.style.display = 'flex'; document.body.classList.add('dragging'); }
+  if (!gh.moved) { gh.moved = true; ghost.innerHTML = gh.label; ghost.style.display = 'flex'; document.body.classList.add('dragging'); if (gh.kind === 'doc' || gh.kind === 'chip') dragTrays(true); }
   ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px';
-  stash.classList.toggle('hot', overStash(e) && gh.kind !== 'chip' && (gh.kind === 'type'));
+  if (gh.kind === 'sign') {
+    world.querySelector('.sign.preview')?.remove();
+    const sp = signSpot(e);
+    ghost.style.display = sp ? 'none' : 'flex';
+    if (sp) sp.hostEl.insertAdjacentHTML('beforeend', signHTML({ id: 'preview', edge: sp.edge, t: sp.t }, ' preview'));
+    return;
+  }
+  hotTray(e, gh.kind === 'doc' || gh.kind === 'chip');
 }
 function dropGhost(e) {
   const g = gh; gh = null;
-  ghost.style.display = 'none'; document.body.classList.remove('dragging'); stash.classList.remove('hot');
+  const trayAt = overStash(e);                     // read it before the trays tuck away
+  world.querySelector('.sign.preview')?.remove();
+  ghost.style.display = 'none'; document.body.classList.remove('dragging'); hotTray(e, false); dragTrays(false);
   if (g.kind === 'chip') {
     const d = docById(g.id); if (!d) return;
     if (!g.moved) return openEditor(d.id);
-    if (!overStash(e) && overCanvas(e)) {
+    const tray = trayAt;
+    if (tray) { if (tray !== trayOf(d).id) { snap(); putInTray([d], tray); save(); render(); } return; }
+    if (overCanvas(e)) {
       snap(); const w = toWorld(e.clientX, e.clientY);
-      d.place = 'canvas'; d.x = Math.round(w.x - CARD_W / 2); d.y = Math.round(w.y - 20);
+      d.place = 'canvas'; d.x = Math.round(w.x - DOC_W / 2); d.y = Math.round(w.y - 20);
       sel.clear(); sel.add(d.id); save(); render();
     }
     return;
   }
-  if (!g.moved) return create(g.kind, g.type, centerWorld(), false);
-  if (overStash(e)) { if (g.kind === 'type') create('type', g.type, { x: 0, y: 0 }, true); return; }
-  if (overCanvas(e)) create(g.kind, g.type, toWorld(e.clientX, e.clientY), false);
+  if (g.kind === 'sign') { if (g.moved) dropSign(e); else toast('Arrastra el letrero hasta el borde de un documento, post-it o marco'); return; }
+  if (!g.moved) return create(g.kind, centerWorld(), false);
+  const tray = trayAt;
+  if (tray) { if (g.kind === 'doc') create('doc', { x: 0, y: 0 }, tray); return; }
+  if (overCanvas(e)) create(g.kind, { ...toWorld(e.clientX, e.clientY), free: true }, false);
 }
 
-$('#types').innerHTML = TYPES.map((t) => `<div class="tool" data-kind="type" data-type="${t.id}" style="--c:${t.color}" title="Clic o arrastra al plano">
-  <span class="ico">${t.icon}</span><span>${t.name}</span></div>`).join('');
-$('#tools').innerHTML = `<div class="tool" data-kind="postit" style="--c:#fff1b8" title="Post-it"><span class="ico">🗒️</span><span>Post-it</span></div>
-  <div class="tool" data-kind="frame" style="--c:#cfe5fb" title="Marco para agrupar"><span class="ico">⬚</span><span>Marco</span></div>`;
+const TOOLS = [
+  ['doc', '📄', 'Documento', '#ffffff', 'Una página que se abre y se escribe'],
+  ['postit', '🗒️', 'Post-it', '#fff1b8', 'Se escribe encima; no se abre'],
+  ['idea', '💡', 'Idea', '#cdeedd', 'Una idea que puedes pegar en el plano y dentro de documentos'],
+  ['tarea', '☑️', 'Tarea', '#cfe5fb', 'Una tarea que puedes pegar en el plano y dentro de documentos'],
+  ['frame', '⬚', 'Marco', '#e3d9f7', 'Un marco para agrupar lo que hay suelto'],
+  ['sign', '🏷️', 'Letrero', '#ffd9c2', 'Suéltalo sobre un borde de un documento, post-it o marco; se lee con un clic'],
+];
+$('#types').innerHTML = TOOLS.map(([k, ico, name, c, tip]) => `<div class="tool" data-kind="${k}" style="--c:${c}" title="${tip} · clic o arrastra al plano">
+  <span class="ico">${ico}</span><span>${name}</span></div>`).join('');
 $('#side').addEventListener('pointerdown', (e) => {
   const t = e.target.closest('.tool'); if (!t || e.button !== 0) return;
-  e.preventDefault(); startGhost(e, { kind: t.dataset.kind, type: t.dataset.type, label: t.innerHTML });
+  e.preventDefault(); startGhost(e, { kind: t.dataset.kind, label: t.innerHTML });
 });
-stashList.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0 || e.target.closest('.x, [contenteditable="true"]')) return;
+stash.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || e.target.closest('.x, .t-x, [contenteditable="true"]')) return;
   const c = e.target.closest('.chip'); if (!c) return;
   e.preventDefault(); startGhost(e, { kind: 'chip', id: c.dataset.id, label: c.innerHTML.replace(/<button[\s\S]*<\/button>/, '') });
 });
-stashList.addEventListener('click', (e) => { const x = e.target.closest('.x'); if (x) removeIds([x.closest('.chip').dataset.id]); });
+stash.addEventListener('click', (e) => {
+  if (e.target.closest('.t-pill')) return showTrays(true);
+  if (e.target.closest('.t-hide')) return showTrays(false);
+  const dot = e.target.closest('.t-dot');
+  if (dot) {
+    const t = S.trays.find((o) => o.id === dot.closest('.tray').dataset.tray);
+    t.color = TRAY_COLORS[(TRAY_COLORS.indexOf(t.color) + 1) % TRAY_COLORS.length]; save(); return renderStash();
+  }
+  const out = e.target.closest('.t-out');
+  if (out) {
+    const t = S.trays.find((o) => o.id === out.closest('.tray').dataset.tray);
+    const ds = S.docs.filter((d) => d.place === 'stash' && trayOf(d) === t); if (!ds.length) return;
+    snap(); const c = centerWorld(), cols = Math.min(4, ds.length);
+    ds.forEach((d, i) => { d.place = 'canvas'; d.x = Math.round(c.x - (cols * 230) / 2 + (i % cols) * 230); d.y = Math.round(c.y - 140 + Math.floor(i / cols) * 300); d.z = topZ(); });
+    sel.clear(); ds.forEach((d) => sel.add(d.id)); changed(); return toast(`${ds.length} documento${ds.length > 1 ? 's' : ''} fuera de «${t.name}»`, [['Deshacer', doUndo]]);
+  }
+  const x = e.target.closest('.chip .x'); if (x) return removeIds([x.closest('.chip').dataset.id]);
+  if (e.target.closest('.t-add')) {
+    snap(); const used = new Set(S.trays.map((t) => t.color));
+    const t = { id: 'b' + uid(), name: `Bandeja ${S.trays.length + 1}`, color: TRAY_COLORS.find((c) => !used.has(c)) || TRAY_COLORS[0], open: true };
+    for (const o of S.trays) o.open = false;
+    S.trays.push(t); save(); renderStash();
+    const nm = stash.querySelector(`[data-tray="${t.id}"] .t-name`); if (nm) editInline(nm, (v) => { if (v) { t.name = v; save(); renderStash(); } });
+    return;
+  }
+  const tx = e.target.closest('.t-x');
+  if (tx) {
+    const t = S.trays.find((o) => o.id === tx.closest('.tray').dataset.tray); if (!t || S.trays.length < 2) return;
+    snap(); S.trays = S.trays.filter((o) => o !== t);
+    const to = S.trays[0];
+    for (const d of S.docs) if (d.place === 'stash' && d.tray === t.id) d.tray = to.id;
+    if (t.open) to.open = true;
+    save(); renderStash(); return;
+  }
+  const hd = e.target.closest('.tray header');
+  if (hd && !e.target.closest('[contenteditable="true"]')) {
+    const t = S.trays.find((o) => o.id === hd.closest('.tray').dataset.tray);
+    for (const o of S.trays) o.open = o === t;
+    for (const el of stash.querySelectorAll('.tray')) el.classList.toggle('open', el.dataset.tray === t.id);
+    save();
+  }
+});
+stash.addEventListener('dblclick', (e) => {
+  const nm = e.target.closest('.t-name'); if (!nm) return;
+  const t = S.trays.find((o) => o.id === nm.closest('.tray').dataset.tray);
+  editInline(nm, (v) => { if (v) { t.name = v; save(); renderStash(); } });
+});
+addEventListener('resize', () => renderStash());
+
+// ---- the panel: tasks, ideas, history ------------------------------------------------------------------------------
+let tab = localStorage.getItem('meadow.tab') || 'tareas';
+$('#panel').classList.toggle('closed', localStorage.getItem('meadow.panel') === 'closed');
+$('#panel-tab').onclick = () => {
+  const closed = $('#panel').classList.toggle('closed');
+  localStorage.setItem('meadow.panel', closed ? 'closed' : 'open');
+};
+$('#panel nav').onclick = (e) => {
+  const b = e.target.closest('button[data-tab]'); if (!b) return;
+  tab = b.dataset.tab; localStorage.setItem('meadow.tab', tab); renderPanel();
+};
+function whereOf(it) {
+  const ds = docsUsing(it).map((d) => d.name);
+  return [it.onCanvas ? 'plano' : '', ...ds.map((n) => `«${n}»`)].filter(Boolean).join(' · ') || 'en ningún sitio';
+}
+function when(t) {
+  const d = new Date(t), now = new Date();
+  const hm = d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return hm;
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'ayer ' + hm;
+  return d.toLocaleDateString('es', { day: 'numeric', month: 'short' }) + ' ' + hm;
+}
+// The frame a point lies in, as a path from the outermost («Viaje › Transporte»), or '' when it lies in none.
+function framePath(x, y) {
+  return S.frames.filter((f) => x > f.x && x < f.x + f.w && y > f.y && y < f.y + f.h)
+    .sort((a, b) => b.w * b.h - a.w * a.h).map((f) => f.title || 'Sin título').join(' › ');
+}
+// Where an idea or task lives for grouping: its own place on the plane, else the place of the first document holding it.
+function groupOf(it) {
+  const at = (o) => { const el = elOf(o.id); const [w, h] = el ? sizeOf(el, o) : [0, 0]; return framePath(o.x + w / 2, o.y + h / 2); };
+  if (it.onCanvas) return at(it) || 'En el plano, sin marco';
+  const d = docsUsing(it).find((x) => x.place === 'canvas');
+  if (d) return at(d) || 'En documentos sueltos';
+  return docsUsing(it).length ? 'En documentos de las bandejas' : 'En ningún sitio';
+}
+function groupedRows(list) {
+  const groups = new Map();
+  for (const it of list) { const g = groupOf(it); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(it); }
+  const order = [...groups.keys()].sort((a, b) => (/^En /.test(a) - /^En /.test(b)) || a.localeCompare(b, 'es'));
+  return order.map((g) => `<details class="grp" open><summary><span>${/^En /.test(g) ? '' : '⬚ '}${esc(g)}</span><i>${groups.get(g).length}</i></summary>${groups.get(g).map(itemRow).join('')}</details>`).join('');
+}
+let taskFilter = localStorage.getItem('meadow.taskFilter') || 'pend';
+function goTo(id) {
+  const f = find(id); if (!f) return toast('Ya no existe');
+  if (f.k === 'd') { if (f.o.place === 'canvas') { /* documents open */ } return openEditor(f.o.id); }
+  if (f.k === 'i' || f.k === 't') return locate(f.o);
+  if (edOpen()) closeEditor();
+  const el = elOf(id); centerOn(f.o, el); sel.clear(); sel.add(id); paintSel();
+  el?.animate([{ transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 450, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+}
+function itemRow(it) {
+  const lead = it.kind === 'idea' ? '<span class="r-ico">💡</span>' : `<button class="chk${it.done ? ' on' : ''}" data-tid="${it.n}">${it.done ? '✔' : ''}</button>`;
+  return `<div class="row${it.done ? ' done' : ''}" data-loc="${it.id}">${lead}<div class="r-main"><div class="r-text">${esc(it.text) || '…'}</div>
+    <div class="r-sub">${esc(whereOf(it))}</div></div><button class="r-copy" data-copy="${it.id}" title="Copiar para pegar">⧉</button></div>`;
+}
+function renderPanel() {
+  const open = S.tasks.filter((t) => !t.done).length;
+  $('#pt-n').textContent = open || '';
+  for (const b of document.querySelectorAll('#panel nav button')) b.classList.toggle('on', b.dataset.tab === tab);
+  let html = '';
+  if (tab === 'tareas') {
+    const pend = S.tasks.filter((t) => !t.done).length, hech = S.tasks.length - pend;
+    const list = S.tasks.filter((t) => taskFilter === 'all' || (taskFilter === 'done') === !!t.done)
+      .sort((a, b) => (a.done - b.done) || (b.created - a.created));
+    html = `<div class="filt">${[['pend', 'Pendientes', pend], ['done', 'Hechas', hech], ['all', 'Todas', S.tasks.length]]
+      .map(([k, l, n]) => `<button data-filt="${k}" class="${taskFilter === k ? 'on' : ''}">${l} <i>${n}</i></button>`).join('')}</div>`;
+    html += groupedRows(list) || `<p class="none">${taskFilter === 'done' ? 'Nada hecho todavía.' : 'Sin tareas pendientes. Arrastra «Tarea» al plano, o escribe <b>[</b> en un documento.'}</p>`;
+  } else if (tab === 'ideas') {
+    html = groupedRows([...S.ideas].sort((a, b) => b.created - a.created)) || '<p class="none">Sin ideas todavía.</p>';
+  } else {
+    html = S.history.slice(0, 200).map((h, i) => `<div class="hrow"><span class="h-ico">${ICON[h.kind] || '·'}</span><div class="r-main">
+      <div class="r-text">${esc(h.msg)}</div><div class="r-sub">${when(h.t)}
+      ${h.restore && !h.restored ? ` · <button class="lnk" data-hi="${i}" data-ha="restore">Restaurar</button>` : ''}
+      ${(() => { const r = h.ref || h.item || h.docId, f = r && find(r); return f ? ` · <button class="lnk" data-goto="${r}">${f.k === 'd' ? 'Abrir' : 'Ir'}</button>` : ''; })()}
+      ${h.kind === 'editar' && h.before != null && docById(h.docId) ? ` · <button class="lnk" data-hi="${i}" data-ha="version">Volver a como estaba</button>` : ''}
+      </div></div></div>`).join('') || '<p class="none">Aquí aparecerá lo que hagas.</p>';
+  }
+  $('#panel-body').innerHTML = html;
+}
+$('#panel-body').addEventListener('click', async (e) => {
+  const fb = e.target.closest('[data-filt]');
+  if (fb) { taskFilter = fb.dataset.filt; localStorage.setItem('meadow.taskFilter', taskFilter); return renderPanel(); }
+  const gt = e.target.closest('[data-goto]');
+  if (gt) return goTo(gt.dataset.goto);
+  const c = e.target.closest('.chk[data-tid]');
+  if (c) return toggleTask(getItem('tarea', +c.dataset.tid));
+  const cp = e.target.closest('[data-copy]');
+  if (cp) { const it = find(cp.dataset.copy).o; await navigator.clipboard.writeText(token(it)); return toast('Copiada. Pégala en un documento o en el plano'); }
+  const h = e.target.closest('[data-ha]');
+  if (h) {
+    const ev = S.history[+h.dataset.hi]; if (!ev) return;
+    if (h.dataset.ha === 'restore') return restoreFrom(ev);
+    const d = docById(ev.docId); if (!d) return;
+    snap(); const now = d.text; d.text = ev.before;
+    log('editar', `Volviste «${d.name}» a como estaba`, { docId: d.id, before: now });
+    if (curId === d.id) ed.replaceText(d.text);
+    changed(); return toast('Documento restaurado', [['Deshacer', doUndo]]);
+  }
+  const row = e.target.closest('[data-loc]');
+  if (row) locate(find(row.dataset.loc).o);
+});
+function locate(it) {
+  if (it.onCanvas) {
+    if (edOpen()) closeEditor();
+    const el = elOf(it.id); centerOn(it, el);
+    sel.clear(); sel.add(it.id); paintSel();
+    elOf(it.id)?.animate([{ transform: 'scale(1.12)' }, { transform: 'scale(1)' }], { duration: 450, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  } else { const d = docsUsing(it)[0]; if (d) openEditor(d.id); }
+}
 
 // ---- keyboard ------------------------------------------------------------------------------------------------------
 const typing = (e) => e.target.closest?.('input, textarea, select, [contenteditable="true"], .cm-editor');
 addEventListener('keydown', (e) => {
   document.body.classList.toggle('ctrl', e.ctrlKey || e.metaKey);
-  if (edOpen()) { if (e.key === 'Escape' && !e.defaultPrevented) closeEditor(); return; }
+  if ($('#reader').classList.contains('open')) { if (e.key === 'Escape') $('#reader').classList.remove('open', 'editing'); return; }
+  if (edOpen()) { if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('.pop')) closeEditor(); return; }
   if (typing(e)) return;
   const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
   if (e.key === ' ') { space = true; vp.classList.add('space'); e.preventDefault(); }
@@ -425,10 +1083,10 @@ addEventListener('keydown', (e) => {
   else if (mod && key === 'z') { e.preventDefault(); doUndo(); }
   else if (mod && key === 'a') { e.preventDefault(); for (const el of world.querySelectorAll('[data-k]')) sel.add(el.dataset.id); paintSel(); }
   else if (mod && key === 'c' && sel.size) {
-    const parts = [];
-    for (const id of sel) { const f = find(id); if (f?.k === 'd') parts.push(`— ${f.o.name} —\n${f.o.text || ''}`); else if (f?.k === 'p') parts.push(f.o.text); }
-    if (parts.length) { navigator.clipboard.writeText(parts.join('\n\n')); toast(parts.length === 1 ? 'Copiado' : `${parts.length} copiados en uno`); }
-  } else if (e.key === 'Escape') { sel.clear(); paintSel(); }
+    e.preventDefault();
+    if (sel.size === 1) { const f = find([...sel][0]); if (f && (f.k === 'i' || f.k === 't')) { navigator.clipboard.writeText(token(f.o)); return toast('Copiada para pegar'); } }
+    navigator.clipboard.writeText(groupText()); toast(sel.size === 1 ? 'Copiado' : 'Copiado todo el grupo');
+  } else if (e.key === 'Escape') { sel.clear(); paintSel(); if (traysShown) showTrays(false); }
 });
 addEventListener('keyup', (e) => {
   document.body.classList.toggle('ctrl', e.ctrlKey || e.metaKey);
@@ -451,7 +1109,7 @@ function toast(msg, actions = [], ms = 4200) {
 }
 
 // ---- the editor ----------------------------------------------------------------------------------------------------
-let ed = null, curId = null, hist = [], plain = false, level = 0;
+let ed = null, curId = null, hist = [], plain = false, level = 0, session = null;
 const edOpen = () => $('#ed').classList.contains('open');
 function tagsInUse() {
   const count = new Map();
@@ -460,46 +1118,74 @@ function tagsInUse() {
   }
   return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
 }
+// A small box to rename an idea or a task from inside a document.
+function popEdit(anchor, value, onDone) {
+  const r = anchor.getBoundingClientRect();
+  const box = document.createElement('input'); box.className = 'pop'; box.value = value;
+  Object.assign(box.style, { left: r.left + 'px', top: r.bottom + 6 + 'px' });
+  document.body.append(box); box.focus(); box.select();
+  let done = false;
+  const end = (ok) => { if (done) return; done = true; box.remove(); if (ok && box.value.trim()) onDone(box.value.trim()); ed?.focus(); };
+  box.addEventListener('keydown', (e) => { if (e.key === 'Enter') end(true); if (e.key === 'Escape') { e.stopPropagation(); end(false); } });
+  box.addEventListener('blur', () => end(true));
+}
 const edApi = {
   onChange(text) {
     const d = docById(curId); if (!d || d.text === text) return;
     d.text = text; d.updated = Date.now(); save();
     clearTimeout(edApi.t); edApi.t = setTimeout(backlinks, 500);
   },
-  getDocs: () => S.docs.map((d, i) => ({ n: i + 1, name: d.name, icon: T(d.type).icon })),
+  getDocs: () => S.docs.map((d, i) => ({ n: i + 1, name: d.name, icon: '📄' })),
   getTags: tagsInUse,
+  getItem: (kind, n) => getItem(kind, n),
+  getItems: () => [...S.tasks.filter((t) => !t.done), ...S.ideas, ...S.tasks.filter((t) => t.done)],
+  createItem(kind, text) { const it = newItem(kind, text, null); save(); renderPanel(); toast(`${kind === 'idea' ? 'Idea' : 'Tarea'} creada · está también en el panel`); return it.n; },
+  toggleTask(n) { const it = getItem('tarea', n); if (it) toggleTask(it); },
+  editItem(kind, n, el) { const it = getItem(kind, n); if (it) popEdit(el, it.text, (v) => setItemText(it, v)); },
   createDoc(name, text = '', o = {}) {
-    const d = newDoc({ name, text, place: 'stash' });
-    save(); renderStash();
+    const d = newDoc({ name, text, place: 'stash' }); putInTray([d], openTray().id);
+    log('crear', `Documento «${name}» (en la bandeja)`, { ref: d.id });
+    save(); renderStash(); renderPanel();
     if (o.announce) toast(`«${name}» creado en la bandeja`, [['Abrir', () => openEditor(d.id)], ['Luego', null]], 6000);
     return N(d);
   },
   openDoc(n) { const d = S.docs[n - 1]; d ? openEditor(d.id) : toast('Ese documento ya no existe'); },
   toast: (m) => toast(m),
+  onOutline(heads, current) {
+    const key = JSON.stringify(heads) + current;
+    if (key === edApi.lastOutline) return; edApi.lastOutline = key;
+    $('#toc-list').innerHTML = heads.length
+      ? heads.map((h) => `<button class="toc d${Math.min(h.d, 3)}${h.line === current ? ' on' : ''}" data-line="${h.line}">${esc(h.text)}</button>`).join('')
+      : '<p class="none">Escribe <b># Título</b> para dividir el documento en secciones; aparecerán aquí.</p>';
+    $('#toc-list .on')?.scrollIntoView({ block: 'nearest' });
+  },
   onLevel(l) {
     level = l;
     for (const b of document.querySelectorAll('#ed-lv [data-l]')) b.classList.toggle('on', +b.dataset.l === l);
-    $('#ed-fold').classList.toggle('on', l > 0);
   },
 };
+// One editing session per opened document: if the text changed, the history keeps how it was before.
+function closeSession() {
+  if (!session) return;
+  const d = docById(session.id);
+  if (d && d.text !== session.before) { log('editar', `Editaste «${d.name}»`, { docId: d.id, before: session.before }); save(); }
+  session = null;
+}
 function openEditor(id, push = true) {
   const d = docById(id); if (!d) return;
   if (curId && push && curId !== id) hist.push(curId);
+  closeSession(); session = { id, before: d.text || '' };
   curId = id;
   $('#ed').classList.add('open');
   if (!ed) ed = createEditor($('#ed-body'), edApi);
   ed.setDoc(d.text || '');
-  ed.setKeep(+$('#ed-keep').value);
   fillHead(); ed.focus();
 }
 function fillHead() {
   const d = docById(curId); if (!d) return;
-  const t = T(d.type);
-  $('#ed-ico').textContent = t.icon;
+  $('#ed-ico').textContent = '📄';
   $('#ed-name').value = d.name;
-  $('#ed-n').textContent = '*' + N(d);
   $('#ed-prev').hidden = !hist.length;
-  $('.ed-panel').style.setProperty('--c', t.color);
   backlinks();
 }
 function backlinks() {
@@ -507,10 +1193,10 @@ function backlinks() {
   const n = N(d), re = new RegExp(`\\[[^\\[\\]\\n]*?\\*${n}\\]`);
   const from = S.docs.filter((o) => o !== d && re.test(o.text || ''));
   $('#ed-foot').innerHTML = from.length
-    ? '<span>Enlazado desde</span>' + from.map((o) => `<button data-id="${o.id}">${T(o.type).icon} ${esc(o.name)} <i>*${N(o)}</i></button>`).join('')
-    : '<span>Ctrl+clic en un enlace lo abre · <b>[nombre*]</b> crea un documento nuevo · <b>[</b> busca uno que ya existe · <b>[ETIQUETA]</b> al empezar la línea · <b># Título</b> hace secciones: clic en su # para moverlas</span>';
+    ? '<span>Enlazado desde</span>' + from.map((o) => `<button data-id="${o.id}">📄 ${esc(o.name)}</button>`).join('')
+    : '<span><b>[</b> busca documentos, ideas y tareas, o crea una nueva · <b>[nombre*]</b> crea un documento · Ctrl+clic abre un enlace · <b># Título</b> hace secciones</span>';
 }
-function closeEditor() { $('#ed').classList.remove('open'); curId = null; hist = []; render(); }
+function closeEditor() { closeSession(); $('#ed').classList.remove('open'); curId = null; hist = []; render(); }
 $('#ed-close').onclick = closeEditor;
 $('.ed-back').onclick = closeEditor;
 $('#ed-prev').onclick = () => { const id = hist.pop(); if (id) openEditor(id, false); };
@@ -519,13 +1205,11 @@ $('#ed-name').addEventListener('input', (e) => { const d = docById(curId); if (d
 $('#ed-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ed.focus(); } });
 $('#ed-plain').onclick = () => {
   plain = !plain; ed.setPlain(plain);
-  $('#ed-plain').classList.toggle('off', plain);
-  $('#ed-plain').textContent = plain ? 'Texto plano' : 'Formato';
+  $('#ed-plain').classList.toggle('on', !plain);
+  $('#ed-plain').title = plain ? 'Texto en crudo · clic: formato a la vista' : 'Formato a la vista · clic: texto en crudo';
   $('#ed-lv').classList.toggle('off', plain);
 };
 for (const b of document.querySelectorAll('#ed-lv [data-l]')) b.onclick = () => ed.setLevel(level === +b.dataset.l ? 0 : +b.dataset.l);
-$('#ed-keep').onchange = (e) => ed.setKeep(+e.target.value);
-$('#ed-foldall').onclick = () => ed.foldAll(true);
-$('#ed-unfoldall').onclick = () => ed.foldAll(false);
+$('#toc-list').onclick = (e) => { const b = e.target.closest('.toc'); if (b) ed.gotoLine(+b.dataset.line); };
 
 load();

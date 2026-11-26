@@ -1,7 +1,7 @@
 // Meadow's text editor: a plain, Notepad-like CodeMirror with a few readings on top (links between documents, tags,
 // rules, post-it lines, coloured brackets, Markdown titles that make sections). Clicking the «#» of a title splits the
 // text into the sections of that level, each one movable, foldable, copyable. setPlain(true) leaves the bare text.
-import { EditorState, Compartment, Prec } from '@codemirror/state';
+import { EditorState, Compartment, Prec, StateEffect } from '@codemirror/state';
 import { EditorView, Decoration, ViewPlugin, WidgetType, keymap, drawSelection } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { autocompletion } from '@codemirror/autocomplete';
@@ -13,9 +13,16 @@ export const TAG_RE = /^(\s*)\[([^\[\]\n*]+)\]/;                // [TAG] at the 
 const RULE_RE = /^\s*-{3,}\s*$/;                                // ------ a rule drawn across the page
 const HEAD_RE = /^(#{1,6})(\s+)(?=\S)/;                         // # Title · ## Title · ### Title: sections
 const POSTIT_RE = /^(\s*)>(?!>)\s?/;                            // > a small note
+export const TOKEN_RE = /\{(idea|tarea) (\d+)\}/g;              // {idea 3} · {tarea 5}: the same idea or task wherever it is pasted
 
 export function hue(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360; }
 
+class LinkRefWidget extends WidgetType {
+  constructor(n) { super(); this.n = n; }
+  eq(o) { return o.n === this.n; }
+  toDOM() { const s = document.createElement('span'); s.className = 'cm-linkref'; s.dataset.n = this.n; s.title = 'Abrir'; s.textContent = '↗'; return s; }
+  ignoreEvent() { return false; }
+}
 class PostitWidget extends WidgetType {
   toDOM() { const s = document.createElement('span'); s.className = 'cm-postit-ico'; s.textContent = '🗒️'; return s; }
   eq() { return true; }
@@ -26,6 +33,52 @@ const M = { brk: mk('cm-brk'), par: mk('cm-par'), arrow: mk('cm-arrow'), colons:
 const RULE_LINE = Decoration.line({ class: 'cm-rule' });
 const POSTIT_LINE = Decoration.line({ class: 'cm-postit' });
 const POSTIT_ICO = Decoration.replace({ widget: new PostitWidget() });
+
+// An idea or a task inside the text: one object shown in place. Ticking or renaming it changes it everywhere.
+class ChipWidget extends WidgetType {
+  constructor(kind, n, item, api) {
+    super(); this.kind = kind; this.n = n; this.api = api;
+    this.text = item ? item.text : 'ya no existe'; this.done = !!item?.done; this.missing = !item;
+  }
+  eq(o) { return o.kind === this.kind && o.n === this.n && o.text === this.text && o.done === this.done && o.missing === this.missing; }
+  toDOM() {
+    const s = document.createElement('span');
+    s.className = `cm-chip cm-chip-${this.kind}${this.done ? ' done' : ''}${this.missing ? ' missing' : ''}`;
+    const ico = document.createElement('span'); ico.className = 'cm-chip-ico';
+    ico.textContent = this.kind === 'idea' ? '💡' : this.done ? '✔' : '';
+    if (this.kind === 'tarea' && !this.missing) {
+      ico.title = this.done ? 'Reabrir' : 'Hecha';
+      ico.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); this.api.toggleTask?.(this.n); });
+    }
+    const t = document.createElement('span'); t.className = 'cm-chip-text'; t.textContent = this.text || '…';
+    if (!this.missing) {
+      t.title = 'Clic para cambiar el texto';
+      t.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); this.api.editItem?.(this.kind, this.n, s); });
+    }
+    s.append(ico, t); return s;
+  }
+  ignoreEvent() { return true; }
+}
+export const refreshEffect = StateEffect.define();
+function chipsPlugin(api) {
+  const build = (view) => {
+    const out = [];
+    for (const { from, to } of view.visibleRanges) {
+      const text = view.state.sliceDoc(from, to); TOKEN_RE.lastIndex = 0; let m;
+      while ((m = TOKEN_RE.exec(text))) {
+        out.push(Decoration.replace({ widget: new ChipWidget(m[1], +m[2], api.getItem?.(m[1], +m[2]), api) })
+          .range(from + m.index, from + m.index + m[0].length));
+      }
+    }
+    return Decoration.set(out, true);
+  };
+  return ViewPlugin.fromClass(class {
+    constructor(v) { this.decorations = build(v); }
+    update(u) {
+      if (u.docChanged || u.viewportChanged || u.transactions.some((t) => t.effects.some((e) => e.is(refreshEffect)))) this.decorations = build(u.view);
+    }
+  }, { decorations: (v) => v.decorations, provide: (pl) => EditorView.atomicRanges.of((v) => v.plugin(pl)?.decorations ?? Decoration.none) });
+}
 
 function decorateLine(line, out) {
   const t = line.text, base = line.from;
@@ -54,7 +107,7 @@ function decorateLine(line, out) {
     spans.push([m.index, m.index + m[0].length]);
     out.push(M.linkb.range(a, a + 1));
     if (star > a + 1) out.push(Decoration.mark({ class: 'cm-link', attributes: { 'data-n': m[2] } }).range(a + 1, star));
-    out.push(Decoration.mark({ class: 'cm-linkref', attributes: { 'data-n': m[2], title: 'Abrir' } }).range(star, b - 1));
+    out.push(Decoration.replace({ widget: new LinkRefWidget(m[2]) }).range(star, b - 1));   // the number is internal: an arrow opens it
     out.push(M.linkb.range(b - 1, b));
   }
   const inLink = (i) => spans.some(([s, e]) => i >= s && i < e);
@@ -83,6 +136,11 @@ const richDecos = ViewPlugin.fromClass(class {
 }, { decorations: (v) => v.decorations });
 
 // ---- sections ------------------------------------------------------------------------------------------------------
+export function headsOf(doc) {
+  const out = [];
+  for (let i = 1; i <= doc.lines; i++) { const t = doc.line(i).text, m = t.match(HEAD_RE); if (m) out.push({ line: i, d: m[1].length, text: t.slice(m[0].length).trim() }); }
+  return out;
+}
 // Level n (1–6): every «#…# Title» with n hashes opens a section that runs until the next title of level n or higher.
 // What sits before the first title, or between sections (a higher title and its intro), stays where it is.
 export function computeBlocks(doc) {
@@ -103,12 +161,26 @@ export function computeBlocks(doc) {
   return levels;
 }
 
+const CHEVRON = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 class Blocks {
   constructor(view, api) {
-    this.view = view; this.api = api; this.level = 0; this.keep = 2; this.naming = -1;
+    this.view = view; this.api = api; this.level = 0; this.keep = 1; this.naming = -1;
     this.layer = document.createElement('div'); this.layer.className = 'mw-layer';
-    view.scrollDOM.append(this.layer);
+    this.folds = document.createElement('div'); this.folds.className = 'mw-folds';
+    view.scrollDOM.append(this.layer, this.folds);
+    // above the column of fold buttons, one that folds or unfolds every title at once (it does not scroll away)
+    this.allBtn = document.createElement('button'); this.allBtn.className = 'mw-foldall'; this.allBtn.title = 'Plegar o desplegar todos los títulos';
+    this.allBtn.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M4 3l4 4 4-4M4 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    view.dom.append(this.allBtn);
+    this.allBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.foldHeads(!foldedRanges(this.view.state).size); });
+    this.folds.addEventListener('mousedown', (e) => {
+      const b = e.target.closest('.mw-fold'); if (!b) return;
+      e.preventDefault(); this.toggleHead(+b.dataset.line);
+    });
+    this.onScroll = () => this.schedule();
+    view.scrollDOM.addEventListener('scroll', this.onScroll, { passive: true });
     this.blocks = computeBlocks(view.state.doc);
+    this.heads = headsOf(view.state.doc);
     this.layer.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
     this.layer.addEventListener('pointerdown', (e) => {
       const g = e.target.closest('.mw-grip'); if (!g || e.button !== 0) return;
@@ -127,7 +199,7 @@ class Blocks {
     this.schedule();
   }
   update(u) {
-    if (u.docChanged) { this.blocks = computeBlocks(u.state.doc); }
+    if (u.docChanged) { this.blocks = computeBlocks(u.state.doc); this.heads = headsOf(u.state.doc); }
     if (u.docChanged || u.geometryChanged || u.viewportChanged || u.heightChanged || u.transactions.some((t) => t.effects.length)) this.schedule();
   }
   schedule() { this.view.requestMeasure({ key: this, read: (v) => this.read(v), write: (m) => this.write(m) }); }
@@ -137,20 +209,58 @@ class Blocks {
     const folded = foldedRanges(v.state);
     const geo = (b) => {
       const from = doc.line(b.from).from, to = doc.line(b.to).to;
-      let f = false; folded.between(from, to + 1, () => { f = true; return false; });
+      const at = doc.line(b.from).to; let f = false;              // its own fold, not a subsection's
+      folded.between(at, at, (x) => { if (x === at) { f = true; return false; } });
       return { ...b, top: v.lineBlockAt(from).top + off, bot: v.lineBlockAt(doc.line(b.to).from).bottom + off, folded: f };
     };
-    return { levels: this.blocks.map((L, i) => (i === this.level - 1 ? L.map(geo) : [])), h: Math.max(v.contentHeight, v.scrollDOM.clientHeight) };
+    const heads = this.heads.map((h) => {
+      const s = this.sectionOf(h.line), lb = v.lineBlockAt(doc.line(h.line).from);
+      let f = false;
+      // folded means its own fold (starting at the end of its title line), not one of a subsection inside it
+      if (s && s.to > s.from) { const at = doc.line(s.from).to; folded.between(at, at, (from) => { if (from === at) { f = true; return false; } }); }
+      return { ...h, y: lb.bottom + off, body: !!s && s.to > s.from, folded: f };
+    });
+    const at = v.lineBlockAtHeight(v.scrollDOM.scrollTop - off + 24);
+    const topLine = doc.lineAt(at.from).number;
+    let current = -1; for (const h of this.heads) if (h.line <= topLine) current = h.line;
+    return { levels: this.blocks.map((L, i) => (i === this.level - 1 ? L.map(geo) : [])), heads, current, h: Math.max(v.contentHeight, v.scrollDOM.clientHeight) };
+  }
+  sectionOf(line) { const h = this.heads.find((x) => x.line === line); return h && this.blocks[h.d - 1].find((b) => b.from === line); }
+  toggleHead(line) {
+    const s = this.sectionOf(line); if (!s || s.to <= s.from) return;
+    const d = this.view.state.doc, from = d.line(s.from).to, to = d.line(s.to).to;
+    const eff = this.unfoldIn(from, to);
+    if (!eff.length) eff.push(foldEffect.of({ from, to }));
+    this.view.dispatch({ effects: eff });
+  }
+  foldHeads(fold) {
+    const st = this.view.state, d = st.doc, eff = [];
+    foldedRanges(st).between(0, d.length, (f, t) => { eff.push(unfoldEffect.of({ from: f, to: t })); });
+    if (eff.length) this.view.dispatch({ effects: eff });
+    if (!fold) return;
+    const top = Math.min(...this.heads.map((h) => h.d));          // fold the highest titles: everything else hides inside
+    const e2 = [];
+    for (const h of this.heads.filter((x) => x.d === top)) { const s = this.sectionOf(h.line); if (s && s.to > s.from) e2.push(foldEffect.of({ from: d.line(s.from).to, to: d.line(s.to).to })); }
+    if (e2.length) this.view.dispatch({ effects: e2 });
   }
   write(m) {
     this.last = m;
     if (this.drag) return;                          // the layout holds still while a block is being dragged
-    this.layer.style.height = m.h + 'px';
+    this.layer.style.height = m.h + 'px'; this.folds.style.height = m.h + 'px';
+    const want = m.heads.filter((h) => h.body), have = new Map([...this.folds.children].map((b) => [b.dataset.line, b]));
+    for (const h of want) {
+      let b = have.get(String(h.line)); have.delete(String(h.line));
+      if (!b) { b = document.createElement('button'); b.className = 'mw-fold'; b.dataset.line = h.line; b.innerHTML = CHEVRON; this.folds.append(b); }
+      b.style.top = (h.y - 24) + 'px'; b.classList.toggle('shut', h.folded); b.title = h.folded ? 'Desplegar' : 'Plegar';
+    }
+    for (const b of have.values()) b.remove();
+    this.allBtn.style.display = m.heads.some((h) => h.body) ? '' : 'none';
+    this.api.onOutline?.(this.heads, m.current);
     if (!this.level) { this.layer.innerHTML = ''; return; }
     const L = m.levels[this.level - 1];
     let lay = '';
     L.forEach((b, i) => {
-      lay += `<div class="mw-box" style="top:${b.top}px;height:${b.bot - b.top}px"></div>`;
+      lay += `<div class="mw-band${i % 2 ? ' odd' : ''}" style="top:${b.top - 4}px;height:${b.bot - b.top + 8}px"></div>`;
       if (L.length > 1) lay += `<div class="mw-grip" data-i="${i}" style="top:${b.top}px;height:${Math.max(22, b.bot - b.top)}px" title="Arrastra para mover el bloque">⠿</div>`;
       if (this.naming === i) {
         lay += `<div class="mw-bar-tools naming" data-i="${i}" style="top:${b.top}px"><input class="mw-name" placeholder="Nombre del documento…"></div>`;
@@ -289,7 +399,10 @@ class Blocks {
     if (effects.length) this.view.dispatch({ effects });
     if (fold) { const e2 = []; for (const b of this.blocks[this.level - 1]) this.foldOne(b, e2); if (e2.length) this.view.dispatch({ effects: e2 }); }
   }
-  destroy() { this.layer.remove(); this.view.dom.parentNode?.classList.remove('mw-active'); }
+  destroy() {
+    this.folds.remove(); this.allBtn.remove(); this.view.scrollDOM.removeEventListener('scroll', this.onScroll);
+    this.api.onOutline?.([], -1);
+    this.layer.remove(); this.view.dom.parentNode?.classList.remove('mw-active'); }
 }
 
 // ---- the editor ----------------------------------------------------------------------------------------------------
@@ -319,9 +432,22 @@ export function createEditor(parent, api) {
     }
     const docs = (api.getDocs?.() || []).filter((d) => d.name.toLowerCase().includes(ql)).slice(0, 12);
     for (const d of docs) {
-      opts.push({ label: m.text + '​' + d.n, displayLabel: `${d.icon || '📄'} ${d.name}`, detail: `*${d.n}`, type: 'doc',
+      opts.push({ label: m.text + '​' + d.n, displayLabel: `${d.icon || '📄'} ${d.name}`, detail: 'documento', type: 'doc',
         apply: (view) => view.dispatch({ changes: { from: m.from, to: end, insert: `[${d.name}*${d.n}]` },
           selection: { anchor: m.from + 1, head: m.from + 1 + d.name.length }, userEvent: 'input.complete' }) });
+    }
+    const items = (api.getItems?.() || []).filter((it) => it.text.toLowerCase().includes(ql)).slice(0, 8);
+    for (const it of items) {
+      opts.push({ label: m.text + '​' + it.kind + it.n, displayLabel: `${it.kind === 'idea' ? '💡' : it.done ? '☑' : '☐'} ${it.text}`, detail: it.kind, type: it.kind,
+        apply: (view) => { const ins = `{${it.kind} ${it.n}}`; view.dispatch({ changes: { from: m.from, to: end, insert: ins }, selection: { anchor: m.from + ins.length } }); } });
+    }
+    if (ql) for (const kind of ['tarea', 'idea']) {
+      opts.push({ label: m.text + '​+' + kind, displayLabel: `＋ Nueva ${kind} «${q.trim()}»`, type: 'new',
+        apply: (view) => {
+          const n = api.createItem?.(kind, q.trim()); if (!n) return;
+          const ins = `{${kind} ${n}}`;
+          view.dispatch({ changes: { from: m.from, to: end, insert: ins }, selection: { anchor: m.from + ins.length } });
+        } });
     }
     if (ql && !docs.some((d) => d.name.toLowerCase() === ql)) {
       opts.push({ label: m.text + '​+', displayLabel: `＋ Nuevo documento «${q.trim()}»`, type: 'new',
@@ -373,7 +499,8 @@ export function createEditor(parent, api) {
 
   const blocks = ViewPlugin.define((v) => (blocksPlugin = new Blocks(v, api)));
 
-  const richExt = () => [richDecos, autoCreate, linkClicks, linkEnter, blocks,
+  const chips = chipsPlugin(api);
+  const richExt = () => [richDecos, chips, autoCreate, linkClicks, linkEnter, blocks,
     autocompletion({ override: [completions], icons: false, activateOnTyping: true, closeOnBlur: true })];
 
   const changes = EditorView.updateListener.of((u) => { if (u.docChanged) api.onChange?.(u.state.doc.toString()); });
@@ -381,7 +508,11 @@ export function createEditor(parent, api) {
   let plain = false;
   const makeState = (text) => EditorState.create({
     doc: text,
-    extensions: [history(), drawSelection(), EditorView.lineWrapping, codeFolding({ placeholderText: '⋯' }),
+    extensions: [history(), drawSelection(), EditorView.lineWrapping, codeFolding({
+      // a quiet label set apart from the title: how many lines are folded; a click unfolds
+      preparePlaceholder: (state, range) => state.doc.lineAt(range.to).number - state.doc.lineAt(range.from).number,
+      placeholderDOM: (view, onclick, n) => { const s = document.createElement('span'); s.className = 'mw-fph'; s.textContent = n + (n === 1 ? ' línea' : ' líneas'); s.title = 'Desplegar'; s.onclick = onclick; return s; },
+    }),
       keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]), changes, rich.of(plain ? [] : richExt())],
   });
 
@@ -410,5 +541,13 @@ export function createEditor(parent, api) {
     setKeep(k) { if (blocksPlugin) { blocksPlugin.keep = k; } },
     foldAll(f) { blocksPlugin?.foldAll(f); },
     focus() { view.focus(); },
+    refresh() { view.dispatch({ effects: refreshEffect.of(null) }); },
+    foldHeads(f) { blocksPlugin?.foldHeads(f); },
+    gotoLine(n) {
+      const line = view.state.doc.line(Math.min(n, view.state.doc.lines));
+      const eff = []; foldedRanges(view.state).between(line.from, line.to, (f, t) => { eff.push(unfoldEffect.of({ from: f, to: t })); });
+      view.dispatch({ selection: { anchor: line.to }, effects: [...eff, EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 30 })] });
+      view.focus();
+    },
   };
 }

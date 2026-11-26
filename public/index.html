@@ -18,15 +18,19 @@
 <aside id="side">
   <div class="brand"><span>🌿</span>Meadow</div>
   <div id="types"></div>
-  <div class="sep"></div>
-  <div id="tools"></div>
 </aside>
 
-<section id="stash">
-  <header>Bandeja <span id="stash-n"></span></header>
-  <div id="stash-list"></div>
-  <div class="hint">Suelta aquí documentos para dejarlos en espera</div>
-</section>
+<section id="stash"></section>
+
+<div id="selbar"><span id="selbar-n"></span><button id="selbar-copy">⧉ Copiar todo</button><button id="selbar-del">🗑 Borrar</button></div>
+
+<aside id="panel">
+  <button id="panel-tab" title="Mostrar u ocultar el panel">☰</button>
+  <div class="pin">
+    <nav><button data-tab="tareas">Tareas <i id="pt-n"></i></button><button data-tab="ideas">Ideas</button><button data-tab="hist">Historial</button></nav>
+    <div id="panel-body"></div>
+  </div>
+</aside>
 
 <div id="zoom">
   <button id="z-fit" title="Encuadrar todo">⤢</button>
@@ -40,29 +44,34 @@
       <button id="ed-prev" class="ib" title="Volver al anterior">←</button>
       <span id="ed-ico"></span>
       <input id="ed-name" spellcheck="false">
-      <span id="ed-n"></span>
       <div class="grow"></div>
       <div id="ed-lv">
         <button class="ib h" data-l="1" title="Dividir por títulos # (o clic en el # de un título)">#</button>
         <button class="ib h" data-l="2" title="Dividir por títulos ##">##</button>
         <button class="ib h" data-l="3" title="Dividir por títulos ###">###</button>
-        <span id="ed-fold">
-          <select id="ed-keep" title="Líneas que se ven al plegar">
-            <option value="1">1 línea</option><option value="2" selected>2 líneas</option>
-            <option value="3">3 líneas</option><option value="5">5 líneas</option>
-          </select>
-          <button class="ib" id="ed-foldall" title="Plegar todos">▾</button>
-          <button class="ib" id="ed-unfoldall" title="Expandir todos">▸</button>
-        </span>
       </div>
-      <button id="ed-plain" class="pill" title="Ver como texto plano">Formato</button>
+      <button id="ed-plain" class="ib fmt on" title="Formato a la vista · clic: texto en crudo">¶</button>
       <button id="ed-close" class="ib" title="Cerrar (Esc)">×</button>
     </header>
-    <div id="ed-body"></div>
+    <div class="ed-main">
+      <nav id="ed-toc"><div class="toc-h">Índice</div><div id="toc-list"></div></nav>
+      <div id="ed-body"></div>
+    </div>
     <footer id="ed-foot"></footer>
   </div>
 </div>
 
+<div id="reader">
+  <div class="rd-back"></div>
+  <div class="rd-panel">
+    <header><span class="rd-where"></span><div class="grow"></div>
+      <button class="pill rd-view-only" data-rd="edit">Editar</button><button class="pill rd-edit-only" data-rd="save">Guardar</button>
+      <button class="ib" data-rd="del" title="Quitar el letrero">🗑</button><button class="ib" data-rd="close" title="Cerrar (Esc)">×</button></header>
+    <div class="rd-text"></div>
+    <textarea class="rd-edit" placeholder="Escribe el letrero… (Ctrl+Enter guarda)"></textarea>
+  </div>
+</div>
+<button id="backpill">↩ Volver a donde estabas</button>
 <div id="toasts"></div>
 <div id="ghost"></div>
 <script type="module" src="app.js"></script>
