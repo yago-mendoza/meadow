@@ -315,7 +315,7 @@ function renderStage() {
   if (!skipFlip) flip(stage, before, () => 1, { sel: '.dc[data-id]', appear: false });
 }
 let skipFlip = false;
-let arPeek = null, arPids = [];
+let arPeek = null, arPids = [], arHtml = '';
 const COLBG = ['#d9c9e2', '#e4d6eb', '#efe5f3', '#fdfbfe'];   // outer columns darker, the one you are in the lightest
 const SCALES = ['#f7e4ec', '#e3edf9', '#e5f3e4', '#f9eedb', '#ece3f7', '#dff2f0'];
 function renderAreas(peek) {
@@ -329,15 +329,16 @@ function renderAreas(peek) {
   const btn = (k, i) => { const a = nd(k), g = isGroup(a); return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><span class="ar-t">${esc(a.title)}</span><i>${a.kids.length || ''}</i><b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
   const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b></span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button></div>`).join('');
-  if ($('#areas').innerHTML !== html) $('#areas').innerHTML = html;   // unchanged: leave it (keeps hover, double clicks)
+  if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; paintHov(); }   // unchanged: leave it (keeps hover, double clicks)
   arPids = cols.map((c) => c.pid);
   if (!peek) document.documentElement.style.setProperty('--areas-w', $('#areas').offsetWidth + 'px');
 }
-$('#areas').addEventListener('pointerover', (e) => {
-  const a = e.target.closest('.ar.grp'); if (!a || a.querySelector('[contenteditable="true"]') || a.dataset.area === arPeek) return;
-  arPeek = a.dataset.area; renderAreas(arPeek);
-});
-$('#areas').addEventListener('pointerleave', () => { if (!arPeek || $('#areas [contenteditable="true"]')) return; arPeek = null; renderAreas(); });
+// hovering a folded column opens it to read; only a click chooses. The hover is kept by hand so a redraw (after a
+// click) does not fold and reopen it
+let arHov = -1;
+const paintHov = () => document.querySelectorAll('#areas .ar-col').forEach((c, i) => c.classList.toggle('hov', i === arHov));
+$('#areas').addEventListener('pointerover', (e) => { const c = e.target.closest('.ar-col'); const i = c ? [...c.parentNode.children].indexOf(c) : -1; if (i !== arHov) { arHov = i; paintHov(); } });
+$('#areas').addEventListener('pointerleave', () => { arHov = -1; paintHov(); });
 function renderTop() {
   const p = pathOf(S.focus);
   $('#crumbs').innerHTML = p.map((n, i) => `${i ? '<span class="sep">›</span>' : ''}<button class="cr${i === p.length - 1 ? ' on' : ''}" data-go="${n.id}" data-drop="into" data-id="${n.kind === 'frame' ? activeTab(n) : n.id}" title="${i === 0 ? 'Doble clic: renombrar el proyecto' : ''}">${esc(n.title)}</button>`).join('');

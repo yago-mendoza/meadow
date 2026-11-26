@@ -354,14 +354,14 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
    in front, whole. Areas centred in their column, no rounded corner. */
 .ar-col { width: 172px; padding: 14px 12px 70px; border-radius: 0; box-shadow: none; transition: box-shadow .18s; }
 .ar-col + .ar-col { margin-left: -124px; padding-left: 12px; box-shadow: -9px 0 14px -9px rgba(70, 45, 80, .4); }
-.ar-col:not(.last):hover { z-index: 50 !important; box-shadow: 9px 0 18px -8px rgba(70, 45, 80, .4); }
-.ar-col:not(.last):hover + .ar-col { box-shadow: none; }
+.ar-col:not(.last).hov { z-index: 50 !important; box-shadow: 9px 0 18px -8px rgba(70, 45, 80, .4); }
+.ar-col:not(.last).hov + .ar-col { box-shadow: none; }
 
 /* outer columns read like the index of a filing cabinet: a strip of vertical tabs; hovering opens the column whole */
 .ar-strip { position: absolute; left: 0; top: 0; bottom: 0; width: 48px; padding: 14px 7px 70px; display: flex; flex-direction: column; gap: 5px; z-index: 2;
   background: var(--cb); transition: opacity .15s; pointer-events: none; }
-.ar-col:hover > .ar-strip { opacity: 0; }
-.ar-col:not(.last):not(:hover) > :not(.ar-strip) { visibility: hidden; }
+.ar-col.hov > .ar-strip { opacity: 0; }
+.ar-col:not(.last):not(.hov) > :not(.ar-strip) { visibility: hidden; }
 .ar-tab { flex: 0 1 auto; min-height: 34px; max-height: 150px; border-radius: 9px; background: var(--sc); border: 1px solid rgba(120, 90, 130, .14);
   box-shadow: 0 1px 2px rgba(70, 45, 80, .1); display: flex; align-items: center; justify-content: center; padding: 9px 0; overflow: hidden; }
 .ar-tab b { writing-mode: vertical-rl; transform: rotate(180deg); font: 700 11.5px "Segoe UI", sans-serif; letter-spacing: .03em; color: #5d4f62;
@@ -500,3 +500,13 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 body.drag-hang #stage .fr, body.drag-hang #stage .dc, body.drag-hang #stage .ft { outline: 1.5px dashed #c6b2cf; outline-offset: 2px; }
 body.drag-hang #stage .ft { outline-offset: 1px; }
 #task ~ .pop, .pop { z-index: 340; }
+
+/* folded columns open smoothly: the column is always whole underneath, a clip shows only its strip and grows on hover */
+.ar-col:not(.last) { clip-path: inset(0 calc(100% - 48px) 0 0); box-shadow: 9px 0 18px -8px rgba(70, 45, 80, .4);
+  transition: clip-path .32s cubic-bezier(.22, 1, .36, 1), z-index 0s linear .32s; }
+.ar-col:not(.last).hov, .ar-col:not(.last):has([contenteditable="true"]) { clip-path: inset(0 -40px 0 0); transition: clip-path .32s cubic-bezier(.22, 1, .36, 1), z-index 0s; }
+.ar-col:not(.last).hov + .ar-col { box-shadow: -9px 0 14px -9px rgba(70, 45, 80, .4); }
+#areas .ar-col:not(.last):not(.hov) > :not(.ar-strip) { visibility: visible; opacity: 0; }
+#areas .ar-col:not(.last) > :not(.ar-strip) { transition: opacity .2s .06s; }
+#areas .ar-col:not(.last).hov > .ar-strip { opacity: 0; transition: opacity .16s; }
+#areas .ar-col:not(.last) > .ar-strip { transition: opacity .2s .1s; }
