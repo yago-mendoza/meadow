@@ -367,12 +367,13 @@ function renderMap() {
   const root = vtree(S.root); weight(root);
   const open = cur ? cur : S.focus;
   const lay = (v, x, y, w, h, depth) => {
+    const whole = v.kind === 'project';
     const cls = `mr k-${v.kind}${(v.id && (v.id === open || v.via === open)) ? ' cur' : ''}`;
     const label = w > 30 && h > 15;
     const attrs = v.head ? `data-head="${v.head.tab}:${v.head.line}" data-drag="head:${v.head.tab}:${v.head.line}"` : `data-id="${v.id}"${v.kind !== 'project' ? ` data-drag="${v.id}"` : ''}`;
-    out.push(`<div class="${cls}" ${attrs} data-drop="map" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px${v.color ? ';--bg:' + v.color : ''}">${label ? `<b>${esc(v.title)}</b>` : ''}</div>`);
+    if (!whole) out.push(`<div class="${cls}" ${attrs} data-drop="map" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px${v.color ? ';--bg:' + v.color : ''}">${label ? `<b>${esc(v.title)}</b>` : ''}</div>`);
     if (!v.kids.length) return;
-    const pad = 3, top = label ? 15 : pad, ix = x + pad, iy = y + top, iw = w - pad * 2, ih = h - top - pad;
+    const pad = whole ? 0 : 3, top = whole ? 0 : label ? 15 : pad, ix = x + pad, iy = y + top, iw = w - pad * 2, ih = h - top - pad;
     if (iw < 4 || ih < 4) return;
     const horiz = iw >= ih, total = v.kids.reduce((a, k) => a + k.w, 0), gap = 2;
     let off = 0; const span = (horiz ? iw : ih) - gap * (v.kids.length - 1);
@@ -382,15 +383,17 @@ function renderMap() {
       off += s + gap;
     }
   };
-  lay(root, 4, 4, W - 8, H - 8, 0);
+  lay(root, 6, 6, W - 12, H - 12, 0);
   $('#map-in').innerHTML = `<div class="map-zoom" style="transform:translate(${mapX}px,${mapY}px) scale(${mapZ})">${out.join('')}</div>`;
 }
 function renderDrawer() {
   $('#dr-n').textContent = S.drawer.length || '';
   const icon = { area: '▤', frame: '⬚', ftab: '▭', doc: '📄', dtab: '📄', project: '⬚' };
-  $('#dr-list').innerHTML = S.drawer.length ? S.drawer.map((id) => { const n = nd(id); return n ? `<div class="dr-chip" data-drag="${id}" data-id="${id}"><span>${icon[n.kind]}</span>${esc(n.title)}<button class="dr-x" title="Borrar para siempre">×</button></div>` : ''; }).join('')
-    : '<p class="dr-none">Arrastra aquí lo que quieras apartar del árbol.</p>';
-  if (S.drawer.length) $('#dr-list').insertAdjacentHTML('beforeend', '<button class="dr-empty">Vaciar el cajón</button>');
+  const KIND = { area: 'Apartado', frame: 'Marco', ftab: 'Pestaña', doc: 'Documento', dtab: 'Página', project: 'Marco' };
+  const rows = S.drawer.map((id) => { const n = nd(id); if (!n) return ''; const c = countIn(id);
+    return `<div class="dr-chip" data-drag="${id}" data-id="${id}"><span class="dr-ico k-${n.kind}">${icon[n.kind]}</span><span class="dr-t"><b>${esc(n.title)}</b><small>${KIND[n.kind]}${c ? ' · ' + c + ' dentro' : ''}</small></span><button class="dr-x" title="Borrar para siempre">×</button></div>`; }).join('');
+  $('#dr-list').innerHTML = `<div class="dr-h"><b>Cajón</b>${S.drawer.length ? '<button class="dr-empty">Vaciar</button>' : ''}</div>`
+    + (rows ? `<div class="dr-rows">${rows}</div>` : '<div class="dr-none"><span class="dr-big">🗄</span>Arrastra aquí lo que quieras apartar; vuelve a sacarlo cuando quieras.</div>');
 }
 let listTab = 'tareas', listWho = 'Todas', listDone = false;
 function nestPath(id) { return id ? pathOf(id).filter((n) => n.kind !== 'project' && !(n.kind === 'ftab' && parent(n.id)?.kids.length === 1) && !(n.kind === 'dtab' && parent(n.id)?.kids.length === 1)).map((n) => n.title).join(' › ') : ''; }
@@ -754,11 +757,20 @@ $('#map').addEventListener('pointerdown', (e) => {
   const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); };
   addEventListener('pointermove', mv); addEventListener('pointerup', up);
 });
+let mapPill = null;
 function mapOpen(on) {
   const m = $('#map'); if (on === !m.classList.contains('mini')) return;
-  m.classList.toggle('mini', !on); mapZ = 1; mapX = 0; mapY = 0;
-  if (on) { renderMap(); m.animate([{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: EASE.smooth }); }
-  else renderMap();
+  const pr = $('#map-pill').getBoundingClientRect(); if (pr.width) mapPill = pr; const pill = mapPill || { top: innerHeight - 50, bottom: innerHeight - 14, left: 14, right: 94 };
+  const clipTo = () => { const r = m.getBoundingClientRect(); return `inset(${pill.top - r.top}px ${r.right - pill.right}px ${r.bottom - pill.bottom}px ${pill.left - r.left}px round 12px)`; };
+  mapZ = 1; mapX = 0; mapY = 0;
+  if (on) {
+    m.classList.remove('mini'); renderMap();
+    m.animate([{ clipPath: clipTo(), opacity: .6 }, { clipPath: 'inset(0 0 0 0 round 0)', opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.2,.85,.25,1)' });
+  } else {
+    const an = m.animate([{ clipPath: 'inset(0 0 0 0 round 0)', opacity: 1 }, { clipPath: clipTo(), opacity: .4 }], { duration: 300, easing: 'cubic-bezier(.5,0,.3,1)' });
+    const done = () => { m.classList.add('mini'); renderMap(); };
+    an.finished.then(done, done);
+  }
 }
 $('#map-pill').onclick = () => mapOpen(true);
 $('#map-size').onclick = () => mapOpen(false);

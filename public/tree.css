@@ -521,3 +521,25 @@ body.drag-hang #stage .ft { outline-offset: 1px; }
 .ed-task-ico { display: inline-block; width: 13px; height: 13px; border: 1.6px solid #8fb3df; border-radius: 4px; background: #fff; vertical-align: -2px; }
 #ed-task:hover .ed-task-ico { border-color: var(--accent); }
 .cm-chip-text.empty { font-style: italic; color: #a397a5; }
+
+/* the open map: the whole screen under the top bar */
+#map:not(.mini) { left: 0; right: 0; top: 56px; bottom: 0; border-radius: 0; box-shadow: none; border-top: 1px solid #ece6ee; background: #fbfafc; }
+#map:not(.mini) #map-size { top: 12px; right: 14px; background: #fff; box-shadow: var(--shadow); border-radius: 10px; }
+
+/* the drawer, inside */
+#dr-list { width: 300px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.dr-h { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 10px; border-bottom: 1px solid #f1ebf2; }
+.dr-h b { font: 700 11px "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #a397a5; }
+#dr-list .dr-empty { display: inline-block; width: auto; margin: 0; padding: 3px 9px; border: 0; border-radius: 8px; font: 600 11.5px "Segoe UI", sans-serif; color: #b3a5b8; }
+#dr-list .dr-empty:hover { background: #fbe0dc; color: #b8443f; }
+.dr-rows { overflow: auto; max-height: calc(50vh - 44px); padding: 6px; display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin; scrollbar-color: #e2d8e6 transparent; }
+.dr-chip { gap: 10px; padding: 7px 8px; border-radius: 10px; }
+.dr-chip:hover { background: #f7f3f8; }
+.dr-ico { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 14px; background: #f1ebf4; color: #7a6385; }
+.dr-ico.k-doc, .dr-ico.k-dtab { background: #fff; box-shadow: inset 0 0 0 1px #ece4ee; }
+.dr-ico.k-area { background: #efe3f3; } .dr-ico.k-frame { background: #e3edf9; color: #4f6d93; } .dr-ico.k-ftab { background: #e5f3e4; color: #4f7f57; }
+.dr-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dr-t b { font: 600 13px "Segoe UI", sans-serif; color: #3a2f3f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dr-t small { font-size: 11.5px; color: #a397a5; }
+.dr-none { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0; padding: 22px 26px 24px; text-align: center; font-size: 12.5px; line-height: 1.5; color: #a397a5; }
+.dr-big { font-size: 26px; opacity: .55; }
