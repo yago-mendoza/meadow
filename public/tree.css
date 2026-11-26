@@ -429,3 +429,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 /* a clean margin under the line: the text scrolls away below it, not against it */
 #ed-body { padding-top: 12px; background: #fff; }
 #ed-body .cm-content { padding-top: 10px; padding-bottom: 55vh; }   /* the last titles can also reach the top */
+/* while you rename an area in a folded column, it stays open */
+.ar-col:has([contenteditable="true"]) { z-index: 50 !important; }
+.ar-col:not(.last):has([contenteditable="true"]) > :not(.ar-strip) { visibility: visible; }
+.ar-col:has([contenteditable="true"]) > .ar-strip { opacity: 0; }
