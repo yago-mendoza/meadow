@@ -939,3 +939,15 @@ body.no-pics .fr.has-pic { margin-top: 0; } body.no-pics .fr.has-pic::before { d
 /* a task's plan and notes read like a document's text */
 .tk-area { font: 14px/1.6 Consolas, "Cascadia Mono", "Lucida Console", monospace; color: var(--ink); }
 .tk-area * { font: inherit !important; color: inherit !important; background: none !important; }
+
+/* each project's plant, and the stickers to choose another */
+.hm-ico { border: 0; cursor: pointer; font-size: 21px; transition: transform .2s cubic-bezier(.22, 1, .36, 1); }
+.hm-ico[data-plant]:hover { transform: rotate(-8deg) scale(1.12); }
+#plants { position: fixed; z-index: 400; display: grid; grid-template-columns: repeat(4, 58px); gap: 6px; padding: 14px; border-radius: 18px;
+  background: #fbf9f4; box-shadow: 0 0 0 1px #ece4ea, 0 14px 40px rgba(60, 40, 70, .18); opacity: 0; transform: translateY(-6px) scale(.97); transform-origin: 20px 0;
+  transition: opacity .18s, transform .25s cubic-bezier(.22, 1, .36, 1); }
+#plants.in { opacity: 1; transform: none; }
+#plants button { height: 58px; font-size: 34px; line-height: 1; border-radius: 14px; transform: rotate(var(--r)); transition: transform .22s cubic-bezier(.22, 1, .36, 1), background .15s;
+  filter: drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff) drop-shadow(0 3px 4px rgba(60, 40, 70, .22)); }
+#plants button:hover { transform: rotate(0) scale(1.16); }
+#plants button.on { background: #eef6ea; }

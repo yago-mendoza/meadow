@@ -37,11 +37,11 @@ function newProjectDir(parent, name) {
   while (fs.existsSync(dir)) dir = path.join(parent, `${slug(name)} ${i++}`);
   return dir;
 }
-function createProject(name, parent = cfg.root, state = null) {
+function createProject(name, parent = cfg.root, state = null, plant = null) {
   const dir = newProjectDir(parent, name);
   fs.mkdirSync(path.join(dir, 'backups'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'meadow.json'), JSON.stringify({ rev: 1, saved: new Date().toISOString(), state: state || fresh(name) }));
-  const p = { id: uid(), path: dir };
+  const p = { id: uid(), path: dir }; if (plant) p.plant = String(plant).slice(0, 16);
   cfg.projects.push(p); saveCfg();
   return p;
 }
@@ -86,7 +86,7 @@ function summary(p) {
   const exists = fs.existsSync(fileOf(p));
   let name = path.basename(p.path), updated = null;
   if (exists) { try { name = stateOf(p).state?.nodes?.root?.title || name; updated = fs.statSync(fileOf(p)).mtime.toISOString(); } catch { /* unreadable */ } }
-  return { id: p.id, name, path: p.path, exists, updated, opened: p.opened || null };
+  return { id: p.id, name, path: p.path, exists, updated, opened: p.opened || null, plant: p.plant || null };
 }
 // moving a project: copy, check, then remove the old folder
 function moveDir(from, to) {
@@ -120,7 +120,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, URL_), q = url.pathname;
   try {
     if (q === '/api/projects' && req.method === 'GET') return send(res, 200, listing());
-    if (q === '/api/projects' && req.method === 'POST') { const { name } = await json(req); const p = createProject(name || 'Proyecto nuevo'); return send(res, 200, { id: p.id, ...listing() }); }
+    if (q === '/api/projects' && req.method === 'POST') { const { name, plant } = await json(req); const p = createProject(name || 'Proyecto nuevo', cfg.root, null, plant); return send(res, 200, { id: p.id, ...listing() }); }
     if (q === '/api/projects/add') {                      // an existing folder (one is made if it has no project yet)
       const b = await json(req); const dir = b.path || pickFolder('Elige la carpeta del proyecto'); if (!dir) return send(res, 200, { cancelled: true });
       let p = cfg.projects.find((x) => path.resolve(x.path) === path.resolve(dir));
@@ -140,6 +140,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, listing());
     }
     if (q === '/api/projects/remove') { const b = await json(req); cfg.projects = cfg.projects.filter((x) => x.id !== b.id); if (cfg.last === b.id) cfg.last = null; cache.delete(b.id); saveCfg(); return send(res, 200, listing()); }
+    if (q === '/api/projects/plant') { const b = await json(req), p = proj(b.id); if (p) { p.plant = String(b.plant || '').slice(0, 16) || undefined; saveCfg(); } return send(res, 200, listing()); }
     if (q === '/api/projects/opened') { const b = await json(req), p = proj(b.id); if (p) { p.opened = new Date().toISOString(); cfg.last = p.id; saveCfg(); } return send(res, 200, { ok: true }); }
     if (q === '/api/root') {                              // the folder for new projects; optionally bring the ones in the old folder along
       const b = await json(req); const to = b.root || pickFolder('Elige la carpeta donde guardar los proyectos'); if (!to) return send(res, 200, { cancelled: true });

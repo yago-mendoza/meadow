@@ -52,7 +52,7 @@ async function load() {
   if (!P) return showHome();
   const r = await fetch('/api/state?p=' + encodeURIComponent(P)); if (!r.ok) return showHome('Ese proyecto ya no está en la lista.');
   const j = await r.json();
-  document.title = (j.project?.name || 'Meadow') + ' · Meadow';
+  document.title = (j.project?.name || 'Meadow') + ' · Meadow'; showPlant(plantOf(j.project));
   fetch('/api/projects/opened', { method: 'POST', body: JSON.stringify({ id: P }) });
   rev = j.rev || 0;
   const st = j.state;
@@ -1852,11 +1852,29 @@ async function showHome(note) {
   if (note) toast(note);
   paintHome(await api('/api/projects'));
 }
+// each project has its little plant: stems, sprigs and flowers on their stalk
+const PLANTS = ['🌿', '🌱', '☘️', '🍀', '🌾', '🎋', '🍃', '🌷', '🪻', '🌹', '🥀', '🌻', '💐', '🪴', '🌵', '🍁'];
+const plantOf = (p) => p?.plant || '🌿';
+const randomPlant = () => PLANTS[Math.floor(Math.random() * PLANTS.length)];
+function showPlant(pl) {
+  $('#to-home').textContent = pl;
+  document.querySelector('link[rel=icon]').href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>" + pl + "</text></svg>";
+}
+function pickPlant(anchor, id, now) {   // the stickers: one is chosen with a click
+  document.querySelector('#plants')?.remove();
+  const box = document.createElement('div'); box.id = 'plants';
+  box.innerHTML = PLANTS.map((pl, i) => `<button data-pl="${pl}" class="${pl === now ? 'on' : ''}" style="--r:${((i * 37) % 23) - 11}deg">${pl}</button>`).join('');
+  document.body.append(box);
+  const r = anchor.getBoundingClientRect(); box.style.left = Math.min(innerWidth - box.offsetWidth - 12, r.left - 8) + 'px'; box.style.top = Math.min(innerHeight - box.offsetHeight - 12, r.bottom + 8) + 'px';
+  requestAnimationFrame(() => box.classList.add('in'));
+  box.onclick = async (e) => { const b = e.target.closest('[data-pl]'); if (!b) return; box.remove(); paintHome(await api('/api/projects/plant', { id, plant: b.dataset.pl })); };
+  setTimeout(() => addEventListener('pointerdown', function off(e) { if (e.target.closest('#plants')) return; box.remove(); removeEventListener('pointerdown', off, true); }, true), 0);
+}
 function paintHome(L) {
   $('#hm-root').textContent = L.root;
   const ps = [...L.projects].sort((a, b) => (b.opened || b.updated || '').localeCompare(a.opened || a.updated || ''));
   $('#hm-list').innerHTML = ps.map((p) => `<div class="hm-p${p.exists ? '' : ' gone'}" data-p="${p.id}">
-      <div class="hm-ico">🌿</div><div class="hm-t"><b>${esc(p.name)}</b><small>${esc(p.path)}</small></div>
+      <button class="hm-ico" data-plant="${p.id}" data-now="${plantOf(p)}" title="Cambiar su planta">${plantOf(p)}</button><div class="hm-t"><b>${esc(p.name)}</b><small>${esc(p.path)}</small></div>
       <span class="hm-when">${p.exists ? esc(ago(p.opened || p.updated)) : 'no está en su carpeta'}</span>
       <span class="hm-acts"><button data-mv="${p.id}" title="Moverlo a otra carpeta">Mover…</button><button data-rm="${p.id}" title="Quitarlo de la lista (no borra nada)">Quitar</button></span>
     </div>`).join('') || '<p class="none">Todavía no hay proyectos. Crea uno.</p>';
@@ -1865,11 +1883,12 @@ $('#home').addEventListener('click', async (e) => {
   const t = e.target;
   try {
     if (t.closest('#hm-new')) {
-      const box = document.createElement('div'); box.className = 'hm-p hm-newrow'; box.innerHTML = '<div class="hm-ico">🌿</div><input placeholder="Nombre del proyecto…">';
+      const box = document.createElement('div'); box.className = 'hm-p hm-newrow'; const pl = randomPlant(); box.innerHTML = `<div class="hm-ico">${pl}</div><input placeholder="Nombre del proyecto…">`;
       $('#hm-list').prepend(box); const inp = box.querySelector('input'); inp.focus();
-      inp.onkeydown = async (ev) => { if (ev.key === 'Escape') box.remove(); if (ev.key === 'Enter' && inp.value.trim()) { const j = await api('/api/projects', { name: inp.value.trim() }); location.href = '/?p=' + j.id; } };
+      inp.onkeydown = async (ev) => { if (ev.key === 'Escape') box.remove(); if (ev.key === 'Enter' && inp.value.trim()) { const j = await api('/api/projects', { name: inp.value.trim(), plant: pl }); location.href = '/?p=' + j.id; } };
       return;
     }
+    const ico = t.closest('[data-plant]'); if (ico) return pickPlant(ico, ico.dataset.plant, ico.dataset.now);
     if (t.closest('#hm-add')) { toast('Elige la carpeta en la ventana que se abre…'); const j = await api('/api/projects/add', {}); if (j.id) location.href = '/?p=' + j.id; return; }
     const mv = t.closest('[data-mv]'); if (mv) { toast('Elige a dónde moverlo en la ventana que se abre…'); paintHome(await api('/api/projects/move', { id: mv.dataset.mv })); return toast('Movido'); }
     const rm = t.closest('[data-rm]'); if (rm) return askChoice(rm, '¿Quitarlo de la lista?', 'Su carpeta y sus datos se quedan donde están; puedes volver a abrirlo con «Abrir carpeta…».', [{ label: 'Quitar de la lista', danger: true, run: async () => paintHome(await api('/api/projects/remove', { id: rm.dataset.rm })) }]);
