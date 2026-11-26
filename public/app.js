@@ -661,11 +661,12 @@ function openDoc(id, tabId, fromEl) {
 function showTab(tabId) { if (!cur) return; const d = nd(cur); curTab = tabId; d.active = tabId; ed.setDoc(nd(tabId).text || ''); renderEdHead(); renderMap(); }
 function closeDoc() {
   if (!cur) return;
-  const id = cur; cur = null; curTab = null; $ed.classList.remove('open'); save(); renderAll();
+  const id = cur; cur = null; curTab = null; $ed.classList.remove('open'); trail = []; $('#ed-back').hidden = true; $('#linkpill').classList.remove('on'); save(); renderAll();
   const el = stage.querySelector(`.dc[data-id="${id}"]`); el?.animate([{ transform: 'scale(1.06)' }, { transform: 'none' }], { duration: 320, easing: EASE.snap });
 }
 function renderEdHead() {
   const d = nd(cur); if (!d) return;
+  backlinks();
   $('#ed-name').value = d.title;
   const tint = pathOf(cur).reverse().find((n) => n.kind === 'frame')?.color;
   $ed.classList.toggle('tinted', !!tint); if (tint) $ed.style.setProperty('--tint', tint); else $ed.style.removeProperty('--tint');
@@ -755,7 +756,8 @@ const edApi = {
     if (o.announce) toast(`«${name}» creado al lado`, [['Abrir', () => openDoc(d.id)]], 6000);
     return d.n;
   },
-  openDoc(n) { const d = docs().find((x) => x.n === n); d ? openDoc(d.id) : toast('Ese documento ya no existe'); },
+  openDoc(n) { const d = docs().find((x) => x.n === n); if (!d) return toast('Ese documento ya no existe'); pushTrail(); openDoc(d.id); },
+  openRef(ref, head) { pushTrail(); openRef(ref, head); },
   toast: (m) => toast(m),
   onOutline(heads, current) {
     $('#toc-list').innerHTML = heads.length
@@ -764,6 +766,117 @@ const edApi = {
   },
   onLevel(l) { level = l; for (const b of document.querySelectorAll('#ed-lv [data-l]')) b.classList.toggle('on', +b.dataset.l === l); },
 };
+
+// ---- links: to anything of the tree, at any level (frames, tabs, documents, pages, titles) ----------------------------
+let trail = [];
+function pushTrail() { if (cur) { trail.push({ id: cur, tab: curTab, pos: ed.view.state.selection.main.head, top: ed.view.scrollDOM.scrollTop }); $('#ed-back').hidden = false; } }
+$('#ed-back').onclick = () => {
+  const t = trail.pop(); $('#ed-back').hidden = !trail.length; if (!t || !nd(t.id)) return;
+  openDoc(t.id, t.tab);
+  setTimeout(() => { ed.view.dispatch({ selection: { anchor: Math.min(t.pos, ed.view.state.doc.length) } }); ed.view.scrollDOM.scrollTop = t.top; }, 30);
+};
+function headLine(tabId, title) { const ls = (nd(tabId)?.text || '').split('\n'); const i = ls.findIndex((l) => { const m = l.match(HEAD); return m && m[2].trim() === title; }); return i < 0 ? null : i + 1; }
+function openRef(ref, head) {
+  const n = nd(ref); if (!n) return toast('Eso ya no existe');
+  if (n.kind === 'project' || n.kind === 'frame' || n.kind === 'ftab') { if (cur) closeDoc(); return focusTo(n.id); }
+  const d = n.kind === 'doc' ? n : parent(n.id), tab = n.kind === 'dtab' ? n.id : null;
+  openDoc(d.id, tab);
+  if (head) { const ln = headLine(curTab, head); if (ln) setTimeout(() => ed.gotoLine(ln), 40); else toast(`El título «${head}» ya no está`); }
+}
+// everything that can be linked, as a tree of entries: { ref, head, kind, title, kids() }
+function entryOf(id) {
+  const n = nd(id);
+  const e = { ref: id, kind: n.kind, title: n.title };
+  e.kids = () => {
+    if (n.kind === 'dtab') { const hs = (x) => x.kids.map((k) => ({ ref: id, head: k.title, kind: 'h', d: k.d, title: k.title, kids: () => hs(k) })); return hs(parseText(n.text)); }
+    if ((n.kind === 'frame' || n.kind === 'doc') && n.kids.length === 1) return entryOf(n.kids[0]).kids();   // its only tab adds no level
+    return n.kids.map(entryOf);
+  };
+  return e;
+}
+function allEntries() {
+  const out = [], walk = (e, path) => { if (e.kind !== 'project') out.push({ ...e, path }); for (const k of e.kids()) walk(k, e.kind === 'project' ? [] : [...path, e.title]); };
+  walk(entryOf(S.root), []);
+  for (const id of S.drawer) if (nd(id)) walk(entryOf(id), ['Cajón']);
+  return out;
+}
+const KICON = { frame: '⬚', ftab: '▭', doc: '📄', dtab: '▭', h: '#' };
+const fold = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+let lk = null;                                               // { from, to, text, stack: [entry], list: [entry], i }
+function openLinker() {
+  if (!cur) return;
+  const r = ed.view.state.selection.main; if (r.empty) return toast('Selecciona primero el texto que quieres enlazar');
+  lk = { from: r.from, to: r.to, text: ed.view.state.sliceDoc(r.from, r.to).replace(/\n/g, ' ').trim(), stack: [entryOf(S.root)], i: 0 };
+  $('#linkpill').classList.remove('on');
+  const c = ed.view.coordsAtPos(r.to) || { left: innerWidth / 2, bottom: innerHeight / 3 }, box = $('#linker');
+  Object.assign(box.style, { left: Math.max(12, Math.min(innerWidth - 470, c.left - 60)) + 'px', top: Math.max(70, Math.min(innerHeight - 440, c.bottom + 10)) + 'px' });
+  box.querySelector('.lk-sel').textContent = '«' + lk.text.slice(0, 40) + (lk.text.length > 40 ? '…' : '') + '»';
+  $('#lk-q').value = ''; box.classList.add('on'); paintLinker(); $('#lk-q').focus();
+}
+function closeLinker() { lk = null; $('#linker').classList.remove('on'); ed?.focus(); }
+function paintLinker() {
+  const q = fold($('#lk-q').value.trim());
+  if (q) { lk.list = allEntries().filter((e) => fold(e.title).includes(q)).slice(0, 60); $('#lk-crumbs').innerHTML = '<span class="lk-mode">Buscando en todo</span>'; }
+  else {
+    lk.list = lk.stack.at(-1).kids();
+    $('#lk-crumbs').innerHTML = lk.stack.map((e, i) => `${i ? '<span class="sep">›</span>' : ''}<button data-lk-up="${i}">${esc(e.title)}</button>`).join('');
+  }
+  lk.i = Math.min(lk.i, Math.max(0, lk.list.length - 1));
+  $('#lk-list').innerHTML = lk.list.map((e, i) => {
+    const deeper = e.kids().length;
+    return `<div class="lk-row${i === lk.i ? ' on' : ''}" data-i="${i}"><span class="lk-k k-${e.kind}">${e.kind === 'h' ? '#'.repeat(Math.min(e.d, 3)) : KICON[e.kind]}</span><div class="lk-t"><div>${esc(e.title)}</div>${q && e.path.length ? `<small>${esc(e.path.join(' › '))}</small>` : ''}</div>${deeper && !q ? `<button class="lk-in" data-in="${i}" title="Ver lo de dentro">›</button>` : ''}</div>`;
+  }).join('') || '<p class="none">Nada con ese nombre.</p>';
+  $('#lk-list .lk-row.on')?.scrollIntoView({ block: 'nearest' });
+}
+function pickLink(e) {
+  const ref = e.head ? `${e.ref}#${e.head}` : e.ref, label = lk.text.replace(/[\[\]]/g, '');
+  const ins = `[${label}@${ref}]`;
+  ed.view.dispatch({ changes: { from: lk.from, to: lk.to, insert: ins }, selection: { anchor: lk.from + ins.length } });
+  toast(`Enlazado a «${e.title}»`); closeLinker();
+}
+$('#lk-q').addEventListener('input', () => { lk.i = 0; paintLinker(); });
+$('#lk-q').addEventListener('keydown', (e) => {
+  if (!lk) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); lk.i = Math.min(lk.list.length - 1, lk.i + 1); paintLinker(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); lk.i = Math.max(0, lk.i - 1); paintLinker(); }
+  else if (e.key === 'Enter') { e.preventDefault(); const x = lk.list[lk.i]; if (x) pickLink(x); }
+  else if (e.key === 'ArrowRight' && !$('#lk-q').value) { e.preventDefault(); const x = lk.list[lk.i]; if (x?.kids().length) { lk.stack.push(x); lk.i = 0; paintLinker(); } }
+  else if ((e.key === 'ArrowLeft' || (e.key === 'Backspace' && !$('#lk-q').value)) && lk.stack.length > 1 && !$('#lk-q').value) { e.preventDefault(); lk.stack.pop(); lk.i = 0; paintLinker(); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeLinker(); }
+});
+$('#linker').addEventListener('mousedown', (e) => {
+  if (e.target === $('#lk-q')) return;
+  e.preventDefault();
+  const up = e.target.closest('[data-lk-up]'); if (up) { lk.stack = lk.stack.slice(0, +up.dataset.lkUp + 1); lk.i = 0; $('#lk-q').value = ''; return paintLinker(); }
+  const inn = e.target.closest('[data-in]'); if (inn) { lk.stack.push(lk.list[+inn.dataset.in]); lk.i = 0; return paintLinker(); }
+  const row = e.target.closest('.lk-row'); if (row) pickLink(lk.list[+row.dataset.i]);
+});
+addEventListener('mousedown', (e) => { if (lk && !e.target.closest('#linker')) closeLinker(); }, true);
+// selecting text in a page: a small «Enlazar» appears by the selection
+function paintLinkPill() {
+  const pill = $('#linkpill');
+  if (!cur || lk) return pill.classList.remove('on');
+  const r = ed.view.state.selection.main;
+  if (r.empty || ed.view.state.sliceDoc(r.from, r.to).includes('\n')) return pill.classList.remove('on');
+  const c = ed.view.coordsAtPos(r.from), c2 = ed.view.coordsAtPos(r.to); if (!c || !c2) return pill.classList.remove('on');
+  Object.assign(pill.style, { left: (c.left + c2.left) / 2 + 'px', top: c.top - 34 + 'px' });
+  pill.classList.add('on');
+}
+$('#ed-body').addEventListener('mouseup', () => setTimeout(paintLinkPill, 0));
+$('#ed-body').addEventListener('keyup', (e) => { if (e.shiftKey || e.key.startsWith('Arrow')) paintLinkPill(); });
+$('#ed-body').addEventListener('mousedown', () => $('#linkpill').classList.remove('on'));
+$('#linkpill').addEventListener('mousedown', (e) => { e.preventDefault(); openLinker(); });
+// who links here: at the foot of the page
+function backlinks() {
+  const d = nd(cur); if (!d) return;
+  const mine = new Set([d.id, ...d.kids]);
+  const re = new RegExp(`\\[[^\\[\\]\\n]*?(?:\\*${d.n}|@(${[...mine].join('|')}))(?:#[^\\]\\n]*)?\\]`);
+  const from = docs().filter((o) => o !== d && re.test(docText(o)));
+  $('#ed-foot').innerHTML = from.length
+    ? '<span>Enlazado desde</span>' + from.map((o) => `<button data-bl="${o.id}">📄 ${esc(o.title)}</button>`).join('')
+    : '<span>Selecciona un texto y pulsa <b>🔗 Enlazar</b> (o Ctrl+K) para enlazarlo a cualquier marco, pestaña, documento o título · <b>[</b> busca documentos, ideas y tareas</span>';
+}
+$('#ed-foot').addEventListener('click', (e) => { const b = e.target.closest('[data-bl]'); if (b) { pushTrail(); openDoc(b.dataset.bl); } });
 
 // ---- small shared pieces --------------------------------------------------------------------------------------------
 function toast(msg, actions = [], ms = 4200) {
@@ -818,6 +931,7 @@ addEventListener('keydown', (e) => {
     if (cur) { e.preventDefault(); return closeDoc(); }
     if (!typing) return zoomOut();
   }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && cur) { e.preventDefault(); return openLinker(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing && !cur) { e.preventDefault(); doUndo(); }
 });
 

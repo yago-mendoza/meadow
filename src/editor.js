@@ -7,7 +7,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { autocompletion } from '@codemirror/autocomplete';
 import { codeFolding, foldEffect, unfoldEffect, foldedRanges } from '@codemirror/language';
 
-export const LINK_RE = /\[([^\[\]\n]*?)\*(\d+)\]/g;          // [label*N]: a link to document N
+export const LINK_RE = /\[([^\[\]\n]*?)(?:\*(\d+)|@([\w-]+)(?:#([^\]\n]*))?)\]/g;   // [label*N] a document · [label@id] any node · [label@id#Título] a title
 const NEW_RE = /\[([^\[\]\n*]*\S[^\[\]\n*]*)\*\]/g;           // [label*]: a new document to create
 export const TAG_RE = /^(\s*)\[([^\[\]\n*]+)\]/;                // [TAG] at the start of a line
 const RULE_RE = /^\s*-{3,}\s*$/;                                // ------ a rule drawn across the page
@@ -18,9 +18,13 @@ export const TOKEN_RE = /\{(idea|tarea) (\d+)\}/g;              // {idea 3} · {
 export function hue(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360; }
 
 class LinkRefWidget extends WidgetType {
-  constructor(n) { super(); this.n = n; }
-  eq(o) { return o.n === this.n; }
-  toDOM() { const s = document.createElement('span'); s.className = 'cm-linkref'; s.dataset.n = this.n; s.title = 'Abrir'; s.textContent = '↗'; return s; }
+  constructor(n, ref, head) { super(); this.n = n; this.ref = ref; this.head = head; }
+  eq(o) { return o.n === this.n && o.ref === this.ref && o.head === this.head; }
+  toDOM() {
+    const s = document.createElement('span'); s.className = 'cm-linkref'; s.title = 'Abrir'; s.textContent = '↗';
+    if (this.ref) { s.dataset.ref = this.ref; if (this.head) s.dataset.head = this.head; } else s.dataset.n = this.n;
+    return s;
+  }
   ignoreEvent() { return false; }
 }
 class PostitWidget extends WidgetType {
@@ -106,8 +110,9 @@ function decorateLine(line, out) {
     const a = base + m.index, b = a + m[0].length, star = a + 1 + m[1].length;
     spans.push([m.index, m.index + m[0].length]);
     out.push(M.linkb.range(a, a + 1));
-    if (star > a + 1) out.push(Decoration.mark({ class: 'cm-link', attributes: { 'data-n': m[2] } }).range(a + 1, star));
-    out.push(Decoration.replace({ widget: new LinkRefWidget(m[2]) }).range(star, b - 1));   // the number is internal: an arrow opens it
+    const at = m[3] ? { 'data-ref': m[3], ...(m[4] ? { 'data-head': m[4] } : {}) } : { 'data-n': m[2] };
+    if (star > a + 1) out.push(Decoration.mark({ class: 'cm-link', attributes: at }).range(a + 1, star));
+    out.push(Decoration.replace({ widget: new LinkRefWidget(m[2], m[3], m[4]) }).range(star, b - 1));   // the number is internal: an arrow opens it
     out.push(M.linkb.range(b - 1, b));
   }
   const inLink = (i) => spans.some(([s, e]) => i >= s && i < e);
@@ -553,7 +558,8 @@ export function createEditor(parent, api) {
       if (e.ctrlKey || e.metaKey || el.classList.contains('cm-linkref')) {
         e.preventDefault();
         try { view.dispatch({ selection: { anchor: view.posAtDOM(el) } }); } catch { /* keep the caret */ }   // the trail remembers this link
-        api.openDoc?.(+el.dataset.n); return true;
+        if (el.dataset.ref) api.openRef?.(el.dataset.ref, el.dataset.head || null); else api.openDoc?.(+el.dataset.n);
+        return true;
       }
       return false;
     },
