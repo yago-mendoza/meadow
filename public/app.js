@@ -22,7 +22,7 @@ const listOf = (kind) => (kind === 'idea' ? S.ideas : S.tasks);
 const getItem = (kind, n) => listOf(kind).find((x) => x.n === n);
 const token = (it) => `{${it.kind} ${it.n}}`;
 function find(id) {
-  for (const [k, list] of [['d', S.docs], ['p', S.postits], ['f', S.frames], ['i', S.ideas], ['t', S.tasks]]) {
+  for (const [k, list] of [['d', S.docs], ['p', S.postits], ['f', S.frames], ['i', S.ideas], ['t', S.tasks], ['x', S.texts || []]]) {
     const o = list.find((x) => x.id === id); if (o) return { k, o };
   }
   return null;
@@ -42,7 +42,7 @@ async function load() {
   rev = j.rev || 0;
   if (j.state) S = { ...S, ...j.state };
   else S.view = { x: Math.round(innerWidth / 2 - 100), y: Math.round(innerHeight / 2 - 140), z: 1 };
-  for (const k of ['postits', 'frames', 'ideas', 'tasks', 'history', 'signs']) S[k] ||= [];
+  for (const k of ['postits', 'frames', 'ideas', 'tasks', 'history', 'signs', 'texts']) S[k] ||= [];
   S.seq ||= { idea: 0, tarea: 0 };
   for (const d of S.docs) { const t = titleOf(d.text); if (t) d.name = t; else d.text = withTitle(d.text, d.name); }
   if (!S.trays?.length) S.trays = [{ id: 'b1', name: 'Cajón', color: TRAY_COLORS[0], open: true }];
@@ -67,12 +67,12 @@ addEventListener('beforeunload', () => {
 
 const undo = [];
 function snap() {
-  undo.push(JSON.stringify({ docs: S.docs, postits: S.postits, frames: S.frames, ideas: S.ideas, tasks: S.tasks, signs: S.signs }));
+  undo.push(JSON.stringify({ docs: S.docs, postits: S.postits, frames: S.frames, ideas: S.ideas, tasks: S.tasks, signs: S.signs, texts: S.texts, trays: S.trays, seq: S.seq }));
   if (undo.length > 80) undo.shift();
 }
 function doUndo() {
   const s = undo.pop(); if (!s) return toast('Nada que deshacer');
-  Object.assign(S, JSON.parse(s)); sel.clear();
+  Object.assign(S, JSON.parse(s)); sel.clear(); renderStash();
   if (curId) { const d = docById(curId); if (!d) closeEditor(); else { ed.replaceText(d.text || ''); fillHead(); } }
   changed();
 }
@@ -172,16 +172,33 @@ const PRS = '<div class="prs" title="Arrastra: más grande o más pequeño (con 
 const ZB = '<button data-a="front">⤒<b>Al frente</b></button><button data-a="back">⤓<b>Al fondo</b></button>';
 const postitHTML = (p) => `<div class="postit${sel.has(p.id) ? ' sel' : ''}" data-id="${p.id}" data-k="p" style="left:${p.x}px;top:${p.y}px;z-index:${p.z || 0};--bg:${p.color};--s:${p.s || 1}">
   <div class="ptext">${esc(p.text)}</div><button class="x" title="Borrar">×</button>${palHTML()}<div class="acts">${ZB}</div>${PRS}</div>`;
+// Free text: words straight on the plane, no document.
+const textHTML = (x) => `<div class="ftext${sel.has(x.id) ? ' sel' : ''}" data-id="${x.id}" data-k="x" style="left:${x.x}px;top:${x.y}px;z-index:${x.z || 0};--s:${x.s || 1}">
+  <div class="xt">${esc(x.text)}</div><button class="x" title="Borrar">×</button><div class="acts">${ZB}</div>${PRS}</div>`;
+function writeText(x, fresh = false) {
+  const el = elOf(x.id)?.querySelector('.xt'); if (!el) return;
+  el.contentEditable = 'true'; el.focus();
+  const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(r);
+  const end = (ok) => {
+    el.contentEditable = 'false';
+    const v = el.innerText.replace(/\n+$/, '');
+    if (!v.trim()) { if (fresh || ok) { S.texts = S.texts.filter((o) => o !== x); render(); save(); } return; }
+    if (v !== x.text) { snap(); x.text = v; save(); renderItems(); paintSel(); }
+  };
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); } if (e.key === 'Escape') { e.stopPropagation(); el.blur(); } e.stopPropagation(); });
+  el.addEventListener('blur', () => end(true), { once: true });
+}
 const frameHTML = (f) => `<div class="frame${sel.has(f.id) ? ' sel' : ''}" data-id="${f.id}" data-k="f" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;--bg:${f.color}">
+  <div class="fdesc${f.desc ? '' : ' empty'}" title="Clic para escribir la descripción">${esc(f.desc || '')}</div>
   <div class="ftab"><span class="ftitle">${esc(f.title)}</span><button class="f-add" title="Crear un marco dentro">＋</button><button class="x" title="Borrar el marco (no lo de dentro)">×</button>${palHTML()}</div>
-  <div class="edge e-t"></div><div class="edge e-b"></div><div class="edge e-l"></div><div class="edge e-r"></div><div class="rs"></div></div>`;
+  <div class="edge e-t"></div><div class="edge e-b"></div><div class="edge e-l"></div><div class="edge e-r"></div><div class="rs c-tl" data-c="tl"></div><div class="rs c-tr" data-c="tr"></div><div class="rs c-bl" data-c="bl"></div><div class="rs c-br" data-c="br"></div></div>`;
 function itemHTML(it) {
   const k = it.kind === 'idea' ? 'i' : 't', uses = docsUsing(it).length;
   if (!it.dock) {                                   // loose: a small circle with its icon; a click reads it
     return `<div class="item circle ${it.kind}${it.done ? ' done' : ''}${sel.has(it.id) ? ' sel' : ''}" data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
       <span class="cico">${it.kind === 'idea' ? '💡' : it.done ? '✔' : ''}</span>
       <button class="x" title="${uses ? 'Quitar del plano (sigue en sus documentos)' : 'Borrar'}">×</button>
-      <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button>${ZB}</div>${PRS}</div>`;
+      <div class="acts"><button data-a="ref">⧉<b>Copiar para pegar</b></button>${ZB}</div>${it.pin ? '' : PRS}</div>`;   // pinned: its size is its host's
   }
   const lead = it.kind === 'idea' ? '<span class="iico">💡</span>' : `<button class="chk" title="${it.done ? 'Reabrir' : 'Hecha'}">${it.done ? '✔' : ''}</button>`;
   return `<div class="item ${it.kind}${it.done ? ' done' : ''} docked${sel.has(it.id) ? ' sel' : ''}" data-id="${it.id}" data-k="${k}" style="left:${it.x}px;top:${it.y}px;z-index:${it.z || 0};--s:${it.s || 1}">
@@ -233,6 +250,7 @@ function renderItems() {
   framesEl.innerHTML = [...S.frames].sort((a, b) => b.w * b.h - a.w * a.h).map(frameHTML).join('');
   itemsEl.innerHTML = S.docs.map((d, i) => (d.place === 'canvas' ? docHTML(d, i + 1) : '')).join('')
     + S.postits.filter((p) => !p.riding).map(postitHTML).join('')
+    + (S.texts || []).filter((x) => !x.riding).map(textHTML).join('')
     + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas && !it.riding && !hiddenInFold(it)).map(itemHTML).join('')
     + groupsHTML();
   $('#empty').classList.toggle('on', !itemsEl.children.length && !S.frames.length);
@@ -288,24 +306,36 @@ function layoutDocks() {
 // ---- circles pinned to a thing: on a document's or post-it's left or right edge (centred on the line, spread around
 // its middle), or in a row right of a frame's tab. They move and scale with it; dragged away, they come loose. ------
 const pinnedTo = (id) => [...S.ideas, ...S.tasks].filter((t) => t.onCanvas && !t.dock && t.pin?.host === id);
+// The eight anchors of a document or post-it: corners tl tr bl br and side middles t r b l. Several circles on one anchor
+// spread along its side (the middles) or along the top/bottom edge, inwards (the corners).
+const ANCHORS = ['tl', 't', 'tr', 'r', 'br', 'b', 'bl', 'l'];
+function anchorAt(h, hel, side, i, n, sc) {
+  const [w, hh] = sizeOf(hel, h), gap = 44 * sc, off = (i - (n - 1) / 2) * gap;
+  const L = h.x, R = h.x + w, T = h.y, B = h.y + hh, CX = h.x + w / 2, CY = h.y + hh / 2;
+  switch (side) {
+    case 'tl': return [L + i * gap, T]; case 'tr': return [R - i * gap, T];
+    case 'bl': return [L + i * gap, B]; case 'br': return [R - i * gap, B];
+    case 't': return [CX + off, T]; case 'b': return [CX + off, B];
+    case 'l': case 'left': return [L, CY + off]; default: return [R, CY + off];
+  }
+}
 function layoutPins() {
   for (const t of [...S.ideas, ...S.tasks]) if (t.pin && !t.riding && !find(t.pin.host)) delete t.pin;
   const hosts = new Set([...S.ideas, ...S.tasks].filter((t) => t.pin && t.onCanvas && !t.riding).map((t) => t.pin.host));
   for (const id of hosts) {
     const f = find(id), hel = elOf(id); if (!f || !hel) continue;
     const h = f.o, sc = f.k === 'f' ? 1 : h.s || 1;
-    for (const side of ['left', 'right', 'tab']) {
+    const sides = new Set(pinnedTo(id).map((t) => t.pin.side));
+    for (const side of sides) {
       const list = pinnedTo(id).filter((t) => t.pin.side === side).sort((a, b) => (a.pin.at ?? 0) - (b.pin.at ?? 0));
       list.forEach((t, i) => {
-        t.s = sc; const r = 19 * sc, gap = 44 * sc;
+        t.s = sc; const r = 19 * sc;
+        let cx, cy;
         if (side === 'tab') {
           const tab = hel.querySelector('.ftab'), tw = tab ? tab.offsetWidth : 90, th = tab ? tab.offsetHeight : 30;
-          t.x = Math.round(h.x + 16 + tw + 10 + i * gap); t.y = Math.round(h.y - th / 2 - r);
-        } else {
-          const [w, hh] = sizeOf(hel, h);
-          const cx = side === 'left' ? h.x : h.x + w, cy = h.y + hh / 2 + (i - (list.length - 1) / 2) * gap;
-          t.x = Math.round(cx - r); t.y = Math.round(cy - r);
-        }
+          cx = h.x + 16 + tw + 10 + i * 44 + 19; cy = h.y - th / 2;
+        } else [cx, cy] = anchorAt(h, hel, side, i, list.length, sc);
+        t.x = Math.round(cx - r); t.y = Math.round(cy - r);
         t.z = Math.max(t.z || 0, (h.z || 0) + 1);
         const el = elOf(t.id); if (!el) return;
         Object.assign(el.style, { left: t.x + 'px', top: t.y + 'px', zIndex: t.z }); el.style.setProperty('--s', t.s);
@@ -313,15 +343,52 @@ function layoutPins() {
     }
   }
 }
-// What a dropped circle pins to: the document, post-it or frame under the pointer (not itself).
+// What a dropped circle pins to. A frame: only its tab row. A document or post-it: near an edge, the nearest of its eight
+// anchors; dropped well inside it, nothing (it just lies on top, and goes with it).
+const EDGE_NEAR = 34;
 function pinTarget(it, e) {
   const me = elOf(it.id);
-  const under = document.elementsFromPoint(e.clientX, e.clientY).map((x) => x.closest?.('[data-k]')).find((x) => x && x !== me && ['d', 'p', 'f'].includes(x.dataset.k));
+  for (const f of S.frames) {
+    const fel = elOf(f.id), tab = fel?.querySelector('.ftab'); if (!tab) continue;
+    const r = tab.getBoundingClientRect(), n = pinnedTo(f.id).filter((x) => x !== it && x.pin.side === 'tab').length;
+    const right = r.right + (10 + (n + 1) * 44) * S.view.z;
+    if (e.clientX > r.left && e.clientX < right && e.clientY > r.top - 8 * S.view.z && e.clientY < r.bottom + 6 * S.view.z) return { host: f.id, side: 'tab', at: 99 };
+  }
+  const near = EDGE_NEAR;
+  const under = [...itemsEl.querySelectorAll('[data-k="d"], [data-k="p"]')].filter((el) => el !== me).reverse().find((el) => {
+    const r = el.getBoundingClientRect();
+    return e.clientX > r.left - near && e.clientX < r.right + near && e.clientY > r.top - near && e.clientY < r.bottom + near;
+  });
   if (!under) return null;
-  const k = under.dataset.k, r = under.getBoundingClientRect();
-  if (k === 'f') return { host: under.dataset.id, side: 'tab', at: 99 };
-  const side = e.clientX < r.left + r.width / 2 ? 'left' : 'right';
-  return { host: under.dataset.id, side, at: e.clientY };
+  const r = under.getBoundingClientRect();
+  const dl = Math.abs(e.clientX - r.left), dr = Math.abs(e.clientX - r.right), dt = Math.abs(e.clientY - r.top), db = Math.abs(e.clientY - r.bottom);
+  const nearX = Math.min(dl, dr) < near, nearY = Math.min(dt, db) < near;
+  if (!nearX && !nearY) return null;                                         // well inside: it just lies on it
+  const v = dt < db ? 't' : 'b', hside = dl < dr ? 'l' : 'r';
+  const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+  let side;
+  if (nearX && nearY) side = v + hside;                                       // a corner
+  else if (nearX) side = fy < .2 ? 't' + hside : fy > .8 ? 'b' + hside : hside;
+  else side = fx < .2 ? v + 'l' : fx > .8 ? v + 'r' : v;
+  return { host: under.dataset.id, side, at: side === 't' || side === 'b' ? e.clientX : e.clientY };
+}
+// The dotted slot: where a circle being dragged would be pinned if dropped now.
+function pinHint(it, e) {
+  const hint = $('#pinhint'), pt = it && pinTarget(it, e);
+  if (!pt) { hint.classList.remove('on'); return; }
+  const f = find(pt.host), hel = elOf(pt.host); if (!f || !hel) return hint.classList.remove('on');
+  const z = S.view.z, h = f.o; let wx, wy, sc = 1;
+  if (pt.side === 'tab') {
+    const tab = hel.querySelector('.ftab'), n = pinnedTo(h.id).filter((x) => x !== it && x.pin.side === 'tab').length;
+    wx = h.x + 16 + tab.offsetWidth + 10 + n * 44 + 19; wy = h.y - tab.offsetHeight / 2;
+  } else {
+    sc = h.s || 1;
+    const n = pinnedTo(h.id).filter((x) => x !== it && x.pin.side === pt.side).length;
+    [wx, wy] = anchorAt(h, hel, pt.side, /^[tb][lr]$/.test(pt.side) ? n : n, /^[tb][lr]$/.test(pt.side) ? n + 1 : n + 1, sc);
+  }
+  const d = 38 * sc * z;
+  Object.assign(hint.style, { left: S.view.x + wx * z - d / 2 + 'px', top: S.view.y + wy * z - d / 2 + 'px', width: d + 'px', height: d + 'px' });
+  hint.classList.add('on');
 }
 // Where a dropped task docks: under a document, if it lands in the strip below it (or among the tasks already there).
 function dockTarget(t) {
@@ -332,7 +399,7 @@ function dockTarget(t) {
     const de = elOf(d.id); if (!de) continue;
     const [dw, dh] = sizeOf(de, d);
     const stack = docked(d).filter((x) => x !== t).reduce((acc, x) => { const xe = elOf(x.id); return acc + (xe ? xe.offsetHeight * (x.s || 1) + 6 : 0); }, 0);
-    if (cx > d.x && cx < d.x + dw && cy > d.y + dh - 24 && cy < d.y + dh + stack + 70) {
+    if (cx > d.x && cx < d.x + dw && cy > d.y + dh + EDGE_NEAR / S.view.z && cy < d.y + dh + stack + 110) {   // below the bottom-edge anchors
       const others = docked(d).filter((x) => x !== t);
       const at = others.filter((x) => x.y + 10 < t.y).length;           // its place in the stack, by where it was dropped
       return { d, at, others };
@@ -370,7 +437,7 @@ function nearTrays(e) {
     const r = stash.getBoundingClientRect();
     return e.clientX < r.right + 90 && e.clientY > r.top - 90;          // stay out while the pointer is around them
   }
-  return e.clientX < 330 && e.clientY > innerHeight - 170;                 // come out when it reaches their corner
+  return e.clientX < 470 && e.clientY > innerHeight - 320;                 // come out while it is still on its way
 }
 const trayOf = (d) => S.trays.find((t) => t.id === d.tray) || S.trays[0];
 const openTray = () => S.trays.find((t) => t.open) || S.trays[0];
@@ -401,6 +468,8 @@ function renderStash() {
 }
 // Which tray is under the pointer (its id), or null.
 function overStash(e) {
+  const add = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.t-add');
+  if (add && S.trays.length < MAX_TRAYS) return 'new';
   const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.tray');
   if (el) return el.dataset.tray;
   const r = stash.getBoundingClientRect();
@@ -409,24 +478,30 @@ function overStash(e) {
 function hotTray(e, on) {
   const id = on ? overStash(e) : null;
   for (const el of stash.querySelectorAll('.tray')) el.classList.toggle('hot', el.dataset.tray === id);
+  stash.querySelector('.t-add')?.classList.toggle('hot', id === 'new');
 }
 // What lies on a document (post-its, ideas, tasks, docked tasks) rides along with it into a drawer: hidden, with its
 // offset kept, and put back in the same place when the document comes out. Its tags go with it by themselves.
 function boardRiders(d) {
   const keep = new Set(sel); sel.clear(); sel.add(d.id);
-  const deps = collectMoving(false).filter((m) => m.o !== d && (m.k === 'p' || m.k === 'i' || m.k === 't'));
+  const deps = collectMoving(false).filter((m) => m.o !== d && (m.k === 'p' || m.k === 'i' || m.k === 't' || m.k === 'x'));
   sel.clear(); for (const id of keep) sel.add(id);
   for (const m of deps) { m.o.riding = d.id; m.o.rdx = m.o.x - d.x; m.o.rdy = m.o.y - d.y; sel.delete(m.o.id); }
 }
 function releaseRiders(d) {
-  for (const o of [...S.postits, ...S.ideas, ...S.tasks]) if (o.riding === d.id) {
+  for (const o of [...S.postits, ...S.ideas, ...S.tasks, ...S.texts]) if (o.riding === d.id) {
     o.x = Math.round(d.x + o.rdx); o.y = Math.round(d.y + o.rdy); o.z = topZ();
     delete o.riding; delete o.rdx; delete o.rdy;
   }
 }
 function putInTray(docs, trayId) {
   // (renderStash redraws after this; the open tray is the one that received them)
-  const t = S.trays.find((x) => x.id === trayId) || openTray();
+  let t = S.trays.find((x) => x.id === trayId) || openTray();
+  if (trayId === 'new') {                          // dropped on «＋»: a new drawer, named after what it receives
+    const used = new Set(S.trays.map((x) => x.color));
+    t = { id: 'b' + uid(), name: docs[0]?.name || `Cajón ${S.trays.length + 1}`, color: TRAY_COLORS.find((c) => !used.has(c)) || TRAY_COLORS[0], open: true };
+    S.trays.push(t);
+  }
   for (const d of docs) { if (d.place === 'canvas') boardRiders(d); d.place = 'stash'; d.tray = t.id; sel.delete(d.id); }
   for (const x of S.trays) x.open = x === t;
   return t;
@@ -446,7 +521,7 @@ function groupText() {
   const ids = [...sel].map(find).filter(Boolean).sort((a, b) => (a.o.y - b.o.y) || (a.o.x - b.o.x));
   for (const { k, o } of ids) {
     if (k === 'd') parts.push(titleOf(o.text) ? readable(o.text) : `# ${o.name}\n${readable(o.text)}`);
-    else if (k === 'p') parts.push(o.text);
+    else if (k === 'p' || k === 'x') parts.push(o.text);
     else if (k === 'i') parts.push(`💡 ${o.text}`);
     else if (k === 't') parts.push(`- [${o.done ? 'x' : ' '}] ${o.text}`);
   }
@@ -471,7 +546,8 @@ function withTitle(text, name) {
   return lines.join('\n');
 }
 function renameDoc(d, name) {
-  if (!name) return;
+  if (!name || name === d.name) return;
+  if (!renameDoc.typing) snap();
   d.name = name; d.text = withTitle(d.text, name); d.updated = Date.now();
   if (curId === d.id) { ed.replaceText(d.text); if (document.activeElement !== $('#ed-name')) $('#ed-name').value = name; }
   save();
@@ -500,6 +576,9 @@ function create(kind, w, inStash) {
       const el = inStash ? stash.querySelector(`.chip[data-id="${d.id}"] b`) : elOf(d.id)?.querySelector('.dtitle');
       if (el) editInline(el, (v) => { if (v) { renameDoc(d, v); render(); } });
     } else { openEditor(d.id); setTimeout(() => { $('#ed-name').focus(); $('#ed-name').select(); }, 30); }
+  } else if (kind === 'text') {
+    const x = { id: uid(), x: Math.round(w.x - 40), y: Math.round(w.y - 14), z: topZ(), text: '' };
+    S.texts.push(x); sel.clear(); sel.add(x.id); save(); render(); writeText(x, true);
   } else if (kind === 'postit') {
     const p = { id: uid(), x: Math.round(w.x - 85), y: Math.round(w.y - 75), z: topZ(), text: '', color: PASTEL[0] };
     S.postits.push(p); sel.clear(); sel.add(p.id); save(); render(); editPostit(p);
@@ -727,6 +806,7 @@ function removeIds(ids) {
   for (const p of S.postits.filter((p) => set.has(p.id))) log('borrar', `Post-it «${(p.text || '').slice(0, 40)}»`, { restore: { k: 'p', o: p } });
   for (const f of S.frames.filter((f) => set.has(f.id))) log('borrar', `Marco «${f.title || 'sin título'}»`, { restore: { k: 'f', o: f } });
   S.signs = (S.signs || []).filter((g) => !set.has(g.host));
+  S.texts = (S.texts || []).filter((x) => !set.has(x.id));
   S.postits = S.postits.filter((p) => !set.has(p.id));
   S.frames = S.frames.filter((f) => !set.has(f.id));
   for (const it of [...S.ideas, ...S.tasks].filter((x) => set.has(x.id))) {
@@ -796,16 +876,16 @@ vp.addEventListener('pointerdown', (e) => {
   if (rs) {
     const f = find(rs.closest('.frame').dataset.id).o;
     const keep = new Set(sel); sel.clear(); sel.add(f.id);
-    const deps = e.altKey ? [] : collectMoving(false).filter((m) => m.o !== f).map((m) => ({ ...m, s0: m.o.s || 1, w0: m.o.w, h0: m.o.h }));
+    const deps = e.shiftKey ? collectMoving(false).filter((m) => m.o !== f).map((m) => ({ ...m, s0: m.o.s || 1, w0: m.o.w, h0: m.o.h })) : [];
     sel.clear(); for (const id of keep) sel.add(id);
-    act = { k: 'resize', f, sx: e.clientX, sy: e.clientY, w: f.w, h: f.h, el: rs.closest('.frame'), deps }; return;
+    act = { k: 'resize', f, sx: e.clientX, sy: e.clientY, x: f.x, y: f.y, w: f.w, h: f.h, c: rs.dataset.c || 'br', el: rs.closest('.frame'), deps }; return;
   }
   if (it) {
-    const id = it.dataset.id, toggle = e.shiftKey || e.ctrlKey || e.metaKey;
+    const id = it.dataset.id, toggle = e.shiftKey || e.ctrlKey || e.metaKey, selBefore = new Set(sel);
     if (toggle) { sel.has(id) ? sel.delete(id) : sel.add(id); }
     else if (!sel.has(id)) { sel.clear(); sel.add(id); }
     paintSel();
-    act = { k: 'move', sx: e.clientX, sy: e.clientY, moving: collectMoving(e.altKey), moved: false, id, kind: it.dataset.k, toggle, title: e.target.closest('.ftitle, .dtitle') };
+    act = { k: 'move', sx: e.clientX, sy: e.clientY, moving: collectMoving(e.altKey), moved: false, id, kind: it.dataset.k, toggle, selBefore, title: e.target.closest('.ftitle, .dtitle, .fdesc') };
     return;
   }
   act = { k: 'box', sx: e.clientX, sy: e.clientY, add: e.shiftKey, base: new Set(sel), moved: false };   // Ctrl + drag on empty grid (Shift adds)
@@ -817,7 +897,7 @@ vp.addEventListener('pointerdown', (e) => {
 // · a document carries the post-its, ideas and tasks lying on it (one lying on two documents goes with the upper one);
 // · a post-it, idea or task carries the small things it touches, and those theirs, except what lies on a document
 //   that is not moving: that belongs to the document.
-const RANK = { f: 4, d: 3, p: 2, i: 2, t: 2 };
+const RANK = { f: 4, d: 3, p: 2, i: 2, t: 2, x: 2 };
 function collectMoving(alone) {
   const out = new Map();
   const add = (id) => { const f = find(id), el = elOf(id); if (f && el && !out.has(id)) out.set(id, { k: f.k, o: f.o, el, x0: f.o.x, y0: f.o.y }); };
@@ -876,8 +956,11 @@ addEventListener('pointermove', (e) => {
     if (!act.moved) { act.moved = true; snap(); document.body.classList.add('dragging'); }
     if (act.moving.some((m) => m.k === 'd')) dragTrays(nearTrays(e));
     const dx = (e.clientX - act.sx) / z, dy = (e.clientY - act.sy) / z;
+    { const now = performance.now(), dt = Math.max(1, now - (act.lt || now - 16)); const v = Math.hypot(e.clientX - (act.lx ?? e.clientX), e.clientY - (act.ly ?? e.clientY)) / dt;
+      act.v = (act.v || 0) * 0.6 + v * 0.4; act.lt = now; act.lx = e.clientX; act.ly = e.clientY; }
     for (const m of act.moving) { m.o.x = Math.round(m.x0 + dx); m.o.y = Math.round(m.y0 + dy); m.el.style.left = m.o.x + 'px'; m.el.style.top = m.o.y + 'px'; }
     liveFit(act);
+    pinHint((act.kind === 'i' || act.kind === 't') && act.moving.length === 1 ? act.moving[0].o : null, e);
     hotTray(e, act.moving.some((m) => m.k === 'd'));
   } else if (act.k === 'box') {
     if (!act.moved && Math.hypot(e.clientX - act.sx, e.clientY - act.sy) < 3) return;
@@ -901,10 +984,11 @@ addEventListener('pointermove', (e) => {
     scaleDeps(act.deps, p.x, p.y, f, f);
   } else if (act.k === 'resize') {
     if (!act.snapped) { act.snapped = true; snap(); document.body.classList.add('dragging'); }
-    act.f.w = Math.max(160, Math.round(act.w + (e.clientX - act.sx) / z));
-    act.f.h = Math.max(100, Math.round(act.h + (e.clientY - act.sy) / z));
-    act.el.style.width = act.f.w + 'px'; act.el.style.height = act.f.h + 'px';
-    scaleDeps(act.deps, act.f.x, act.f.y, act.f.w / act.w, act.f.h / act.h);
+    const dx = (e.clientX - act.sx) / z, dy = (e.clientY - act.sy) / z, c = act.c, f = act.f;
+    const W = Math.max(160, Math.round(c.includes('l') ? act.w - dx : act.w + dx)), H = Math.max(100, Math.round(c.includes('t') ? act.h - dy : act.h + dy));
+    f.w = W; f.h = H; f.x = c.includes('l') ? act.x + act.w - W : act.x; f.y = c.includes('t') ? act.y + act.h - H : act.y;
+    Object.assign(act.el.style, { left: f.x + 'px', top: f.y + 'px', width: W + 'px', height: H + 'px' });
+    if (act.deps.length) scaleDeps(act.deps, c.includes('l') ? act.x + act.w : act.x, c.includes('t') ? act.y + act.h : act.y, W / act.w, H / act.h);
   }
 });
 // What a thing carries follows its scaling: positions stretch from the corner, sizes grow by the same factor.
@@ -930,7 +1014,7 @@ addEventListener('pointerup', (e) => {
     renderItems(); paintSel(); return;
   }
   const trayAt = overStash(e);                     // read it before the trays tuck away
-  vp.classList.remove('panning'); document.body.classList.remove('dragging'); hotTray(e, false); dragTrays(false);
+  vp.classList.remove('panning'); document.body.classList.remove('dragging'); hotTray(e, false); dragTrays(false); $('#pinhint').classList.remove('on');
   if (a.k === 'pan') { if (a.empty && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < 3) { sel.clear(); paintSel(); } else saveView(); }
   else if (a.k === 'move' && a.moved) {
     const movedDocs = new Set(a.moving.filter((m) => m.k === 'd').map((m) => m.o.id));
@@ -944,7 +1028,8 @@ addEventListener('pointerup', (e) => {
         m.o.pin = pt;
         // order on that side by where things were dropped
         const list = pinnedTo(pt.host).filter((x) => x.pin.side === pt.side && x !== m.o);
-        const idx = pt.side === 'tab' ? list.length : list.filter((x) => (elOf(x.id)?.getBoundingClientRect().top ?? 0) + 19 < e.clientY).length;
+        const along = (x) => { const r = elOf(x.id)?.getBoundingClientRect(); return r ? (pt.side === 't' || pt.side === 'b' ? r.left + r.width / 2 : r.top + r.height / 2) : 0; };
+        const idx = pt.side === 'tab' || /^[tb][lr]$/.test(pt.side) ? list.length : list.filter((x) => along(x) < pt.at).length;
         list.splice(idx, 0, m.o); list.forEach((x, i) => { x.pin.at = i; });
       } else if (m.o.pin) { delete m.o.pin; m.o.s = 1; }
     }
@@ -962,9 +1047,17 @@ addEventListener('pointerup', (e) => {
   } else if (a.k === 'move' && a.title && !a.toggle) {
     const f = find(a.id).o;                              // one click on a frame's or a document's title edits it
     if (a.kind === 'd') editInline(a.title, (v) => { if (v) { renameDoc(f, v); render(); } });
-    else editInline(a.title, (v) => { if (v !== null) { f.title = v; save(); render(); } }, true);
+    else if (a.title.classList.contains('fdesc')) editInline(a.title, (v) => { if (v !== null) { snap(); f.desc = v; save(); render(); } }, true);
+    else editInline(a.title, (v) => { if (v !== null && v !== f.title) { snap(); f.title = v; save(); render(); } }, true);
   } else if (a.k === 'move' && !a.toggle && (a.kind === 'i' || a.kind === 't')) {
     openItem(find(a.id).o);                             // a click on an idea or a task reads it
+  } else if (a.k === 'move' && !a.toggle && a.kind === 'f') {
+    const f = find(a.id).o, keep = new Set([f.id]);
+    sel.clear(); sel.add(f.id);
+    const all = collectMoving(false).map((m) => m.o.id);
+    const wasAll = a.selBefore && a.selBefore.size === all.length && all.every((id) => a.selBefore.has(id));
+    sel.clear(); for (const id of wasAll ? keep : all) sel.add(id);
+    paintSel();
   } else if (a.k === 'move' && !a.toggle) {
     clearTimeout(clickT); clickT = setTimeout(() => focusOn(a.id), 240);   // a click brings it close; a double click opens
   } else if (a.k === 'box') {
@@ -995,6 +1088,7 @@ vp.addEventListener('click', (e) => {
 });
 vp.addEventListener('dblclick', (e) => {
   clearTimeout(clickT);
+  const ftx = e.target.closest('.ftext'); if (ftx) return writeText(find(ftx.dataset.id).o);
   const dc = e.target.closest('.doc');
   if (dc && !e.target.closest('.dtitle, .acts, .x, .prs, .sign')) return openEditor(dc.dataset.id);
   const pt = e.target.closest('.postit');
@@ -1069,12 +1163,15 @@ $('#backpill').onclick = () => {
 
 // ---- frames make room: dragging things into a frame grows it, and the frames that hold it, to keep them inside -----
 const FIT_PAD = 26;
+const FIT_FAST = 1.1;                   // px per ms: faster than this, a dragged document leaves the frame instead
 function liveFit(a) {
-  if (a.moving.some((m) => m.k === 'f')) return;                        // a whole frame being moved makes no room
+  // only a document makes a frame adapt: smaller things never move or resize bigger ones (hierarchy)
+  if (a.kind !== 'd' || a.moving.some((m) => m.k === 'f')) return;
   const things = a.moving.filter((m) => m.k !== 'f'); if (!things.length) return;
   a.fitOrig ||= new Map();
-  for (const [f, o] of a.fitOrig) { Object.assign(f, o); paintFrame(f); }        // start from how they were
-  const movingFrames = new Set(a.moving.filter((m) => m.k === 'f').map((m) => m.o));
+  for (const [f, o] of a.fitOrig) { Object.assign(f, o); paintFrame(f, true); }   // start from how they were
+  if ((a.v || 0) > FIT_FAST) { a.fitHost = null; return; }                         // fast: it just goes out (and lets go of the frame)
+  const moving = new Set(a.moving.map((m) => m.o));
   const box = things.reduce((r, m) => {
     const [w, h] = sizeOf(m.el, m.o);
     return r ? { x0: Math.min(r.x0, m.o.x), y0: Math.min(r.y0, m.o.y), x1: Math.max(r.x1, m.o.x + w), y1: Math.max(r.y1, m.o.y + h) }
@@ -1082,19 +1179,32 @@ function liveFit(a) {
   }, null);
   const cx = (box.x0 + box.x1) / 2, cy = (box.y0 + box.y1) / 2;
   const holds = (f, x, y) => x > f.x && x < f.x + f.w && y > f.y && y < f.y + f.h;
-  const host = S.frames.filter((f) => !movingFrames.has(f) && holds(f, cx, cy)).sort((p, q) => p.w * p.h - q.w * q.h)[0];
+  if (!a.fitHost || !S.frames.includes(a.fitHost)) a.fitHost = S.frames.filter((f) => holds(f, cx, cy)).sort((p, q) => p.w * p.h - q.w * q.h)[0] || null;
+  const host = a.fitHost;
   if (!host) return;
-  // the host and the frames around it that hold it, inner to outer
-  const chain = [host, ...S.frames.filter((f) => f !== host && !movingFrames.has(f) && f.x <= host.x && f.y <= host.y
+  const chain = [host, ...S.frames.filter((f) => f !== host && f.x <= host.x && f.y <= host.y
     && f.x + f.w >= host.x + host.w && f.y + f.h >= host.y + host.h).sort((p, q) => p.w * p.h - q.w * q.h)];
+  // what a frame holds besides what is being dragged: things whose centre is in it, frames wholly in it
+  const contents = (f) => {
+    const r = [];
+    for (const el of itemsEl.querySelectorAll('[data-k]')) {
+      const o = find(el.dataset.id)?.o; if (!o || moving.has(o)) continue;
+      const [w, h] = sizeOf(el, o);
+      if (holds(f, o.x + w / 2, o.y + h / 2)) r.push({ x0: o.x, y0: o.y, x1: o.x + w, y1: o.y + h });
+    }
+    for (const g of S.frames) if (g !== f && !chain.includes(g) && g.x >= f.x && g.y >= f.y && g.x + g.w <= f.x + f.w && g.y + g.h <= f.y + f.h)
+      r.push({ x0: g.x, y0: g.y - 34, x1: g.x + g.w, y1: g.y + g.h });
+    return r;
+  };
   let inner = box;
   for (const f of chain) {
     if (!a.fitOrig.has(f)) a.fitOrig.set(f, { x: f.x, y: f.y, w: f.w, h: f.h });
-    const x0 = Math.min(f.x, inner.x0 - FIT_PAD), y0 = Math.min(f.y, inner.y0 - FIT_PAD);
-    const x1 = Math.max(f.x + f.w, inner.x1 + FIT_PAD), y1 = Math.max(f.y + f.h, inner.y1 + FIT_PAD);
-    Object.assign(f, { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0) });
+    const all = [inner, ...contents(f)], top = FIT_PAD + (f.desc ? 30 : 0);
+    const x0 = Math.min(...all.map((q) => q.x0)) - FIT_PAD, y0 = Math.min(...all.map((q) => q.y0)) - top;
+    const x1 = Math.max(...all.map((q) => q.x1)) + FIT_PAD, y1 = Math.max(...all.map((q) => q.y1)) + FIT_PAD;
+    Object.assign(f, { x: Math.round(x0), y: Math.round(y0), w: Math.max(160, Math.round(x1 - x0)), h: Math.max(100, Math.round(y1 - y0)) });
     paintFrame(f, true);
-    inner = { x0: f.x - 34, y0: f.y - 34, x1: f.x + f.w, y1: f.y + f.h };    // the next frame out also keeps this one's tab inside
+    inner = { x0: f.x, y0: f.y - 34, x1: f.x + f.w, y1: f.y + f.h };    // the next frame out keeps this one, tab included
   }
 }
 function paintFrame(f, smooth = false) {
@@ -1131,6 +1241,7 @@ const VIEWER_BELOW = 0.6;
 function titleLine(f) {
   const { k, o } = f;
   if (k === 'd') { const w = (readable(o.text).match(/\S+/g) || []).length; return ['📄', o.name, w ? w + (w === 1 ? ' palabra' : ' palabras') : '']; }
+  if (k === 'x') return ['Aa', (o.text || 'texto').split('\n')[0], ''];
   if (k === 'p') return ['🗒️', (o.text || 'post-it vacío').split('\n')[0], ''];
   if (k === 'i') return ['💡', o.text || 'idea', ''];
   if (k === 't') return [o.done ? '☑' : '☐', o.text || 'tarea', o.done ? 'hecha' : ''];
@@ -1227,6 +1338,7 @@ const TOOLS = [
   ['postit', '🗒️', 'Post-it', '#fff1b8', 'Se escribe encima; no se abre'],
   ['idea', '💡', 'Idea', '#cdeedd', 'Una idea que puedes pegar en el plano y dentro de documentos'],
   ['tarea', '☑️', 'Tarea', '#cfe5fb', 'Una tarea que puedes pegar en el plano y dentro de documentos'],
+  ['text', 'Aa', 'Texto', '#f1eef4', 'Texto suelto, escrito directamente en el plano'],
   ['frame', '⬚', 'Marco', '#e3d9f7', 'Un marco para agrupar lo que hay suelto'],
   ['sign', '🔖', 'Ribete', '#f6c9c7', 'Una cinta roja (o del color que quieras) en el borde de un documento, post-it o marco'],
 ];
@@ -1249,7 +1361,7 @@ stash.addEventListener('click', (e) => {
   const dot = e.target.closest('.t-dot');
   if (dot) {
     const t = S.trays.find((o) => o.id === dot.closest('.tray').dataset.tray);
-    t.color = TRAY_COLORS[(TRAY_COLORS.indexOf(t.color) + 1) % TRAY_COLORS.length]; save(); return renderStash();
+    snap(); t.color = TRAY_COLORS[(TRAY_COLORS.indexOf(t.color) + 1) % TRAY_COLORS.length]; save(); return renderStash();
   }
   const out = e.target.closest('.t-out');
   if (out) {
@@ -1265,7 +1377,7 @@ stash.addEventListener('click', (e) => {
     const t = { id: 'b' + uid(), name: `Cajón ${S.trays.length + 1}`, color: TRAY_COLORS.find((c) => !used.has(c)) || TRAY_COLORS[0], open: true };
     for (const o of S.trays) o.open = false;
     S.trays.push(t); save(); renderStash();
-    const nm = stash.querySelector(`[data-tray="${t.id}"] .t-name`); if (nm) editInline(nm, (v) => { if (v) { t.name = v; save(); renderStash(); } });
+    const nm = stash.querySelector(`[data-tray="${t.id}"] .t-name`); if (nm) editInline(nm, (v) => { if (v && v !== t.name) { t.name = v; save(); renderStash(); } });
     return;
   }
   const tx = e.target.closest('.t-x');
@@ -1278,7 +1390,7 @@ stash.addEventListener('click', (e) => {
     save(); renderStash(); return;
   }
   const nm1 = e.target.closest('.t-name');
-  if (nm1 && !nm1.isContentEditable) { const t = S.trays.find((o) => o.id === nm1.closest('.tray').dataset.tray); return editInline(nm1, (v) => { if (v) { t.name = v; save(); renderStash(); } }); }
+  if (nm1 && !nm1.isContentEditable) { const t = S.trays.find((o) => o.id === nm1.closest('.tray').dataset.tray); return editInline(nm1, (v) => { if (v && v !== t.name) { snap(); t.name = v; save(); renderStash(); } }); }
   const hd = e.target.closest('.tray header');
   if (hd && !e.target.closest('[contenteditable="true"]')) {
     const t = S.trays.find((o) => o.id === hd.closest('.tray').dataset.tray);
@@ -1587,7 +1699,7 @@ $('#ed-crumbs').addEventListener('pointerover', (e) => {
 });
 $('#ed-crumbs').addEventListener('pointerout', (e) => { if (!e.relatedTarget?.closest?.('.cr[data-i]')) $('#crumb-peek').classList.remove('on'); });
 $('#ed-foot').onclick = (e) => { const b = e.target.closest('button[data-id]'); if (b) openEditor(b.dataset.id); };
-$('#ed-name').addEventListener('input', (e) => { const d = docById(curId); if (d && e.target.value.trim()) renameDoc(d, e.target.value.trim()); });
+$('#ed-name').addEventListener('input', (e) => { const d = docById(curId); if (!d || !e.target.value.trim()) return; if (!renameDoc.typing) snap(); renameDoc.typing = true; renameDoc(d, e.target.value.trim()); clearTimeout(renameDoc.t); renameDoc.t = setTimeout(() => { renameDoc.typing = false; }, 1200); });
 $('#ed-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ed.focus(); } });
 $('#ed-plain').onclick = () => {
   plain = !plain; ed.setPlain(plain);

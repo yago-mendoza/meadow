@@ -602,3 +602,66 @@ button.cr:hover { background: #fff; color: var(--accent); box-shadow: var(--shad
 /* a document's hover buttons go above it, so they never cover what is docked under it */
 .doc > .acts { top: auto; bottom: 100%; padding-top: 0; padding-bottom: 10px; }
 .doc > .acts b { top: auto; bottom: 42px; }
+
+/* drawers without a white backdrop: each drawer carries its own colour, strong enough to read anywhere */
+.st-skin { background: transparent; box-shadow: none; }
+.st-open { padding: 6px 8px 8px 2px; }
+.tray { background: color-mix(in srgb, var(--t) 42%, #fff); border-left: 5px solid color-mix(in srgb, var(--t) 70%, #5a4a66);
+  box-shadow: 0 1px 2px rgba(50, 35, 60, .1), 0 4px 12px rgba(50, 35, 60, .12); }
+.tray.open { background: color-mix(in srgb, var(--t) 55%, #fff); }
+.t-empty { border-color: color-mix(in srgb, var(--t) 60%, #6a5a70); color: #6a5e6c; background: rgba(255, 255, 255, .35); }
+.chip { box-shadow: 0 1px 3px rgba(50, 35, 60, .15); }
+/* «＋» always above the drawers (also when they came out by themselves); «Recoger» only when you opened them */
+.t-tools { justify-content: flex-start; }
+.t-add, .t-hide { background: #fff; box-shadow: var(--shadow); }
+.t-add { width: 30px; height: 28px; padding: 0; font-size: 16px; }
+#stash.tucked.dragopen .t-tools { visibility: visible; }
+#stash.tucked.dragopen .t-hide { display: none; }
+.t-add.hot, #stash.dragopen .t-add:hover { background: var(--accent); color: #fff; }
+/* the chest: no white frame either */
+.t-pill { padding: 2px; }
+.cab { background: #e4e0ea; box-shadow: 0 1px 2px rgba(50, 35, 60, .12), 0 4px 10px rgba(50, 35, 60, .12); }
+
+/* where a dragged circle would be pinned: a dotted slot that breathes */
+#pinhint { position: fixed; z-index: 40; border-radius: 50%; border: 2px dashed var(--accent); background: rgba(113, 75, 103, .08); pointer-events: none;
+  opacity: 0; transform: scale(.6); transition: opacity .15s, transform .25s cubic-bezier(.34, 1.56, .64, 1), left .12s, top .12s; }
+#pinhint.on { opacity: 1; transform: scale(1); animation: breathe 1.1s ease-in-out infinite; }
+@keyframes breathe { 50% { box-shadow: 0 0 0 6px rgba(113, 75, 103, .12); } }
+
+/* free text on the plane */
+.ftext { position: absolute; min-width: 40px; max-width: 520px; padding: 2px 4px; cursor: grab; scale: var(--s, 1); transform-origin: 0 0; border-radius: 4px; }
+.ftext .xt { font: 600 20px/1.35 Georgia, "Times New Roman", serif; color: #3a2f3f; white-space: pre-wrap; word-break: break-word; outline: none; min-height: 1.35em; }
+.ftext .xt:empty::before { content: "Escribe…"; color: #b8adb6; font-weight: 400; }
+.ftext .xt[contenteditable="true"] { cursor: text; user-select: text; }
+.ftext.sel { outline: 2px solid var(--accent); outline-offset: 4px; }
+.ftext:hover > .x { opacity: 1; transform: none; }
+.ftext:hover .acts { pointer-events: auto; } .ftext:hover .acts button { opacity: 1; transform: none; }
+.ftext:hover .prs, .ftext.sel .prs { opacity: 1; }
+
+/* a frame's description: a strip under its tab, the full width */
+.fdesc { position: absolute; left: 0; right: 0; top: 0; padding: 6px 14px; font-size: 12.5px; line-height: 1.4; color: #5a4e5c;
+  background: color-mix(in srgb, var(--bg) 55%, #fff); border-bottom: 1px solid color-mix(in srgb, var(--bg) 70%, #4a3550 15%);
+  white-space: pre-wrap; outline: none; cursor: text; pointer-events: auto; }
+.fdesc.empty { padding: 0 14px; height: 0; border-bottom: 0; overflow: hidden; transition: height .2s; }
+.frame:hover .fdesc.empty, .frame.sel .fdesc.empty, .fdesc[contenteditable="true"] { height: auto; padding: 6px 14px; border-bottom: 1px dashed color-mix(in srgb, var(--bg) 60%, #4a3550 25%); }
+.fdesc.empty::before { content: "Añade una descripción…"; color: #a397a5; font-style: italic; }
+.fdesc[contenteditable="true"]::before { content: none; }
+.fdesc[contenteditable="true"] { user-select: text; }
+.ftext { width: max-content; }
+
+/* four corners to resize a frame */
+.rs { width: 14px; height: 14px; border-radius: 0; }
+.rs.c-br { right: -7px; bottom: -7px; left: auto; top: auto; cursor: nwse-resize; }
+.rs.c-tl { left: -7px; top: -7px; right: auto; bottom: auto; cursor: nwse-resize; }
+.rs.c-tr { right: -7px; top: -7px; left: auto; bottom: auto; cursor: nesw-resize; }
+.rs.c-bl { left: -7px; bottom: -7px; right: auto; top: auto; cursor: nesw-resize; }
+
+/* the close / delete button: a drawn cross in a soft disc, red only when you mean it */
+.x { font-size: 0 !important; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 1px solid #ece6ee;
+  box-shadow: 0 2px 6px rgba(60, 40, 70, .14); display: grid; place-items: center; }
+.x::before, .x::after { content: ""; position: absolute; width: 9px; height: 1.6px; border-radius: 1px; background: #8f8296; transition: background .15s; }
+.x::before { transform: rotate(45deg); } .x::after { transform: rotate(-45deg); }
+.x:hover { background: #e5534b; border-color: #e5534b; transform: scale(1.1) !important; }
+.x:hover::before, .x:hover::after { background: #fff; }
+.ftab .x, .chip .x, .item.circle .x { width: 18px; height: 18px; }
+.ftab .x::before, .ftab .x::after, .chip .x::before, .chip .x::after, .item.circle .x::before, .item.circle .x::after { width: 7px; }
