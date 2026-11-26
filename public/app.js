@@ -508,7 +508,7 @@ function backlinks() {
   const from = S.docs.filter((o) => o !== d && re.test(o.text || ''));
   $('#ed-foot').innerHTML = from.length
     ? '<span>Enlazado desde</span>' + from.map((o) => `<button data-id="${o.id}">${T(o.type).icon} ${esc(o.name)} <i>*${N(o)}</i></button>`).join('')
-    : '<span>Ctrl+clic en un enlace lo abre · <b>[nombre*]</b> crea un documento nuevo · <b>[</b> busca uno que ya existe · <b>[ETIQUETA]</b> al empezar la línea</span>';
+    : '<span>Ctrl+clic en un enlace lo abre · <b>[nombre*]</b> crea un documento nuevo · <b>[</b> busca uno que ya existe · <b>[ETIQUETA]</b> al empezar la línea · <b># Título</b> hace secciones: clic en su # para moverlas</span>';
 }
 function closeEditor() { $('#ed').classList.remove('open'); curId = null; hist = []; render(); }
 $('#ed-close').onclick = closeEditor;

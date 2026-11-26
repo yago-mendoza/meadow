@@ -1,6 +1,6 @@
 // Meadow's text editor: a plain, Notepad-like CodeMirror with a few readings on top (links between documents, tags,
-// rules, post-it lines, coloured brackets) and three block columns on the right. Everything on top can be switched
-// off with setPlain(true), which leaves the bare text.
+// rules, post-it lines, coloured brackets, Markdown titles that make sections). Clicking the «#» of a title splits the
+// text into the sections of that level, each one movable, foldable, copyable. setPlain(true) leaves the bare text.
 import { EditorState, Compartment, Prec } from '@codemirror/state';
 import { EditorView, Decoration, ViewPlugin, WidgetType, keymap, drawSelection } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
@@ -10,7 +10,8 @@ import { codeFolding, foldEffect, unfoldEffect, foldedRanges } from '@codemirror
 export const LINK_RE = /\[([^\[\]\n]*?)\*(\d+)\]/g;          // [label*N]: a link to document N
 const NEW_RE = /\[([^\[\]\n*]*\S[^\[\]\n*]*)\*\]/g;           // [label*]: a new document to create
 export const TAG_RE = /^(\s*)\[([^\[\]\n*]+)\]/;                // [TAG] at the start of a line
-const RULE_RE = /^\s*-{3,}\s*$/;                                // ------ a section rule
+const RULE_RE = /^\s*-{3,}\s*$/;                                // ------ a rule drawn across the page
+const HEAD_RE = /^(#{1,6})(\s+)(?=\S)/;                         // # Title · ## Title · ### Title: sections
 const POSTIT_RE = /^(\s*)>(?!>)\s?/;                            // > a small note
 
 export function hue(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360; }
@@ -30,8 +31,14 @@ function decorateLine(line, out) {
   const t = line.text, base = line.from;
   if (RULE_RE.test(t)) { out.push(RULE_LINE.range(base)); return; }
   let skip = 0;
-  const tm = t.match(TAG_RE);
-  if (tm) {
+  const tm = t.match(TAG_RE), hm = t.match(HEAD_RE);
+  if (hm) {
+    const d = Math.min(3, hm[1].length);
+    out.push(Decoration.line({ class: `cm-h cm-h${d}${line.number === 1 ? ' cm-hfirst' : ''}` }).range(base));
+    out.push(Decoration.mark({ class: 'cm-hmark', attributes: { 'data-d': String(hm[1].length), title: 'Clic: dividir en secciones de este nivel' } })
+      .range(base, base + hm[1].length));
+    skip = hm[0].length;
+  } else if (tm) {
     out.push(Decoration.line({ class: 'cm-tagline', attributes: { style: `--h:${hue(tm[2].trim().toUpperCase())}` } }).range(base));
     out.push(M.tag.range(base + tm[1].length, base + tm[0].length));
     skip = tm[0].length;
@@ -75,45 +82,33 @@ const richDecos = ViewPlugin.fromClass(class {
   update(u) { if (u.docChanged || u.viewportChanged) this.decorations = buildDecos(u.view); }
 }, { decorations: (v) => v.decorations });
 
-// ---- the three block columns ---------------------------------------------------------------------------------------
-// level 1: paragraphs (split by one blank line) · level 2: groups (split by two blank lines) · level 3: sections (------)
+// ---- sections ------------------------------------------------------------------------------------------------------
+// Level n (1–6): every «#…# Title» with n hashes opens a section that runs until the next title of level n or higher.
+// What sits before the first title, or between sections (a higher title and its intro), stays where it is.
 export function computeBlocks(doc) {
-  const n = doc.lines, kind = [];
-  for (let i = 1; i <= n; i++) { const t = doc.line(i).text; kind[i] = RULE_RE.test(t) ? 'r' : t.trim() === '' ? 'b' : 't'; }
-  const L1 = [];
-  for (let i = 1; i <= n;) {
-    if (kind[i] !== 't') { i++; continue; }
-    let j = i; while (j + 1 <= n && kind[j + 1] === 't') j++;
-    L1.push({ from: i, to: j }); i = j + 1;
+  const heads = [];
+  for (let i = 1; i <= doc.lines; i++) { const m = doc.line(i).text.match(HEAD_RE); if (m) heads.push({ line: i, d: m[1].length }); }
+  const levels = [];
+  for (let n = 1; n <= 6; n++) {
+    const L = [];
+    heads.forEach((h, k) => {
+      if (h.d !== n) return;
+      const next = heads.slice(k + 1).find((x) => x.d <= n);
+      let to = next ? next.line - 1 : doc.lines;
+      while (to > h.line && doc.line(to).text.trim() === '') to--;     // trailing blank lines belong to the gap
+      L.push({ from: h.line, to });
+    });
+    levels.push(L);
   }
-  const group = (split) => {
-    const out = []; let cur = null;
-    for (const p of L1) {
-      if (!cur) { cur = { ...p }; continue; }
-      let blanks = 0, rule = false;
-      for (let k = cur.to + 1; k < p.from; k++) kind[k] === 'r' ? (rule = true) : blanks++;
-      if (split(blanks, rule)) { out.push(cur); cur = { ...p }; } else cur.to = p.to;
-    }
-    if (cur) out.push(cur);
-    return out;
-  };
-  return [L1, group((b, r) => r || b >= 2), group((b, r) => r)];
+  return levels;
 }
-
-const COL_X = [58, 34, 10];                       // right offset of each level's column
-const LEVEL_NAME = ['Párrafos', 'Grupos', 'Secciones'];
 
 class Blocks {
   constructor(view, api) {
     this.view = view; this.api = api; this.level = 0; this.keep = 2; this.naming = -1;
     this.layer = document.createElement('div'); this.layer.className = 'mw-layer';
-    this.cols = document.createElement('div'); this.cols.className = 'mw-cols';
-    view.scrollDOM.append(this.layer, this.cols);
+    view.scrollDOM.append(this.layer);
     this.blocks = computeBlocks(view.state.doc);
-    this.cols.addEventListener('mousedown', (e) => {
-      const c = e.target.closest('.mw-col'); if (!c) return;
-      e.preventDefault(); this.setLevel(this.level === +c.dataset.l ? 0 : +c.dataset.l);
-    });
     this.layer.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
     this.layer.addEventListener('pointerdown', (e) => {
       const g = e.target.closest('.mw-grip'); if (!g || e.button !== 0) return;
@@ -145,30 +140,17 @@ class Blocks {
       let f = false; folded.between(from, to + 1, () => { f = true; return false; });
       return { ...b, top: v.lineBlockAt(from).top + off, bot: v.lineBlockAt(doc.line(b.to).from).bottom + off, folded: f };
     };
-    return { levels: this.blocks.map((L) => L.map(geo)), h: Math.max(v.contentHeight, v.scrollDOM.clientHeight) };
+    return { levels: this.blocks.map((L, i) => (i === this.level - 1 ? L.map(geo) : [])), h: Math.max(v.contentHeight, v.scrollDOM.clientHeight) };
   }
   write(m) {
     this.last = m;
     if (this.drag) return;                          // the layout holds still while a block is being dragged
-    this.cols.style.height = m.h + 'px'; this.layer.style.height = m.h + 'px';
-    let html = '';
-    m.levels.forEach((L, li) => {
-      html += `<div class="mw-col${this.level === li + 1 ? ' on' : ''}" data-l="${li + 1}" style="right:${COL_X[li]}px" title="${LEVEL_NAME[li]}">`;
-      for (const b of L) html += `<i style="top:${b.top + 3}px;height:${Math.max(4, b.bot - b.top - 6)}px"></i>`;
-      html += '</div>';
-    });
-    this.cols.innerHTML = html;
+    this.layer.style.height = m.h + 'px';
     if (!this.level) { this.layer.innerHTML = ''; return; }
     const L = m.levels[this.level - 1];
     let lay = '';
     L.forEach((b, i) => {
-      if (i > 0) {
-        // the wider the gap in the text, the thicker the band: 1 blank line · 2 blank lines · 3 or more · a ------ rule
-        const doc = this.view.state.doc; let blanks = 0, rule = false;
-        for (let n = L[i - 1].to + 1; n < b.from; n++) RULE_RE.test(doc.line(n).text) ? (rule = true) : blanks++;
-        const w = rule ? 4 : Math.min(3, Math.max(1, blanks)), h = [0, 2, 5, 9, 14][w];
-        lay += `<div class="mw-sep w${w}" style="top:${Math.round((L[i - 1].bot + b.top) / 2 - h / 2)}px;height:${h}px"></div>`;
-      }
+      lay += `<div class="mw-box" style="top:${b.top}px;height:${b.bot - b.top}px"></div>`;
       if (L.length > 1) lay += `<div class="mw-grip" data-i="${i}" style="top:${b.top}px;height:${Math.max(22, b.bot - b.top)}px" title="Arrastra para mover el bloque">⠿</div>`;
       if (this.naming === i) {
         lay += `<div class="mw-bar-tools naming" data-i="${i}" style="top:${b.top}px"><input class="mw-name" placeholder="Nombre del documento…"></div>`;
@@ -307,7 +289,7 @@ class Blocks {
     if (effects.length) this.view.dispatch({ effects });
     if (fold) { const e2 = []; for (const b of this.blocks[this.level - 1]) this.foldOne(b, e2); if (e2.length) this.view.dispatch({ effects: e2 }); }
   }
-  destroy() { this.layer.remove(); this.cols.remove(); this.view.dom.parentNode?.classList.remove('mw-active'); }
+  destroy() { this.layer.remove(); this.view.dom.parentNode?.classList.remove('mw-active'); }
 }
 
 // ---- the editor ----------------------------------------------------------------------------------------------------
@@ -371,6 +353,8 @@ export function createEditor(parent, api) {
 
   const linkClicks = EditorView.domEventHandlers({
     mousedown(e) {
+      const h = e.target.closest?.('.cm-hmark');
+      if (h) { e.preventDefault(); const d = +h.dataset.d; blocksPlugin?.setLevel(blocksPlugin.level === d ? 0 : d); return true; }
       const el = e.target.closest?.('.cm-link, .cm-linkref'); if (!el) return false;
       if (e.ctrlKey || e.metaKey || el.classList.contains('cm-linkref')) { e.preventDefault(); api.openDoc?.(+el.dataset.n); return true; }
       return false;

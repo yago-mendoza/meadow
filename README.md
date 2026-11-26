@@ -21,7 +21,9 @@ A zoomable grid (AutoCAD-like, pastel) of documents, post-its and frames, with a
 - Ctrl+click a link (or click its `*N`) opens it. `[text]` with no `*` is plain text.
 - Deleting document N removes links to it (they stay as `[label]`) and shifts every later number down by one.
 - `[TAG]` at the start of a line colours the line (suggests the tags in use). `> text` is a small note (🗒️).
-  `------` is a section rule drawn across the page. Brackets, parentheses, `>>` and `::` are coloured.
-- Right columns: paragraphs (one blank line), groups (two blank lines), sections (`------`). Click one to split the text
-  into its blocks; each block gets copy, paste over, save as a document, fold (to 1–5 lines), move up and down.
+  `------` is a rule drawn across the page (only visual). Brackets, parentheses, `>>` and `::` are coloured.
+- Markdown titles make sections: `# Title` (in capitals, most room above), `## Title`, `### Title`. Clicking the «#» of a
+  title (or #/##/### in the header) splits the text into the sections of that level: a section runs to the next title
+  of the same level or higher. Each one gets a grip on the left to drag it (the lines slide to their new place) and,
+  on the right, copy, paste over, save as a document and fold (to 1–5 lines). Text before the first title stays put.
 - «Formato» switches all of this off to see the bare text.

@@ -194,7 +194,7 @@ body.dragging .acts, body.dragging .x, body.dragging .pal { display: none; }
 #ed-body .cm-editor { height: 100%; outline: none !important; }
 #ed-body .cm-scroller { position: relative; font: 15px/1.6 Consolas, "Cascadia Mono", "Lucida Console", monospace; }
 #ed-body .cm-content { padding: 18px 24px 40vh; caret-color: var(--ink); user-select: text; }
-#ed-body.mw-rich .cm-content { padding-right: 96px; }
+#ed-body.mw-rich .cm-content { padding-right: 32px; }
 /* with a level on: the grips get their own margin on the left and the block buttons theirs on the right, never over the text */
 #ed-body.mw-rich.mw-active .cm-content { padding-left: 46px; padding-right: 226px; }
 .cm-cursor { border-left: 2px solid var(--ink) !important; }
@@ -252,3 +252,17 @@ body.dragging .acts, body.dragging .x, body.dragging .pal { display: none; }
 .mw-bar-tools button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); }
 .mw-bar-tools button:disabled { opacity: .3; cursor: default; }
 .mw-name { border: 0; outline: none; font: 13px "Segoe UI", sans-serif; padding: 4px 8px; width: 170px; }
+
+/* Markdown titles: the higher the title, the more room above it; # is in capitals */
+.cm-h { font-weight: 700; color: #3a2f3f; }
+.cm-h1 { font-size: 1.34em; text-transform: uppercase; letter-spacing: .06em; padding-top: 1.4em !important; }
+.cm-h2 { font-size: 1.16em; padding-top: .95em !important; }
+.cm-h3 { font-size: 1.04em; padding-top: .55em !important; }
+.cm-hfirst { padding-top: 0 !important; }
+.cm-hmark { display: inline-block; color: #fff; background: #cdb7c8; border-radius: 6px; padding: 0 5px; margin-right: 2px; font-size: .62em;
+  letter-spacing: 0; vertical-align: .25em; cursor: pointer; transition: background .15s, transform .15s; }
+.cm-hmark:hover { background: var(--accent); transform: scale(1.08); }
+#ed-body.mw-active .cm-hmark { background: #b597ad; }
+.ib.h { font: 700 12px Consolas, monospace; width: auto; min-width: 30px; padding: 0 6px; }
+.mw-box { position: absolute; left: 36px; right: 212px; margin-top: -6px; padding-bottom: 12px; box-sizing: content-box;
+  border: 1.5px solid #e9dde6; border-radius: 12px; pointer-events: none; }
