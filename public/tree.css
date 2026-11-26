@@ -771,3 +771,22 @@ body.selmode .ar-x, body.selmode .fr-x, body.selmode .ft-x, body.selmode .dc-x, 
 .sp-clear, .sp-done { border-radius: 16px; }
 .sp-copy { border-radius: 18px; padding: 9px 18px; }
 .sp-hint { padding: 0 4px; }
+
+/* context by Ctrl+click: no mode, one kind of mark */
+#sel-btn { padding: 0; width: 34px; height: 34px; justify-content: center; font-size: 15px; }
+#sel-btn.on { background: var(--accent); color: #fff; }
+.sel-self { outline: 2.5px solid var(--accent) !important; }
+.sp-done { width: 32px; padding: 0 !important; font-size: 16px !important; }
+/* the figures, taken by passing over them */
+.dw-shapes { display: flex; justify-content: center; gap: 8px; }
+#draw [data-shape] { width: 38px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: #f6f2f7; cursor: crosshair; transition: transform .12s; }
+#draw [data-shape] svg { fill: currentColor; stroke: currentColor; }
+#draw [data-shape]:hover { transform: scale(1.1); }
+#draw [data-shape].on { background: #fff; box-shadow: 0 0 0 2px var(--accent), 0 2px 6px rgba(60, 40, 70, .15); }
+/* the count, bigger and close to its name in frames, tabs, documents and pages; also on the folded column's tabs */
+.fr-head .nb, .dc-title .nb, .ft .nb, [data-pg] .nb { min-width: 20px; height: 20px; font-size: 11px; border-radius: 10px; }
+.fr-head .nb { margin-left: -4px; }
+.dc-title .nb { margin-left: 6px; vertical-align: 3px; }
+.ft .nb { min-width: 18px; height: 18px; font-size: 10.5px; }
+.ar-tab { flex-direction: column; gap: 6px; }
+.ar-tab .nb { margin: 0; min-width: 18px; height: 18px; font-size: 10px; flex: none; }

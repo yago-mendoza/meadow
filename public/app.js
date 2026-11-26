@@ -344,7 +344,7 @@ function renderAreas(peek) {
   }
   const btn = (k, i) => { const a = nd(k), g = isGroup(a); return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
-  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b></span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
+  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b>${nb(k)}</span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; paintHov(); }   // unchanged: leave it (keeps hover, double clicks)
   arPids = cols.map((c) => c.pid);
   if (!peek) document.documentElement.style.setProperty('--areas-w', (cols.length - 1) * 48 + 172 + 'px');   // folded strips + the open column, whatever is hovered
@@ -496,7 +496,6 @@ let drag = null, justDragged = false;
 const ghost = $('#ghost'), bar = $('#drop-bar');
 addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
-  if (selMode) return;                       // selecting: nothing moves either
   const src = e.target.closest('[data-drag]'); if (!src) return;
   if (e.target.closest('button:not([data-drag]), input, [contenteditable="true"], .fr-pal')) return;
   drag = { key: src.dataset.drag, el: src, sx: e.clientX, sy: e.clientY, on: false };
@@ -539,7 +538,11 @@ addEventListener('pointerup', () => {
 function targetAt(x, y) {
   const el = document.elementFromPoint(x, y); if (!el) return null;
   const src = drag.src;
-  if ((src.item || src.make === 'idea' || src.make === 'tarea' || src.make === 'dibujo') && el.closest('#areas')) return null;   // not on a column's buttons: loose in the area instead
+  if ((src.item || src.make === 'idea' || src.make === 'tarea' || src.make === 'dibujo') && el.closest('#areas')) {   // on an area of the column: loose in that area
+    const arEl = el.closest('.ar[data-area]'); if (!arEl || src.make === 'dibujo') return null;
+    const pid = leafOf(arEl.dataset.area);
+    return src.item ? { kind: 'hang', pid, el: arEl, ok: true } : { kind: 'place', pid, el: arEl, ok: true };
+  }
   const bg = el.closest('#stage') && !el.closest('.fr, .dc') ? stage.querySelector(':scope > .grid') : null;   // the empty space of an area counts as the area
   if (src.item) { const h = el.closest('[data-id]') || bg; const id = h?.dataset.id; return id && nd(id) ? { kind: 'hang', pid: id, el: h, ok: true } : null; }
   const t = el.closest('[data-drop]') || bg; if (!t) return null;
@@ -1050,29 +1053,22 @@ $('#task').addEventListener('click', (e) => {
 });
 
 // ---- selecting, to copy context by hand -------------------------------------------------------------------------------
-// A click goes round: with everything inside (solid edge) → only itself (dashed) → out. Ideas and tasks: in or out.
-// The pill at the bottom says what is in and copies it as one Markdown text.
+// Ctrl+click puts something in (with everything inside) or takes it out, and it adds up; a plain click still navigates.
+// While something is chosen, a bar at the bottom says what is in and copies it as one Markdown text.
 const SEL = new Map(JSON.parse(localStorage.getItem('meadow.sel.' + P) || '[]'));   // id → 'all' | 'self'
 const selInc = Object.assign({ ideas: true, tareas: true, texto: true }, JSON.parse(localStorage.getItem('meadow.selinc') || '{}'));
 let selMode = false;
 const selKeep = () => { localStorage.setItem('meadow.sel.' + P, JSON.stringify([...SEL])); localStorage.setItem('meadow.selinc', JSON.stringify(selInc)); };
 const isItemId = (id) => [...S.tasks, ...S.ideas].some((x) => x.id === id);
-function selRotate(id, item) {
-  const m = SEL.get(id);
-  if (item) m ? SEL.delete(id) : SEL.set(id, 'all');
-  else if (!m) SEL.set(id, 'all'); else if (m === 'all') SEL.set(id, 'self'); else SEL.delete(id);
-  selKeep(); paintSel();
-}
-function setSelMode(on) {
-  selMode = on; document.body.classList.toggle('selmode', on); $('#sel-btn').classList.toggle('on', on);
-  if (on) { $('#list').classList.add('closed'); toast('Clic: con todo lo de dentro · otro clic: solo él · otro: fuera'); }
-  paintSel();
-}
+for (const [k, m] of SEL) if (m !== 'all') SEL.set(k, 'all');       // older «only itself» choices count whole
+let selHidden = false;                                                 // the bar put away (the choice stays)
+function selRotate(id) { SEL.has(id) ? SEL.delete(id) : SEL.set(id, 'all'); selHidden = false; selKeep(); paintSel(); }
+function setSelMode() { if (!SEL.size) return toast('Ctrl+clic en un marco, documento, página, apartado, idea o tarea para elegirlo como contexto'); selHidden = !selHidden; paintSel(); }
 // what is inside something chosen «with everything» is in too (lighter)
 function selUnder(id) { for (const [k, m] of SEL) if (m === 'all' && k !== id && nd(k) && nd(id) && isIn(id, k)) return true; return false; }
 function paintSel() {
   for (const el of document.querySelectorAll('.sel-all, .sel-self, .sel-in')) el.classList.remove('sel-all', 'sel-self', 'sel-in');
-  if (!selMode) return paintSelPill();          // the marks show only while selecting
+  if (!SEL.size || selHidden) return paintSelPill();   // the marks show while the bar does
   const mark = (el, id) => { const m = SEL.get(id); if (m) el.classList.add(m === 'all' ? 'sel-all' : 'sel-self'); else if (selUnder(id)) el.classList.add('sel-in'); };
   for (const el of document.querySelectorAll('#stage .fr[data-id], #stage .dc[data-id], #areas .ar[data-area]')) mark(el, el.dataset.id || el.dataset.area);
   for (const el of document.querySelectorAll('#stage .ft[data-tab]')) mark(el, el.dataset.tab);
@@ -1136,10 +1132,9 @@ function buildContext() {
 }
 function paintSelPill() {
   // only while selecting; what was chosen stays for the next time
-  const pill = $('#selpill'); const any = SEL.size > 0;
-  pill.classList.toggle('on', selMode);
-  if (!selMode) return;
-  if (!any) { pill.innerHTML = '<span class="sp-hint">Toca marcos, documentos, páginas, ideas o tareas para elegir qué copiar</span><button class="sp-done">Listo</button>'; return; }
+  const pill = $('#selpill'), show = SEL.size > 0 && !selHidden;
+  pill.classList.toggle('on', show); $('#sel-btn').classList.toggle('on', show);
+  if (!show) return;
   const c = buildContext(), s = c.stats;
   const kb = c.bytes < 1024 ? c.bytes + ' B' : (c.bytes / 1024).toLocaleString('es', { maximumFractionDigits: 1 }) + ' KB';
   const counts = [[s.frames, '⬚', 'marcos'], [s.docs, '📄', 'documentos'], [s.pages, '▭', 'páginas'], [s.titles, '#', 'títulos'], [s.tareas, '☐', 'tareas'], [s.ideas, '💡', 'ideas']]
@@ -1147,7 +1142,7 @@ function paintSelPill() {
   pill.innerHTML = `<span class="sp-counts">${counts}</span>
     <span class="sp-size"><b>${c.words.toLocaleString('es')}</b> palabras<small>${kb}</small></span>
     <span class="sp-inc"><button data-inc="texto" class="${selInc.texto ? 'on' : ''}" title="${selInc.texto ? 'Con' : 'Sin'} el texto de las páginas">¶</button><button data-inc="tareas" class="${selInc.tareas ? 'on' : ''}" title="${selInc.tareas ? 'Con' : 'Sin'} las tareas"><span class="ed-task-ico"></span></button><button data-inc="ideas" class="${selInc.ideas ? 'on' : ''}" title="${selInc.ideas ? 'Con' : 'Sin'} las ideas">💡</button></span>
-    <button class="sp-clear" title="Quitar toda la selección">Vaciar</button><button class="sp-copy">Copiar contexto</button><button class="sp-done" title="Salir de seleccionar (Esc); lo elegido se queda para la próxima vez">Listo</button>`;
+    <button class="sp-clear" title="Quitar toda la selección">Vaciar</button><button class="sp-copy">Copiar contexto</button><button class="sp-done" title="Guardar la barra; lo elegido se queda (Ctrl+clic la vuelve a sacar)">–</button>`;
 }
 async function copyContext() {
   const { text, words } = buildContext();
@@ -1156,103 +1151,79 @@ async function copyContext() {
   window.__lastContext = text;
   toast(`Contexto copiado · ${words.toLocaleString('es')} palabras`);
 }
-$('#sel-btn').onclick = () => setSelMode(!selMode);
+$('#sel-btn').onclick = () => setSelMode();
 $('#selpill').addEventListener('click', (e) => {
   const t = e.target;
   const inc = t.closest('[data-inc]'); if (inc) { selInc[inc.dataset.inc] = !selInc[inc.dataset.inc]; selKeep(); return paintSelPill(); }
   if (t.closest('.sp-clear')) { SEL.clear(); selKeep(); return paintSel(); }
   if (t.closest('.sp-copy')) return copyContext();
-  if (t.closest('.sp-done')) return setSelMode(false);
-  if (t.closest('.sp-more')) return setSelMode(true);
+  if (t.closest('.sp-done')) { selHidden = true; return paintSel(); }
 });
-// in selection mode a click chooses instead of opening (entering a frame, its buttons and the column still work)
+// Ctrl+click chooses (nothing opens, nothing is deleted); a plain click does what it always did
 addEventListener('click', (e) => {
-  if (!selMode) return;
+  if (!(e.ctrlKey || e.metaKey)) return;
   const t = e.target;
-  if (t.closest('.ar-x, .fr-x, .ft-x, .dc-x, .dr-x, .dr-empty, .tk-rm, .dw-rm, .bt-x')) { e.preventDefault(); e.stopPropagation(); return toast('Mientras seleccionas no se borra nada'); }
-  if (t.closest('#selpill, #top, .fr-in, .fr-out, .ft-add, .fr-pal, #pick, #toasts')) return;
-  const arEl = t.closest('#areas .ar');   // an area: its box, or the left part of its button
-  if (arEl && (t.closest('.ar-sel') || e.clientX - arEl.getBoundingClientRect().left < 36)) { e.preventDefault(); e.stopPropagation(); return selRotate(arEl.dataset.area); }
-  if (!t.closest('#stage')) return;
-  const it = t.closest('.it[data-it]'), pg = t.closest('[data-pg]'), ft = t.closest('.ft[data-tab]'), dc = t.closest('.dc[data-id]'), fr = t.closest('.fr[data-id]');
-  const pick = it ? [it.dataset.it, true] : pg ? [pg.dataset.pg] : ft ? [ft.dataset.tab] : dc ? [dc.dataset.id] : fr ? [fr.dataset.id] : null;
-  if (!pick) return;
-  e.preventDefault(); e.stopPropagation(); selRotate(pick[0], pick[1]);
+  if (t.closest('#selpill, #top, #ed, #task, #draw, #pick, #toasts, #list, #map')) return;
+  const arEl = t.closest('#areas .ar[data-area]');
+  const it = t.closest('#stage .it[data-it]'), pg = t.closest('#stage [data-pg]'), ft = t.closest('#stage .ft[data-tab]'), dc = t.closest('#stage .dc[data-id]'), fr = t.closest('#stage .fr[data-id]');
+  const id = it ? it.dataset.it : pg ? pg.dataset.pg : ft ? ft.dataset.tab : dc ? dc.dataset.id : fr ? fr.dataset.id : arEl ? arEl.dataset.area : null;
+  if (!id) return;
+  e.preventDefault(); e.stopPropagation(); selRotate(id);
 }, true);
-addEventListener('dblclick', (e) => { if (selMode && e.target.closest('#stage')) { e.preventDefault(); e.stopPropagation(); } }, true);
 
 // ---- drawings: quick sketches hung on a frame or a document ------------------------------------------------------------
-// Stored as shapes (rectangles, ellipses, lines, strokes), never pixels; drawn each time on a small sheet, a bit pixelated.
-// A stroke that looks like a circle becomes one, like a rectangle becomes one; edges and centres snap to what is there.
-const DW_W = 192, DW_H = 128;
+// Figures only (rectangle, circle, triangle, diamond, line), chosen by passing over them and put on the sheet by dragging.
+// Stored as figures, never pixels; painted pixel by pixel on a small sheet (96 × 64), so they look like pixel art.
+const DW_W = 96, DW_H = 64;
 const DW_COLORS = {
   top: ['#f6c9d6', '#f9d8b8', '#f8eaa6', '#cfeccd', '#c4e3f3', '#cfd3f5', '#e3cdf1', '#f2f0ee'],
   left: ['#2f2735', '#3d5a80', '#7a2e3a', '#2e6b4a', '#8a5a2b', '#6b6670'],
   right: ['#e0607e', '#f0954a', '#e8c547', '#56b37f', '#4a9fd8', '#8f78d6'],
 };
+const DW_SHAPES = [['rect', 'Rectángulo'], ['ellipse', 'Círculo'], ['tri', 'Triángulo'], ['diamond', 'Rombo'], ['line', 'Línea']];
 const drawsAt = (id) => (S.drawings || []).filter((d) => d.at === id);
 const darker = (hex, k = 0.72) => { const n = parseInt(hex.slice(1), 16); const c = (v) => Math.round(v * k).toString(16).padStart(2, '0'); return '#' + c(n >> 16) + c((n >> 8) & 255) + c(n & 255); };
-function paintShapes(ctx, shapes, w = DW_W, h = DW_H) {
-  ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#fffdf8'; ctx.fillRect(0, 0, w, h);
-  ctx.save(); ctx.scale(w / DW_W, h / DW_H);
-  for (const s of shapes) {
-    ctx.lineWidth = s.t === 'path' || s.t === 'line' ? 2 : 1.4; ctx.strokeStyle = s.t === 'path' || s.t === 'line' ? s.c : darker(s.c); ctx.fillStyle = s.c;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    if (s.t === 'rect') { ctx.fillRect(s.x, s.y, s.w, s.h); ctx.strokeRect(s.x + 0.5, s.y + 0.5, s.w - 1, s.h - 1); }
-    else if (s.t === 'ellipse') { ctx.beginPath(); ctx.ellipse(s.x + s.w / 2, s.y + s.h / 2, Math.max(1, s.w / 2), Math.max(1, s.h / 2), 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
-    else if (s.t === 'line') { ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke(); }
-    else if (s.t === 'path') { ctx.beginPath(); s.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); }
+// is a point inside a figure (in sheet units)
+function inside(s, x, y) {
+  if (s.t === 'rect') return x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h;
+  if (s.t === 'ellipse') { const rx = s.w / 2, ry = s.h / 2; return rx > 0 && ry > 0 && ((x - s.x - rx) / rx) ** 2 + ((y - s.y - ry) / ry) ** 2 <= 1; }
+  if (s.t === 'diamond') { const rx = s.w / 2, ry = s.h / 2; return rx > 0 && ry > 0 && Math.abs(x - s.x - rx) / rx + Math.abs(y - s.y - ry) / ry <= 1; }
+  if (s.t === 'tri') { if (y < s.y || y > s.y + s.h || !s.h) return false; const half = (s.w / 2) * (y - s.y) / s.h; return Math.abs(x - s.x - s.w / 2) <= half; }
+  return false;
+}
+const segDist = (px, py, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy; const t = L ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L)) : 0; return Math.hypot(px - ax - t * dx, py - ay - t * dy); };
+// paint the figures pixel by pixel on a sheet-sized context (older drawings were on a 192 × 128 sheet)
+function paintShapes(ctx, shapes, base = DW_W) {
+  const k = DW_W / base;
+  ctx.fillStyle = '#fffdf8'; ctx.fillRect(0, 0, DW_W, DW_H);
+  for (const s0 of shapes) {
+    const s = { ...s0 }; for (const p of ['x', 'y', 'w', 'h', 'x1', 'y1', 'x2', 'y2']) if (s[p] != null) s[p] *= k;
+    if (s.t === 'line' || s.t === 'path') {
+      const segs = s.t === 'line' ? [[s.x1, s.y1, s.x2, s.y2]] : s.pts.slice(1).map((p, i) => [s.pts[i][0] * k, s.pts[i][1] * k, p[0] * k, p[1] * k]);
+      ctx.fillStyle = s.c;
+      for (const [ax, ay, bx, by] of segs) for (let y = Math.floor(Math.min(ay, by) - 1); y <= Math.max(ay, by) + 1; y++) for (let x = Math.floor(Math.min(ax, bx) - 1); x <= Math.max(ax, bx) + 1; x++) if (segDist(x + 0.5, y + 0.5, ax, ay, bx, by) <= 0.62) ctx.fillRect(x, y, 1, 1);
+      continue;
+    }
+    const x0 = Math.floor(s.x), y0 = Math.floor(s.y), x1 = Math.ceil(s.x + s.w), y1 = Math.ceil(s.y + s.h), edge = darker(s.c);
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      if (!inside(s, x + 0.5, y + 0.5)) continue;
+      const rim = !inside(s, x - 0.5, y + 0.5) || !inside(s, x + 1.5, y + 0.5) || !inside(s, x + 0.5, y - 0.5) || !inside(s, x + 0.5, y + 1.5);
+      ctx.fillStyle = rim ? edge : s.c; ctx.fillRect(x, y, 1, 1);
+    }
   }
-  ctx.restore();
 }
 const thumbCache = new Map();
 function drawThumb(d) {
-  const key = d.id + ':' + JSON.stringify(d.shapes).length + ':' + d.v;
-  if (!thumbCache.has(key)) { const c = document.createElement('canvas'); c.width = 72; c.height = 48; paintShapes(c.getContext('2d'), d.shapes, 72, 48); thumbCache.set(key, c.toDataURL()); }
+  const key = d.id + ':' + (d.v || 0) + ':' + d.shapes.length;
+  if (!thumbCache.has(key)) { const c = document.createElement('canvas'); c.width = DW_W; c.height = DW_H; paintShapes(c.getContext('2d'), d.shapes, d.base || 192); thumbCache.set(key, c.toDataURL()); }
   return thumbCache.get(key);
 }
 const thumbs = (id) => drawsAt(id).map((d) => `<img class="dw-th" data-draw="${d.id}" src="${drawThumb(d)}" alt="" title="Dibujo · clic para abrirlo">`).join('');
 
-// recognizing a stroke
-function recognize(pts) {
-  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), w = x1 - x0, h = y1 - y0;
-  let len = 0; for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-  const ends = Math.hypot(pts.at(-1)[0] - pts[0][0], pts.at(-1)[1] - pts[0][1]), diag = Math.hypot(w, h) || 1;
-  if (len < 3) return null;
-  if (ends > len * 0.9 && len > 6) return { t: 'line', x1: pts[0][0], y1: pts[0][1], x2: pts.at(-1)[0], y2: pts.at(-1)[1] };   // a straight stroke
-  if (ends < diag * 0.3 && w > 5 && h > 5) {                                       // closed: a circle or a rectangle?
-    const cx = x0 + w / 2, cy = y0 + h / 2, m = Math.min(w, h);
-    const ell = pts.reduce((a, [x, y]) => a + Math.abs(Math.hypot((x - cx) / (w / 2), (y - cy) / (h / 2)) - 1), 0) / pts.length;
-    const rec = pts.reduce((a, [x, y]) => a + Math.min(Math.abs(x - x0), Math.abs(x - x1), Math.abs(y - y0), Math.abs(y - y1)) / m, 0) / pts.length;
-    if (rec < 0.09 && rec < ell * 0.8) return { t: 'rect', x: x0, y: y0, w, h };
-    if (ell < 0.16) return { t: 'ellipse', x: x0, y: y0, w, h };
-  }
-  return { t: 'path', pts: pts.filter((p, i) => i % 2 === 0 || i === pts.length - 1).map(([x, y]) => [Math.round(x * 2) / 2, Math.round(y * 2) / 2]) };
-}
-// snapping: almost-square becomes square; edges and centres close to another shape's (or the sheet's) line up with them
-function snapShape(s, others) {
-  if (s.t !== 'rect' && s.t !== 'ellipse') return s;
-  if (Math.abs(s.w - s.h) < Math.max(s.w, s.h) * 0.1) { const m = (s.w + s.h) / 2; s.x += (s.w - m) / 2; s.y += (s.h - m) / 2; s.w = s.h = m; }
-  const boxes = [{ x: 0, y: 0, w: DW_W, h: DW_H }, ...others.filter((o) => o.t === 'rect' || o.t === 'ellipse')];
-  const T = 4;
-  const fit = (pos, size, lines) => {            // try the near edge, the far edge, then the centre
-    let best = null;
-    for (const L of lines) for (const [mine, shift] of [[pos, 0], [pos + size, -size], [pos + size / 2, -size / 2]]) {
-      const d = Math.abs(mine - L); if (d < T && (!best || d < best.d)) best = { d, v: L + shift };
-    }
-    return best ? best.v : pos;
-  };
-  const xs = boxes.flatMap((b) => [b.x, b.x + b.w, b.x + b.w / 2]), ys = boxes.flatMap((b) => [b.y, b.y + b.h, b.y + b.h / 2]);
-  s.x = fit(s.x, s.w, xs); s.y = fit(s.y, s.h, ys);
-  for (const k of ['x', 'y', 'w', 'h']) s[k] = Math.round(s[k]);
-  return s;
-}
-
 // the sheet
-let dwOpen = null, dwColor = DW_COLORS.top[4], dwSnapped = false;
+let dwOpen = null, dwColor = DW_COLORS.top[4], dwShape = 'rect', dwSnapped = false;
 const dwNow = () => (S.drawings || []).find((d) => d.id === dwOpen);
+const shapeIco = (t) => `<svg viewBox="0 0 20 20" width="18" height="18">${{ rect: '<rect x="3" y="5" width="14" height="10"/>', ellipse: '<circle cx="10" cy="10" r="7"/>', tri: '<path d="M10 3 L17 16 L3 16 Z"/>', diamond: '<path d="M10 2 L18 10 L10 18 L2 10 Z"/>', line: '<path d="M3 17 L17 3" stroke-width="2.4" fill="none"/>' }[t]}</svg>`;
 function openDrawing(d) {
   if (!d) return;
   dwOpen = d.id; dwSnapped = false;
@@ -1260,8 +1231,9 @@ function openDrawing(d) {
   box.querySelector('.dw-top').innerHTML = DW_COLORS.top.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
   box.querySelector('.dw-left').innerHTML = DW_COLORS.left.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
   box.querySelector('.dw-right').innerHTML = DW_COLORS.right.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
+  box.querySelector('.dw-shapes').innerHTML = DW_SHAPES.map(([t, name]) => `<b data-shape="${t}" title="${name}">${shapeIco(t)}</b>`).join('');
   box.querySelector('.dw-where').textContent = nestPath(d.at) || '';
-  box.hidden = false; dwPaint(); dwPickColor(dwColor);
+  box.hidden = false; dwPaint(); dwPickColor(dwColor); dwPickShape(dwShape);
   box.querySelector('.dw-in').animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
 }
 function closeDrawing() {
@@ -1270,26 +1242,38 @@ function closeDrawing() {
   if (d) delete d.fresh;
   dwOpen = null; $('#draw').hidden = true; save(); renderAll();
 }
-function dwPaint(live) {
+function dwPaint(preview) {
   const d = dwNow(); if (!d) return;
-  const ctx = $('#dw-c').getContext('2d'); paintShapes(ctx, d.shapes);
-  if (live?.length > 1) { ctx.strokeStyle = dwColor; ctx.lineWidth = 1.5; ctx.beginPath(); live.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); }
+  paintShapes($('#dw-c').getContext('2d'), preview ? [...d.shapes.map((s) => ({ ...s })), preview] : d.shapes, d.base || 192);
 }
-function dwPickColor(c) { dwColor = c; for (const el of document.querySelectorAll('#draw [data-col]')) el.classList.toggle('on', el.dataset.col === c); $('#draw .dw-cur').style.background = c; }
+function dwPickColor(c) { dwColor = c; for (const el of document.querySelectorAll('#draw [data-col]')) el.classList.toggle('on', el.dataset.col === c); $('#draw .dw-cur').style.background = c; for (const el of document.querySelectorAll('#draw [data-shape]')) el.style.color = c; }
+function dwPickShape(t) { dwShape = t; for (const el of document.querySelectorAll('#draw [data-shape]')) el.classList.toggle('on', el.dataset.shape === t); }
 function dwEdit(fn) { if (!dwSnapped) { snap(); dwSnapped = true; } fn(); const d = dwNow(); d.v = (d.v || 0) + 1; save(); dwPaint(); }
-// colours are taken by passing over them, no click
+// colours and figures are taken by passing over them, no click
 let dwHoverT = null;
-$('#draw').addEventListener('pointerover', (e) => { const sw = e.target.closest('[data-col]'); clearTimeout(dwHoverT); if (sw) dwHoverT = setTimeout(() => dwPickColor(sw.dataset.col), 90); });
-// drawing with the mouse
+$('#draw').addEventListener('pointerover', (e) => {
+  const sw = e.target.closest('[data-col]'), sh = e.target.closest('[data-shape]'); clearTimeout(dwHoverT);
+  if (sw) dwHoverT = setTimeout(() => dwPickColor(sw.dataset.col), 90);
+  if (sh) dwHoverT = setTimeout(() => dwPickShape(sh.dataset.shape), 90);
+});
+// a figure is put on the sheet by dragging its box (a line: from where you press to where you let go)
 $('#dw-c').addEventListener('pointerdown', (e) => {
-  const c = e.currentTarget, r = c.getBoundingClientRect(), at = (ev) => [(ev.clientX - r.left) * DW_W / r.width, (ev.clientY - r.top) * DW_H / r.height];
-  const pts = [at(e)]; c.setPointerCapture(e.pointerId);
-  const mv = (ev) => { pts.push(at(ev)); dwPaint(pts); };
+  const d = dwNow(); if (!d) return;
+  const c = e.currentTarget, r = c.getBoundingClientRect(), k = (d.base || 192) / DW_W;   // figures are kept in the drawing's own units
+  const at = (ev) => [Math.max(0, Math.min(DW_W, Math.round((ev.clientX - r.left) * DW_W / r.width))), Math.max(0, Math.min(DW_H, Math.round((ev.clientY - r.top) * DW_H / r.height)))];
+  const p0 = at(e); c.setPointerCapture(e.pointerId);
+  const fig = (p1) => {
+    if (dwShape === 'line') return { t: 'line', x1: p0[0] * k, y1: p0[1] * k, x2: p1[0] * k, y2: p1[1] * k, c: dwColor };
+    const x = Math.min(p0[0], p1[0]), y = Math.min(p0[1], p1[1]);
+    return { t: dwShape, x: x * k, y: y * k, w: Math.abs(p1[0] - p0[0]) * k, h: Math.abs(p1[1] - p0[1]) * k, c: dwColor };
+  };
+  let last = p0;
+  const mv = (ev) => { last = at(ev); dwPaint(fig(last)); };
   const up = () => {
     c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', up);
-    const s = recognize(pts); if (!s) return dwPaint();
-    s.c = dwColor;
-    dwEdit(() => { const d = dwNow(); d.shapes.push(snapShape(s, d.shapes)); });
+    const s = fig(last), big = s.t === 'line' ? Math.hypot(s.x2 - s.x1, s.y2 - s.y1) >= k : s.w >= k && s.h >= k;
+    if (!big) return dwPaint();
+    dwEdit(() => dwNow().shapes.push(s));
   };
   c.addEventListener('pointermove', mv); c.addEventListener('pointerup', up);
 });
@@ -1310,7 +1294,7 @@ function newDrawing(at) {
   let n = nd(at); if (n?.kind === 'ftab') n = parent(at); if (n?.kind === 'dtab') n = parent(at);
   if (!n || (n.kind !== 'frame' && n.kind !== 'doc')) return toast('Un dibujo va en un marco o en un documento: arrástralo encima de uno');
   snap(); S.drawings ||= []; S.seq.dibujo = (S.seq.dibujo || 0) + 1;
-  const d = { id: 'd' + S.seq.dibujo + '-' + uid().slice(0, 3), n: S.seq.dibujo, at: n.id, shapes: [], created: Date.now(), fresh: true };
+  const d = { id: 'd' + S.seq.dibujo + '-' + uid().slice(0, 3), n: S.seq.dibujo, at: n.id, shapes: [], base: DW_W, created: Date.now(), fresh: true };
   S.drawings.push(d); save(); renderAll(); openDrawing(d);
 }
 addEventListener('click', (e) => { const th = e.target.closest('.dw-th'); if (!th || selMode) return; e.preventDefault(); e.stopPropagation(); openDrawing((S.drawings || []).find((d) => d.id === th.dataset.draw)); }, true);
@@ -1627,7 +1611,6 @@ addEventListener('keydown', (e) => {
   const typing = e.target.closest?.('input, textarea, [contenteditable="true"], .cm-editor');
   if (e.key === 'Escape') {
     if (taskOpen) { e.preventDefault(); return closeTask(); }
-    if (selMode) { e.preventDefault(); return setSelMode(false); }
     if ($('#pick').classList.contains('on')) return $('#pick').classList.remove('on');
     if (document.querySelector('.pop')) return;
     if (!$('#map').classList.contains('mini')) return mapOpen(false);
