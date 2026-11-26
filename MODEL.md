@@ -5,7 +5,7 @@ está, siguiendo una escalera:
 
 ```
 Proyecto (GGUF.OS)
- └ Apartado                   (columna de la izquierda: PRINCIPIOS, UIX…)
+ └ Apartado                   (columnas de la izquierda: PRINCIPIOS, UIX…; un apartado puede tener apartados dentro, hasta 4 columnas)
     └ Marco
        └ Pestaña de marco          (un marco tiene siempre al menos una)
           └ Marco … | Documento     (marcos dentro de marcos, los que haga falta; al final, documentos)
@@ -23,7 +23,7 @@ Soltar algo en otro peldaño lo convierte, y todo lo que lleva dentro baja o sub
 - Un marco soltado en un texto → títulos; sus pestañas → subtítulos; y así hacia abajo.
 - Nada escrito se pierde: el texto que no tiene página donde vivir se guarda en un documento.
 
-Qué hijo admite cada uno: proyecto → apartado · apartado → marco · marco → pestaña · pestaña de marco → marco o documento · documento →
+Qué hijo admite cada uno: proyecto → apartado · apartado → apartados o marcos · marco → pestaña · pestaña de marco → marco o documento · documento →
 pestaña · pestaña de documento → títulos en el texto.
 
 ## Pantalla
