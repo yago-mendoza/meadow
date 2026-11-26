@@ -22,7 +22,7 @@ const listOf = (kind) => (kind === 'idea' ? S.ideas : S.tasks);
 const getItem = (kind, n) => listOf(kind).find((x) => x.n === n);
 const token = (it) => `{${it.kind} ${it.n}}`;
 function find(id) {
-  for (const [k, list] of [['d', S.docs], ['p', S.postits], ['f', S.frames], ['i', S.ideas], ['t', S.tasks], ['x', S.texts || []]]) {
+  for (const [k, list] of [['d', S.docs], ['p', S.postits], ['f', S.frames], ['i', S.ideas], ['t', S.tasks], ['x', S.texts || []], ['g', S.shapes || []]]) {
     const o = list.find((x) => x.id === id); if (o) return { k, o };
   }
   return null;
@@ -42,7 +42,7 @@ async function load() {
   rev = j.rev || 0;
   if (j.state) S = { ...S, ...j.state };
   else S.view = { x: Math.round(innerWidth / 2 - 100), y: Math.round(innerHeight / 2 - 140), z: 1 };
-  for (const k of ['postits', 'frames', 'ideas', 'tasks', 'history', 'signs', 'texts']) S[k] ||= [];
+  for (const k of ['postits', 'frames', 'ideas', 'tasks', 'history', 'signs', 'texts', 'shapes']) S[k] ||= [];
   S.seq ||= { idea: 0, tarea: 0 };
   for (const t of [...(S.ideas || []), ...(S.tasks || [])]) if (t.pin?.side === 'tab') t.pin.side = 't';
   for (const d of S.docs) { const t = titleOf(d.text); if (t) d.name = t; else d.text = withTitle(d.text, d.name); }
@@ -68,7 +68,7 @@ addEventListener('beforeunload', () => {
 
 const undo = [];
 function snap() {
-  undo.push(JSON.stringify({ docs: S.docs, postits: S.postits, frames: S.frames, ideas: S.ideas, tasks: S.tasks, signs: S.signs, texts: S.texts, trays: S.trays, seq: S.seq }));
+  undo.push(JSON.stringify({ docs: S.docs, postits: S.postits, frames: S.frames, ideas: S.ideas, tasks: S.tasks, signs: S.signs, texts: S.texts, shapes: S.shapes, trays: S.trays, seq: S.seq }));
   if (undo.length > 80) undo.shift();
 }
 function doUndo() {
@@ -292,6 +292,20 @@ const tiltOf = (id) => { let h = 0; for (const c of String(id)) h = (h * 31 + c.
 const ZB = '<button data-a="front">⤒<b>Al frente</b></button><button data-a="back">⤓<b>Al fondo</b></button>';
 const postitHTML = (p) => `<div class="postit${sel.has(p.id) ? ' sel' : ''}" data-id="${p.id}" data-k="p" style="left:${p.x}px;top:${p.y}px;z-index:${p.z || 0};--bg:${p.color};--s:${p.s || 1};--tilt:${tiltOf(p.id)}deg">
   <div class="ptext">${esc(p.text)}</div><button class="x" title="Borrar">×</button>${palHTML()}<div class="acts">${ZB}</div>${PRS}</div>`;
+// A shape: colour on the plane. Its form and colour change on hover; its right and bottom edges (and corner) size it.
+const SHAPES = {
+  rect: '<rect x="0" y="0" width="100" height="100"/>',
+  round: '<rect x="0" y="0" width="100" height="100" rx="14" ry="14"/>',
+  ellipse: '<ellipse cx="50" cy="50" rx="50" ry="50"/>',
+  tri: '<path d="M50 0 L100 100 L0 100 Z"/>',
+  diamond: '<path d="M50 0 L100 50 L50 100 L0 50 Z"/>',
+};
+const SHAPE_COLORS = ['#f6c1d6', '#f9b4a6', '#ffd58a', '#fff1b8', '#bfe3c6', '#a9d6ee', '#c9c0f0', '#e6dfe8', '#8fb3df', '#d9534f', '#5cae6b', '#3b3341'];
+const shapeHTML = (g) => `<div class="shape${sel.has(g.id) ? ' sel' : ''}" data-id="${g.id}" data-k="g" style="left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px;z-index:${g.z || 0};--c:${g.color}">
+  <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${SHAPES[g.form] || SHAPES.round}</svg>
+  <button class="x" title="Borrar">×</button>
+  <div class="shp-tools"><span class="shp-forms">${Object.keys(SHAPES).map((f) => `<button data-form="${f}" class="${f === g.form ? 'on' : ''}" title="${{ rect: 'Rectángulo', round: 'Redondeado', ellipse: 'Círculo', tri: 'Triángulo', diamond: 'Rombo' }[f]}"><svg viewBox="0 0 100 100" width="14" height="14">${SHAPES[f]}</svg></button>`).join('')}</span><i></i><span class="shp-cols">${SHAPE_COLORS.map((c) => `<b data-sc="${c}" style="--d:${c}" class="${c === g.color ? 'on' : ''}"></b>`).join('')}</span></div>
+  <div class="acts">${ZB}</div><div class="tb tb-w" data-d="w"></div><div class="tb tb-h" data-d="h"></div><div class="tb tb-wh" data-d="wh"></div></div>`;
 // Free text: words straight on the plane, no document.
 const textHTML = (x) => `<div class="ftext${sel.has(x.id) ? ' sel' : ''}" data-id="${x.id}" data-k="x" style="left:${x.x}px;top:${x.y}px;z-index:${x.z || 0};--s:${x.s || 1}${x.w ? `;width:${x.w}px` : ''}${x.h ? `;height:${x.h}px` : ''}">
   <div class="xt">${esc(x.text)}</div><button class="x" title="Borrar">×</button><div class="acts">${ZB}</div><div class="tb tb-w" data-d="w" title="Ancho"></div><div class="tb tb-h" data-d="h" title="Alto"></div>${PRS}</div>`;
@@ -331,7 +345,7 @@ const frameHTML = (f) => `<div class="frame${sel.has(f.id) ? ' sel' : ''}" data-
 // A frame's tabs: the first is its title; the active one decides what is shown inside.
 function tabsOf(f) { if (!f.tabs?.length) f.tabs = [{ id: 'tab-' + f.id, title: f.title || '' }]; f.tabs[0].title = f.title || ''; return f.tabs; }
 const activeTab = (f) => (tabsOf(f).some((t) => t.id === f.active) ? f.active : tabsOf(f)[0].id);
-const things = () => [...S.docs.filter((d) => d.place === 'canvas'), ...S.postits, ...S.texts, ...S.ideas, ...S.tasks];
+const things = () => [...S.docs.filter((d) => d.place === 'canvas'), ...S.postits, ...S.texts, ...(S.shapes || []), ...S.ideas, ...S.tasks];
 const tabCount = (f, tid) => things().filter((o) => (o.ftab?.f === f.id && o.ftab.t === tid) || (o.pin?.host === f.id && o.pin.side === 'desc' && o.pin.tab === tid)).length;
 // hidden behind another tab: itself, or the host it is pinned or docked to
 function inOtherTab(o) {
@@ -412,6 +426,7 @@ function renderItems() {
   framesEl.innerHTML = [...S.frames].sort((a, b) => b.w * b.h - a.w * a.h).map(frameHTML).join('');
   itemsEl.innerHTML = S.docs.map((d, i) => (d.place === 'canvas' && !inOtherTab(d) ? docHTML(d, i + 1) : '')).join('')
     + S.postits.filter((p) => !p.riding && !inOtherTab(p)).map(postitHTML).join('')
+    + (S.shapes || []).filter((g) => !inOtherTab(g)).map(shapeHTML).join('')
     + (S.texts || []).filter((x) => !x.riding && !inOtherTab(x)).map(textHTML).join('')
     + [...S.ideas, ...S.tasks].filter((it) => it.onCanvas && !it.riding && !hiddenInFold(it) && !inOtherTab(it) && !stackBase(it)).map(itemHTML).join('')
     + groupsHTML();
@@ -823,6 +838,10 @@ function create(kind, w, inStash) {
   } else if (kind === 'text') {
     const x = { id: uid(), x: Math.round(w.x - 40), y: Math.round(w.y - 14), z: topZ(), text: '' };
     S.texts.push(x); sel.clear(); sel.add(x.id); save(); render(); writeText(x, true);
+  } else if (kind === 'shape') {
+    const g = { id: uid(), x: Math.round(w.x - 80), y: Math.round(w.y - 55), w: 160, h: 110, z: topZ(), form: 'round', color: SHAPE_COLORS[(S.shapes.length) % 8] };
+    S.shapes.push(g); sel.clear(); sel.add(g.id); log('crear', 'Forma', { ref: g.id }); save(); render();
+    elOf(g.id)?.animate([{ opacity: 0, transform: 'scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)' });
   } else if (kind === 'postit') {
     const p = { id: uid(), x: Math.round(w.x - 85), y: Math.round(w.y - 75), z: topZ(), text: '', color: PASTEL[0] };
     S.postits.push(p); sel.clear(); sel.add(p.id); save(); render(); editPostit(p);
@@ -1171,7 +1190,9 @@ function removeIds(ids) {
   for (const p of S.postits.filter((p) => set.has(p.id))) log('borrar', `Post-it «${(p.text || '').slice(0, 40)}»`, { restore: { k: 'p', o: p } });
   for (const f of S.frames.filter((f) => set.has(f.id))) log('borrar', `Marco «${f.title || 'sin título'}»`, { restore: { k: 'f', o: f } });
   S.signs = (S.signs || []).filter((g) => !set.has(g.host));
+  for (const g of (S.shapes || []).filter((g) => set.has(g.id))) log('borrar', 'Forma', { restore: { k: 'g', o: g } });
   S.texts = (S.texts || []).filter((x) => !set.has(x.id));
+  S.shapes = (S.shapes || []).filter((g) => !set.has(g.id));
   S.postits = S.postits.filter((p) => !set.has(p.id));
   for (const o of things()) if (o.ftab && set.has(o.ftab.f)) delete o.ftab;
   S.frames = S.frames.filter((f) => !set.has(f.id));
@@ -1194,6 +1215,7 @@ function restoreFrom(h) {
   snap();
   if (k === 'd') { S.docs.push({ ...o }); }
   else if (k === 'p') S.postits.push({ ...o });
+  else if (k === 'g') S.shapes.push({ ...o });
   else if (k === 'f') S.frames.push({ ...o });
   else { if (getItem(k, o.n)) return toast('Ya está'); listOf(k).push({ ...o, onCanvas: true }); }
   log('restaurar', h.msg, { ref: o.id }); h.restored = true; changed(); toast('Restaurado');
@@ -1221,7 +1243,7 @@ let act = null, space = false;
 vp.addEventListener('contextmenu', (e) => e.preventDefault());
 vp.addEventListener('dblclick', (e) => { if (inline && e.target.closest('.doc.live')) { e.stopPropagation(); $('#ep-edit').click(); } }, true);
 vp.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.ied, .dhov button, .cin button')) return;                       // selecting text in the page being read
+  if (e.target.closest('.ied, .dhov button, .cin button, .shp-tools')) return;                       // selecting text in the page being read
   const ae = document.activeElement;
   if (ae?.isContentEditable && !e.target.closest('[contenteditable="true"]')) ae.blur();   // a click elsewhere = Enter
   if (e.target.closest('.dgroup')) return;
@@ -1242,10 +1264,10 @@ vp.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   document.activeElement?.blur?.();
   const rs = e.target.closest('.rs');
-  const tb = e.target.closest('.ftext .tb');
+  const tb = e.target.closest('.ftext .tb, .shape .tb');
   if (tb && e.button === 0) {
     e.stopPropagation();
-    const host = tb.closest('.ftext'), x = find(host.dataset.id).o;
+    const host = tb.closest('.ftext, .shape'), x = find(host.dataset.id).o;
     act = { k: 'tbox', x, el: host, d: tb.dataset.d, sx: e.clientX, sy: e.clientY, w0: host.offsetWidth, h0: host.offsetHeight }; return;
   }
   const prs = e.target.closest('.prs');
@@ -1301,7 +1323,7 @@ vp.addEventListener('pointerdown', (e) => {
 // · a document carries the post-its, ideas and tasks lying on it (one lying on two documents goes with the upper one);
 // · a post-it, idea or task carries the small things it touches, and those theirs, except what lies on a document
 //   that is not moving: that belongs to the document.
-const RANK = { f: 4, d: 3, p: 2, i: 2, t: 2, x: 2 };
+const RANK = { f: 4, d: 3, p: 2, i: 2, t: 2, x: 2, g: 1 };   // a shape holds nothing: it is colour on the plane
 function collectMoving(alone) {
   const out = new Map();
   const add = (id) => { const f = find(id), el = elOf(id); if (f && el && !out.has(id)) out.set(id, { k: f.k, o: f.o, el, x0: f.o.x, y0: f.o.y }); };
@@ -1376,8 +1398,9 @@ addEventListener('pointermove', (e) => {
   } else if (act.k === 'tbox') {
     if (!act.snapped) { act.snapped = true; snap(); document.body.classList.add('dragging'); }
     const s2 = (act.x.s || 1) * z;
-    if (act.d === 'w') { act.x.w = Math.round(Math.max(60, act.w0 + (e.clientX - act.sx) / s2)); act.el.style.width = act.x.w + 'px'; }
-    else { act.x.h = Math.round(Math.max(30, act.h0 + (e.clientY - act.sy) / s2)); act.el.style.height = act.x.h + 'px'; }
+    const shp = act.el.classList.contains('shape'), mw = shp ? 16 : 60, mh = shp ? 16 : 30;
+    if (act.d.includes('w')) { act.x.w = Math.round(Math.max(mw, act.w0 + (e.clientX - act.sx) / s2)); act.el.style.width = act.x.w + 'px'; }
+    if (act.d.includes('h')) { act.x.h = Math.round(Math.max(mh, act.h0 + (e.clientY - act.sy) / s2)); act.el.style.height = act.x.h + 'px'; }
   } else if (act.k === 'scale') {
     if (!act.snapped) { act.snapped = true; snap(); document.body.classList.add('dragging'); }
     const ns = Math.round(Math.min(4, Math.max(0.25, act.s0 * (1 + (e.clientX - act.sx) / z / (act.w0 * act.s0)))) * 100) / 100;
@@ -1490,6 +1513,8 @@ addEventListener('pointerup', (e) => {
     const wasAll = !body || (a.selBefore && a.selBefore.size === all.length && all.every((id) => a.selBefore.has(id)));
     sel.clear(); for (const id of wasAll ? keep : all) sel.add(id);
     paintSel();
+  } else if (a.k === 'move' && !a.toggle && a.kind === 'g') {
+    sel.clear(); sel.add(a.id); paintSel();
   } else if (a.k === 'move' && !a.toggle && (a.kind === 'd' || a.kind === 'p' || a.kind === 'x')) {
     const d = find(a.id).o; sel.clear(); sel.add(d.id);
     const all = collectMoving(false).map((m) => m.o.id);
@@ -1539,6 +1564,8 @@ vp.addEventListener('click', (e) => {
   }
   const fa = e.target.closest('.f-add');
   if (fa) return frameInside(find(fa.closest('.frame').dataset.id).o);
+  const sf = e.target.closest('.shp-forms button, .shp-cols b');
+  if (sf) { const g = find(sf.closest('.shape').dataset.id).o; snap(); if (sf.dataset.form) g.form = sf.dataset.form; else g.color = sf.dataset.sc; save(); render(); return; }
   const cin = e.target.closest('.cin button');
   if (cin) { const it = find(cin.closest('[data-k]').dataset.id).o; $('#ipeek')?.classList.remove('on'); return cin.dataset.c === 'done' ? toggleTask(it) : removeIds([it.id]); }
   const x = e.target.closest('.x');
@@ -1927,6 +1954,7 @@ const TOOLS = [
   ['idea', '💡', 'Idea', '#cdeedd', 'Una idea que puedes pegar en el plano y dentro de documentos'],
   ['tarea', '☑️', 'Tarea', '#cfe5fb', 'Una tarea que puedes pegar en el plano y dentro de documentos'],
   ['text', 'Aa', 'Texto', '#f1eef4', 'Texto suelto, escrito directamente en el plano'],
+  ['shape', '◆', 'Forma', '#f6c1d6', 'Una forma de color: rectángulo, círculo, triángulo o rombo'],
   ['frame', '⬚', 'Marco', '#e3d9f7', 'Un marco para agrupar lo que hay suelto'],
   ['sign', '🔖', 'Ribete', '#f6c9c7', 'Una cinta roja (o del color que quieras) en el borde de un documento, post-it o marco'],
 ];
@@ -2074,7 +2102,7 @@ function itemRow(it) {
     <div class="r-sub">${esc(whereOf(it))}</div></div><button class="r-copy" data-copy="${it.id}" title="Copiar para pegar">⧉</button></div>`;
 }
 // ---- the map of nestings: everything, as a tree of what holds what (frames › tabs › pages › circles) ----
-const KINDS = [['f', 'Marcos', '⬚'], ['d', 'Documentos', '📄'], ['p', 'Post-its', '🗒️'], ['x', 'Textos', 'Aa'], ['i', 'Ideas', '💡'], ['t', 'Tareas', '☐']];
+const KINDS = [['f', 'Marcos', '⬚'], ['d', 'Documentos', '📄'], ['p', 'Post-its', '🗒️'], ['x', 'Textos', 'Aa'], ['g', 'Formas', '◆'], ['i', 'Ideas', '💡'], ['t', 'Tareas', '☐']];
 let mapKinds = new Set(JSON.parse(localStorage.getItem('meadow.mapKinds') || '[]'));
 const kindOfObj = (o) => find(o.id)?.k || (S.docs.includes(o) ? 'd' : null);
 // What holds a thing, and how: { o, rel, tab } (null: it lies on the open plane)
@@ -2095,7 +2123,7 @@ function parentOf(o, k, ownerOf) {
 }
 function mapTree() {
   const { ownerOf } = owners();
-  const nodes = [...S.frames.map((o) => ['f', o]), ...S.docs.map((o) => ['d', o]), ...S.postits.map((o) => ['p', o]), ...S.texts.map((o) => ['x', o]),
+  const nodes = [...S.frames.map((o) => ['f', o]), ...S.docs.map((o) => ['d', o]), ...S.postits.map((o) => ['p', o]), ...S.texts.map((o) => ['x', o]), ...(S.shapes || []).map((o) => ['g', o]),
     ...S.ideas.map((o) => ['i', o]), ...S.tasks.map((o) => ['t', o])];
   const kids = new Map(), roots = [], trays = new Map();
   const push = (key, n) => { if (!kids.has(key)) kids.set(key, []); kids.get(key).push(n); };
@@ -2112,10 +2140,10 @@ function mapTree() {
 function mapHTML() {
   const { kids, roots, trays } = mapTree();
   const want = (k) => !mapKinds.size || mapKinds.has(k);
-  const label = (n) => n.k === 'f' ? (n.o.title || 'Marco sin título') : n.k === 'd' ? n.o.name : (n.o.text || '').split('\n')[0] || (n.k === 'p' ? 'Post-it' : n.k === 'x' ? 'Texto' : '…');
-  const TOOLK = { f: 'frame', d: 'doc', p: 'postit', i: 'idea', t: 'tarea', x: 'text' };
-  const icon = (n) => { const t = TOOLS.find((q) => q[0] === TOOLK[n.k]); return `<span class="mk mk-${n.k}${n.k === 't' && n.o.done ? ' done' : ''}" style="--c:${t[3]}">${n.k === 't' ? (n.o.done ? '✔' : '') : t[1]}</span>`; };
-  const order = (a, b) => 'itdpxf'.indexOf(a.k) - 'itdpxf'.indexOf(b.k) || (a.o.y || 0) - (b.o.y || 0) || (a.o.x || 0) - (b.o.x || 0);
+  const label = (n) => n.k === 'f' ? (n.o.title || 'Marco sin título') : n.k === 'd' ? n.o.name : (n.o.text || '').split('\n')[0] || (n.k === 'p' ? 'Post-it' : n.k === 'x' ? 'Texto' : n.k === 'g' ? 'Forma' : '…');
+  const TOOLK = { f: 'frame', d: 'doc', p: 'postit', i: 'idea', t: 'tarea', x: 'text', g: 'shape' };
+  const icon = (n) => { const t = TOOLS.find((q) => q[0] === TOOLK[n.k]); return `<span class="mk mk-${n.k}${n.k === 't' && n.o.done ? ' done' : ''}" style="--c:${n.k === 'g' && n.o.color ? n.o.color : t[3]}">${n.k === 't' ? (n.o.done ? '✔' : '') : t[1]}</span>`; };
+  const order = (a, b) => 'itdpxgf'.indexOf(a.k) - 'itdpxgf'.indexOf(b.k) || (a.o.y || 0) - (b.o.y || 0) || (a.o.x || 0) - (b.o.x || 0);
   const childrenOf = (n) => {
     const own = [...(kids.get(n.o.id) || [])];
     const tabs = n.k === 'f' && tabsOf(n.o).length > 1 ? tabsOf(n.o).map((t) => ({ tab: t, f: n.o, list: kids.get(n.o.id + '|' + t.id) || [] })) : [];

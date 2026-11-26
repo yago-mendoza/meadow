@@ -3,6 +3,8 @@
 Qué hay en el plano, cómo se ordena y cómo responde a cada gesto. Cuando algo nuevo entra, se le da su género aquí
 primero; si un gesto hace en un género algo distinto que en otro, tiene que estar escrito el porqué.
 
+- **Forma**: color en el plano (rectángulo, redondeado, círculo, triángulo, rombo). Rango 1: no contiene nada; se mide por sus bordes; dentro de un marco, va con él.
+
 ## 1. Géneros (de mayor a menor)
 
 | Género | Piezas | Qué es |
