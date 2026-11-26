@@ -390,17 +390,16 @@ body.dragging .prs { visibility: hidden; }
 
 /* signs: a wooden plank standing out from behind an edge, perpendicular to it, with a little board and a scribble */
 .sign { position: absolute; z-index: -1; display: flex; align-items: center; cursor: pointer; pointer-events: auto; }
-.sign .plank { flex: none; background: linear-gradient(90deg, #9b6a3e, #b7834f 40%, #a27140); box-shadow: inset 0 0 0 1px rgba(80, 45, 15, .35), 0 2px 4px rgba(60, 35, 10, .25); border-radius: 2px; }
-.sign .board { flex: none; display: grid; place-items: center; width: 54px; height: 36px; border-radius: 4px;
-  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .06) 0 3px, transparent 3px 9px), linear-gradient(#d9a46a, #c38d55);
-  box-shadow: inset 0 0 0 2px #8a5a32, inset 0 0 0 4px #e2b37f, 0 4px 10px rgba(60, 35, 10, .28); transition: transform .2s var(--spring); }
-.sign:hover .board { transform: rotate(-4deg) scale(1.06); }
+.sign .plank { flex: none; border-radius: 3px; background: linear-gradient(#f5e2bf, #e8cb98); box-shadow: 0 1px 2px rgba(150, 105, 45, .2); }
+.sign .board { flex: none; display: block; filter: drop-shadow(0 2px 3px rgba(150, 105, 45, .22)); transform-origin: 50% 50%;
+  transition: transform .25s cubic-bezier(.34, 1.56, .64, 1); }
+.sign:hover .board { transform: rotate(-5deg) scale(1.12); }
 .sign.e-right { left: 100%; top: var(--t); transform: translateY(-50%); flex-direction: row; }
 .sign.e-left { right: 100%; top: var(--t); transform: translateY(-50%); flex-direction: row-reverse; }
 .sign.e-top { bottom: 100%; left: var(--t); transform: translateX(-50%); flex-direction: column-reverse; }
 .sign.e-bottom { top: 100%; left: var(--t); transform: translateX(-50%); flex-direction: column; }
-.sign.e-right .plank, .sign.e-left .plank { width: 26px; height: 9px; }
-.sign.e-top .plank, .sign.e-bottom .plank { width: 9px; height: 24px; }
+.sign.e-right .plank, .sign.e-left .plank { width: 13px; height: 5px; }
+.sign.e-top .plank, .sign.e-bottom .plank { width: 5px; height: 12px; }
 .sign.preview { opacity: .75; pointer-events: none; animation: none; }
 .sign.preview .board { transform: rotate(-3deg); }
 .frame .sign { z-index: 1; }
@@ -509,3 +508,4 @@ details.grp summary i { font: 600 10.5px Consolas, monospace; font-style: normal
   background: #3b3341; color: #fff; font-weight: 600; font-size: 13px; box-shadow: var(--shadow-up); transition: transform .45s cubic-bezier(.34, 1.56, .64, 1); }
 #backpill.on { transform: translate(-50%, 0); }
 #backpill:hover { background: var(--accent); }
+#backpill kbd { margin-left: 8px; padding: 1px 7px; border-radius: 6px; background: rgba(255, 255, 255, .18); font: 600 11px "Segoe UI", sans-serif; }

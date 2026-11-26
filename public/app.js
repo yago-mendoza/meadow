@@ -180,19 +180,25 @@ function itemHTML(it) {
 }
 // ---- signs: a tab standing out of an edge of a document, post-it, idea, task or frame; a click reads it -------------
 const signsOf = (id) => (S.signs || []).filter((g) => g.host === id);
-// A scribble that means nothing, always the same for one sign.
+// A little light-wood board, drawn: soft grain, four tiny nails, and a scribble that means nothing (always the same for one sign).
 function scribble(seed) {
   let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   const rnd = () => ((h = (h * 1103515245 + 12345) >>> 0) / 4294967296);
   let d = '';
   for (let row = 0; row < 2; row++) {
-    const y = 10 + row * 9; let x = 6; d += `M${x} ${y}`;
-    while (x < 40 - row * 8) { const nx = x + 3 + rnd() * 4; d += ` Q${(x + nx) / 2} ${y - 3 - rnd() * 4} ${nx} ${y + (rnd() - .5) * 2}`; x = nx; }
+    const y = 10.5 + row * 6.5; let x = 9; d += `M${x.toFixed(1)} ${y}`;
+    const end = 31 - row * 6 - rnd() * 3;
+    while (x < end) { const nx = Math.min(end, x + 2.2 + rnd() * 2.6); d += ` Q${((x + nx) / 2).toFixed(1)} ${(y - 1.8 - rnd() * 2.2).toFixed(1)} ${nx.toFixed(1)} ${(y + (rnd() - .5) * 1.4).toFixed(1)}`; x = nx; }
   }
-  return `<svg viewBox="0 0 46 28" width="46" height="28"><path d="${d}" fill="none" stroke="#5b3a1f" stroke-width="1.6" stroke-linecap="round" opacity=".8"/></svg>`;
+  return `<svg class="board" viewBox="0 0 40 26" width="40" height="26" aria-hidden="true">
+    <defs><linearGradient id="mw-wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbedd3"/><stop offset="1" stop-color="#efd6a8"/></linearGradient></defs>
+    <rect x=".6" y=".6" width="38.8" height="24.8" rx="5" fill="url(#mw-wood)" stroke="#e2c592" stroke-width=".9"/>
+    <path d="M3 6.5 Q14 5.2 22 6.8 T37 6 M3 19.5 Q12 21 21 19.4 T37 20.2 M5 13 Q9 12.4 12 13.2" stroke="#e8cfa0" stroke-width=".7" fill="none"/>
+    <g fill="#d3b07a"><circle cx="4" cy="4" r=".85"/><circle cx="36" cy="4" r=".85"/><circle cx="4" cy="22" r=".85"/><circle cx="36" cy="22" r=".85"/></g>
+    <path d="${d}" fill="none" stroke="#a07a4c" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 const signHTML = (g, extra = '') => `<div class="sign e-${g.edge}${extra}" data-sign="${g.id}" style="--t:${(g.t * 100).toFixed(1)}%" title="Clic para leer">
-  <i class="plank"></i><span class="board">${scribble(g.id)}</span></div>`;
+  <i class="plank"></i>${scribble(g.id)}</div>`;
 function signsHTML(id) { return signsOf(id).map((g) => signHTML(g)).join(''); }
 // Where a sign dropped at the pointer would stand: the edge of the thing under it nearest to the pointer.
 function signSpot(e) {
@@ -777,7 +783,7 @@ addEventListener('paste', (e) => {
 let clickT = null, backView = null, backT = null;
 const ease = (t) => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 let viewAnim = 0;
-function animateView(to, ms = 560) {
+function animateView(to, ms = 380) {
   const from = { ...S.view }, id = ++viewAnim, t0 = performance.now();
   const area = visibleArea(), cx = (area.l + area.r) / 2, cy = (area.t + area.b) / 2;
   const c0 = { x: (cx - from.x) / from.z, y: (cy - from.y) / from.z }, c1 = { x: (cx - to.x) / to.z, y: (cy - to.y) / to.z };
@@ -1078,7 +1084,8 @@ addEventListener('keydown', (e) => {
   if (edOpen()) { if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('.pop')) closeEditor(); return; }
   if (typing(e)) return;
   const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
-  if (e.key === ' ') { space = true; vp.classList.add('space'); e.preventDefault(); }
+  if (e.key === 'Enter' && $('#backpill').classList.contains('on')) { e.preventDefault(); $('#backpill').click(); }
+  else if (e.key === ' ') { space = true; vp.classList.add('space'); e.preventDefault(); }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && sel.size) removeIds([...sel]);
   else if (mod && key === 'z') { e.preventDefault(); doUndo(); }
   else if (mod && key === 'a') { e.preventDefault(); for (const el of world.querySelectorAll('[data-k]')) sel.add(el.dataset.id); paintSel(); }
