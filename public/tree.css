@@ -582,3 +582,38 @@ body.drag-hang #stage .ft { outline-offset: 1px; }
 .lwho { background: #fdf0e1; color: #b86a17; }
 .lst.s-plan { background: #ece6fa; color: #6a54a8; }
 .lrow.st-plan .lchk { border-color: #8c74cf; background: #ece6fa; }
+
+/* the tick, drawn: a clean check in the teal box (circle, list, line in a text) */
+.it.tarea.done::after, .lchk.on::after, .cm-chip-tarea.done .cm-chip-ico::after {
+  content: ''; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
+.it.tarea.done { display: grid; place-items: center; }
+.lchk { display: grid; place-items: center; padding: 0; }
+.cm-chip-tarea .cm-chip-ico { display: inline-grid; place-items: center; }
+
+/* ideas have states too */
+.tk-h.st-cruda { --sc: #fff7dc; --sf: #8a7262; } .tk-h.st-madurando { --sc: #fdf1dc; --sf: #9a6b1f; }
+.tk-h.st-lista { --sc: #e4f4e7; --sf: #3f7f4b; } .tk-h.st-descartada { --sc: #f0eef1; --sf: #8a8290; }
+.it.idea.st-lista { box-shadow: 0 0 0 2px #7cc48a, 0 1px 3px rgba(60, 40, 70, .15); } .it.idea.st-hecha { background: #d7efdc; }
+.it.idea.st-descartada { opacity: .45; filter: grayscale(1); }
+#ipeek.st-madurando { --ip-h: #fdf1dc; } #ipeek.st-lista, #ipeek.st-hecha { --ip-h: #e4f4e7; } #ipeek.st-descartada { --ip-h: #f0eef1; }
+
+/* see a frame's tasks / ideas */
+.fr-see { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; opacity: 0; transition: opacity .15s; }
+.fr-head:hover .fr-see { opacity: .6; } .fr-see:hover { opacity: 1 !important; background: #fff; }
+
+/* the list, with its filters */
+#list .lfil { flex-direction: column; align-items: stretch; gap: 6px; padding: 4px 4px 10px; }
+.lq { width: 100%; padding: 7px 10px; border: 1px solid #ece4ee; border-radius: 9px; font: 13px "Segoe UI", sans-serif; outline: none; background: #faf8fb; }
+.lq:focus { background: #fff; border-color: #d9c9e0; }
+.lf-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.lf-row > span:first-child { width: 46px; font: 600 11px "Segoe UI", sans-serif; color: #a397a5; }
+.lf-row button { padding: 3px 9px; border-radius: 20px; font: 600 11.5px "Segoe UI", sans-serif; color: #7a6f80; background: #f6f2f7; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lf-row button.on { background: var(--accent); color: #fff; }
+.lf-row button i { font-style: normal; margin-left: 4px; opacity: .8; }
+.lf-gap { flex: 1; }
+.lrow { padding-left: calc(8px + var(--d, 0) * 14px); }
+.lgrp { padding: 6px 8px 3px calc(8px + var(--d, 0) * 14px); font: 700 11.5px "Segoe UI", sans-serif; color: #8a7d8e; display: flex; gap: 6px; cursor: pointer; border-radius: 8px; }
+.lgrp:hover { color: var(--accent); background: #f8f4f9; }
+.lst { background: #eef3fb; color: #5a6f8f; }
+.lst.s-curso, .lst.s-madurando { background: #fdf1dc; color: #9a6b1f; } .lst.s-bloqueada { background: #fbe4e1; color: #a8463f; }
+.lst.s-hecha, .lst.s-lista { background: #e4f4e7; color: #3f7f4b; } .lst.s-descartada { background: #f0eef1; color: #8a8290; } .lst.s-cruda { background: #fff4d6; color: #8a7262; }

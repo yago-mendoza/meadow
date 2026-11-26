@@ -65,7 +65,7 @@ class ChipWidget extends WidgetType {
     const s = document.createElement('span');
     s.className = `cm-chip cm-chip-${this.kind}${this.done ? ' done' : ''}${this.missing ? ' missing' : ''}${this.st ? ' st-' + this.st : ''}`;
     const ico = document.createElement('span'); ico.className = 'cm-chip-ico';
-    ico.textContent = this.kind === 'idea' ? '💡' : this.done ? '✔' : '';
+    ico.textContent = this.kind === 'idea' ? '💡' : '';
     if (this.kind === 'tarea' && !this.missing) {
       ico.title = this.done ? 'Reabrir' : 'Hecha';
       ico.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); this.api.toggleTask?.(this.n); });

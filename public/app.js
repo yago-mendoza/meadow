@@ -284,7 +284,7 @@ function tidy() {
 
 // ---- drawing ---------------------------------------------------------------------------------------------------------
 const itemsAt = (id) => [...S.tasks, ...S.ideas].filter((t) => t.at === id);
-const circles = (id) => { const l = itemsAt(id); return l.length ? `<span class="its">${l.map((it) => `<i class="it ${it.kind}${it.done ? ' done' : ''}${it.kind === 'tarea' ? ' st-' + stOf(it) + (whoOf(it.who) === 'Agente' ? ' agent' : '') : ''}" data-it="${it.id}" data-drag="item:${it.id}">${it.kind === 'idea' ? '💡' : it.done ? '✔' : ''}</i>`).join('')}</span>` : ''; };
+const circles = (id) => { const l = itemsAt(id); return l.length ? `<span class="its">${l.map((it) => `<i class="it ${it.kind}${it.done ? ' done' : ''}${' st-' + stOf(it) + (whoOf(it.who) === 'Agente' ? ' agent' : '')}" data-it="${it.id}" data-drag="item:${it.id}">${it.kind === 'idea' ? '💡' : ''}</i>`).join('')}</span>` : ''; };
 function frameHTML(id, depth) {
   const f = nd(id), at = activeTab(f), t = nd(at), tabs = f.kids.map(nd);
   const kids = t.kids.map((k) => (nd(k).kind === 'frame' ? (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)) : docHTML(k))).join('');
@@ -295,7 +295,7 @@ function frameHTML(id, depth) {
       ${circles(id)}${tabs.length > 1 ? circles(at) : ''}
       <span class="grow"></span>
       <span class="fr-pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</span>
-      ${depth || S.focus !== id ? '<button class="fr-in" title="Entrar">⤢</button>' : '<button class="fr-out" title="Salir (Esc)">⤡ Salir</button>'}<button class="fr-x" title="Borrar o guardar en el cajón">×</button>
+      <button class="fr-see" data-see="tarea" title="Ver sus tareas"><span class="ed-task-ico"></span></button><button class="fr-see" data-see="idea" title="Ver sus ideas">💡</button>${depth || S.focus !== id ? '<button class="fr-in" title="Entrar">⤢</button>' : '<button class="fr-out" title="Salir (Esc)">⤡ Salir</button>'}<button class="fr-x" title="Borrar o guardar en el cajón">×</button>
     </div>
     <div class="fr-body" data-drop="into" data-id="${at}">${kids || '<div class="hint">Vacío · arrastra aquí documentos o marcos</div>'}</div>
   </section>`;
@@ -397,15 +397,52 @@ function renderDrawer() {
   $('#dr-list').innerHTML = `<div class="dr-h"><b>Cajón</b>${S.drawer.length ? '<button class="dr-empty">Vaciar</button>' : ''}</div>`
     + (rows ? `<div class="dr-rows">${rows}</div>` : '<div class="dr-none"><span class="dr-big">🗄</span>Arrastra aquí lo que quieras apartar; vuelve a sacarlo cuando quieras.</div>');
 }
-let listTab = 'tareas', listWho = 'Todas', listDone = false;
 function nestPath(id) { return id ? pathOf(id).filter((n) => n.kind !== 'project' && !(n.kind === 'ftab' && parent(n.id)?.kids.length === 1) && !(n.kind === 'dtab' && parent(n.id)?.kids.length === 1)).map((n) => n.title).join(' › ') : ''; }
+// ---- the list of tasks or ideas: search, where (everything, here, one container or page), state, for whom; flat or nested
+let listTab = 'tareas', listWho = 'Todas', listScope = null, listQ = '', listNested = false;
+const listSt = { tarea: null, idea: null };                                  // null: everything except finished / discarded
+const tabsUsing = (it) => Object.values(S.nodes).filter((n) => n.kind === 'dtab' && (n.text || '').includes(token(it))).map((n) => n.id);
+const placeOf = (it) => (it.at && nd(it.at) ? it.at : tabsUsing(it)[0] || null);
+const hereId = () => (cur ? cur : S.focus);
+function inScope(it, sid) { const n = nd(sid); if (!n) return true; return [it.at, ...tabsUsing(it)].filter(Boolean).some((p) => p === sid || isIn(p, sid)); }
+function openList(kind, scope) { listTab = kind === 'idea' ? 'ideas' : 'tareas'; listScope = scope || null; $('#list').classList.remove('closed'); renderList(); }
+const scopeName = (id) => { const n = nd(id); if (!n) return ''; return n.kind === 'dtab' ? parent(id).title + ' › ' + n.title : n.title; };
 function renderList() {
-  const rows = (l) => l.map((it) => `<div class="lrow${it.done ? ' done' : ''}${it.kind === 'tarea' ? ' st-' + stOf(it) : ''}" data-at="${it.at || ''}" data-it="${it.id}">${it.kind === 'idea' ? '<span class="lic">💡</span>' : `<button class="lchk${it.done ? ' on' : ''}" data-chk="${it.id}">${it.done ? '✔' : ''}</button>`}<div><div class="ltx">${esc(it.text) || '…'}</div><div class="lsub">${it.kind === 'tarea' && whoOf(it.who) === 'Agente' ? '<b class="lwho">Agente</b>' : ''}${it.kind === 'tarea' && stOf(it) !== 'pendiente' && stOf(it) !== 'hecha' ? `<b class="lst s-${stOf(it)}">${TSTATES.find((x) => x[0] === stOf(it))[1]}</b>` : ''}${esc(nestPath(it.at) || (docsUsing(it).length ? 'en «' + docsUsing(it)[0].title + '»' : 'sin sitio'))}</div></div></div>`).join('');
+  const kind = listTab === 'ideas' ? 'idea' : 'tarea', all = listOf(kind), states = STATES[kind];
+  const on = listSt[kind] || new Set(states.map((s) => s[0]).filter((k) => k !== 'hecha' && k !== 'descartada'));
+  const scope = listScope === 'here' ? hereId() : listScope;
+  const q = listQ.trim().toLowerCase();
+  const l = all.filter((it) => on.has(stOf(it)) && (listWho === 'Todas' || whoOf(it.who) === listWho) && (!scope || inScope(it, scope))
+    && (!q || [it.text, it.body, it.notes].some((x) => (x || '').toLowerCase().includes(q))))
+    .sort((a, b) => states.findIndex((s) => s[0] === stOf(a)) - states.findIndex((s) => s[0] === stOf(b)));
+  const row = (it, d = 0) => `<div class="lrow st-${stOf(it)}${it.done ? ' done' : ''}" style="--d:${d}" data-it="${it.id}">${kind === 'idea' ? '<span class="lic">💡</span>' : `<button class="lchk${it.done ? ' on' : ''}" data-chk="${it.id}" title="${it.done ? 'Reabrir' : 'Hecha'}"></button>`}<div><div class="ltx">${esc(it.text) || '…'}</div><div class="lsub">${whoOf(it.who) === 'Agente' ? '<b class="lwho">Agente</b>' : ''}<b class="lst s-${stOf(it)}">${stLabel(it)}</b>${listNested ? '' : esc(nestPath(placeOf(it)) || 'sin sitio')}</div></div></div>`;
+  let body = '';
+  if (!listNested) body = l.map((it) => row(it)).join('');
+  else {   // nested: under the containers they hang on, as in the tree
+    const root = { kids: new Map(), items: [] };
+    for (const it of l) {
+      const p = placeOf(it); let node = root;
+      for (const n of p ? pathOf(p).filter((n) => n.kind !== 'project' && !(n.kind === 'ftab' && parent(n.id)?.kids.length === 1) && !(n.kind === 'dtab' && parent(n.id)?.kids.length === 1)) : [{ id: '-', title: 'Sin sitio', kind: '' }]) {
+        if (!node.kids.has(n.id)) node.kids.set(n.id, { n, kids: new Map(), items: [] }); node = node.kids.get(n.id);
+      }
+      node.items.push(it);
+    }
+    const ico = { area: '▤', frame: '⬚', ftab: '▭', doc: '📄', dtab: '▭' };
+    const walk = (node, d) => {
+      if (node.n) body += `<div class="lgrp" style="--d:${d}"${node.n.id !== '-' ? ` data-scope="${node.n.id}" title="Ver solo lo de aquí"` : ''}><span>${ico[node.n.kind] || '·'}</span>${esc(node.n.title)}</div>`;
+      body += node.items.map((it) => row(it, node.n ? d + 1 : d)).join('');
+      for (const k of node.kids.values()) walk(k, node.n ? d + 1 : d);
+    };
+    walk(root, 0);
+  }
+  const chip = (attr, label, sel, extra = '') => `<button ${attr} class="${sel ? 'on' : ''}"${extra}>${label}</button>`;
+  $('#list-body').innerHTML = `<div class="lfil">
+      <input class="lq" placeholder="Buscar…" value="${esc(listQ)}">
+      <div class="lf-row"><span>Dónde</span>${chip('data-lscope=""', 'Todo', !listScope)}${chip('data-lscope="here"', 'Aquí · ' + esc(scopeName(hereId())), listScope === 'here')}${listScope && listScope !== 'here' ? chip(`data-lscope="${listScope}"`, esc(scopeName(listScope)) + ' <i data-lscope="">×</i>', true) : ''}</div>
+      <div class="lf-row"><span>Estado</span>${states.map(([k, lab]) => chip(`data-lst="${k}"`, lab, on.has(k))).join('')}</div>
+      <div class="lf-row"><span>Para</span>${['Todas', ...WHO].map((w) => chip(`data-lw="${w}"`, w, w === listWho)).join('')}<span class="lf-gap"></span>${chip('data-lnest', '⌥ Anidadas', listNested, ' title="Agruparlas bajo donde están"')}</div>
+    </div>${body || `<p class="none">${all.length ? 'Nada con estos filtros.' : kind === 'tarea' ? 'Sin tareas todavía.' : 'Sin ideas todavía.'}</p>`}`;
   for (const b of document.querySelectorAll('#list nav button')) b.classList.toggle('on', b.dataset.l === listTab);
-  const order = { curso: 0, bloqueada: 1, plan: 2, pendiente: 3, hecha: 4 };
-  const l = listTab === 'tareas' ? S.tasks.filter((t) => (listWho === 'Todas' || whoOf(t.who) === listWho) && (listDone || !t.done)).sort((a, b) => order[stOf(a)] - order[stOf(b)]) : S.ideas;
-  const fil = listTab === 'tareas' ? `<div class="lfil">${['Todas', ...whoList()].map((w) => `<button data-lw="${esc(w)}" class="${w === listWho ? 'on' : ''}">${esc(w)}</button>`).join('')}<button data-ldone class="${listDone ? 'on' : ''}">✓ Hechas</button></div>` : '';
-  $('#list-body').innerHTML = fil + rows(l) || `<p class="none">${listTab === 'tareas' ? 'Sin tareas. Arrastra «Tarea» a cualquier sitio.' : 'Sin ideas todavía.'}</p>`;
 }
 function renderAll() { tidy(); renderAreas(); renderTop(); renderStage(); renderMap(); renderDrawer(); renderList(); renderDock(); if (cur) renderEdHead(); }
 
@@ -649,6 +686,7 @@ addEventListener('click', (e) => {
     const el = $(`.ar[data-area="${g.id}"] .ar-t`); if (el) editInline(el, (v) => { if (v) { g.title = v; save(); } renderAll(); }); return;
   }
   if (t.closest('.fr-out')) return zoomOut();
+  const see = t.closest('.fr-see'); if (see) return openList(see.dataset.see, see.closest('.fr').dataset.id);
   const fin = t.closest('.fr-in'); if (fin) return focusTo(fin.closest('.fr').dataset.id);
   const pal = t.closest('.fr-pal i'); if (pal) { snap(); nd(pal.closest('.fr').dataset.id).color = pal.dataset.c; save(); return renderAll(); }
   const ftx = t.closest('.ft-x'); if (ftx) return askDelete(ftx.closest('.ft').dataset.tab, ftx);
@@ -675,7 +713,10 @@ addEventListener('click', (e) => {
   const drc = t.closest('.dr-chip'); if (drc) { const n = nd(drc.dataset.id); if (n.kind === 'doc') openDoc(n.id); return; }
   const lchk = t.closest('[data-chk]'); if (lchk) return toggleTask(S.tasks.find((x) => x.id === lchk.dataset.chk));
   const lw = t.closest('[data-lw]'); if (lw) { listWho = lw.dataset.lw; return renderList(); }
-  if (t.closest('[data-ldone]')) { listDone = !listDone; return renderList(); }
+  const lsc = t.closest('[data-lscope]'); if (lsc) { listScope = lsc.dataset.lscope || null; return renderList(); }
+  const lgr = t.closest('.lgrp[data-scope]'); if (lgr) { listScope = lgr.dataset.scope; return renderList(); }
+  const lst = t.closest('[data-lst]'); if (lst) { const k = listTab === 'ideas' ? 'idea' : 'tarea'; const on = listSt[k] || new Set(STATES[k].map((x) => x[0]).filter((x) => x !== 'hecha' && x !== 'descartada')); on.has(lst.dataset.lst) ? on.delete(lst.dataset.lst) : on.add(lst.dataset.lst); listSt[k] = on; return renderList(); }
+  if (t.closest('[data-lnest]')) { listNested = !listNested; return renderList(); }
   const lrow = t.closest('.lrow'); if (lrow && !t.closest('[data-chk]')) return openTask([...S.tasks, ...S.ideas].find((x) => x.id === lrow.dataset.it));
   if (lrow) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === lrow.dataset.it); if (it?.at) return focusTo(nd(it.at).kind === 'ftab' ? parent(it.at).id : it.at); const d = it && docsUsing(it)[0]; if (d) openDoc(d.id); return; }
   const lb = t.closest('#list nav button'); if (lb) { listTab = lb.dataset.l; return renderList(); }
@@ -790,6 +831,7 @@ $('#list-btn').onclick = () => $('#list').classList.toggle('closed');
 // a click anywhere else closes the side list
 addEventListener('pointerdown', (e) => { if (!$('#list').classList.contains('closed') && !e.target.closest('#list, #list-btn, #pick, #toasts, #ipeek, #task, .pop')) $('#list').classList.add('closed'); }, true);
 addEventListener('resize', () => renderMap());
+$('#list').addEventListener('input', (e) => { if (!e.target.matches('.lq')) return; listQ = e.target.value; const at = e.target.selectionStart; renderList(); const q = $('#list .lq'); q.focus(); q.setSelectionRange(at, at); });
 
 // ---- what an idea or a task says, on hover --------------------------------------------------------------------------
 let peekT = null;
@@ -800,8 +842,8 @@ function showPeek(el, focus) {
   const it = [...S.ideas, ...S.tasks].find((x) => x.id === el.dataset.it); if (!it) return;
   const r = el.getBoundingClientRect();
   peekBox.dataset.id = it.id;
-  peekBox.className = 'k-' + it.kind + (it.done ? ' done' : '') + (it.kind === 'tarea' ? ' st-' + stOf(it) : '');
-  peekBox.innerHTML = `<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea' : 'Tarea · ' + TSTATES.find((x) => x[0] === stOf(it))[1] + (whoOf(it.who) === 'Agente' ? ' · para el agente' : '')}</span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="Quitar"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Quitar</span></button></div>${true ? `<div class="ip-t ip-open" title="Abrir">${esc(it.text || '…')}${it.body ? `<small>${esc(it.body.slice(0, 160))}${it.body.length > 160 ? '…' : ''}</small>` : ''}</div>` : `<div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`}`;
+  peekBox.className = 'k-' + it.kind + (it.done ? ' done' : '') + ' st-' + stOf(it);
+  peekBox.innerHTML = `<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea · ' + stLabel(it) : 'Tarea · ' + stLabel(it) + (whoOf(it.who) === 'Agente' ? ' · para el agente' : '')}</span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="Quitar"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Quitar</span></button></div>${true ? `<div class="ip-t ip-open" title="Abrir">${esc(it.text || '…')}${it.body ? `<small>${esc(it.body.slice(0, 160))}${it.body.length > 160 ? '…' : ''}</small>` : ''}</div>` : `<div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`}`;
   const left = Math.min(innerWidth - 300, Math.max(8, r.left + r.width / 2 - 145));
   Object.assign(peekBox.style, { left: left + 'px', top: r.bottom + 10 + 'px' }); peekBox.style.setProperty('--ax', (r.left + r.width / 2 - left) + 'px');
   peekBox.classList.add('on');
@@ -838,8 +880,13 @@ peekBox.addEventListener('click', (e) => {
 });
 
 // ---- a task is a small document: its plan (with versions), what to keep in mind, its state, who it is for, comments -
-const TSTATES = [['pendiente', 'Por empezar'], ['plan', 'Plan revisado'], ['curso', 'En curso'], ['hecha', 'Hecha'], ['bloqueada', 'Bloqueada']];
-const stOf = (it) => it.state || (it.done ? 'hecha' : 'pendiente');
+const STATES = {
+  tarea: [['pendiente', 'Por empezar'], ['plan', 'Plan revisado'], ['curso', 'En curso'], ['hecha', 'Hecha'], ['bloqueada', 'Bloqueada']],
+  idea: [['cruda', 'Cruda'], ['madurando', 'Madurando'], ['lista', 'Lista'], ['hecha', 'Hecha'], ['descartada', 'Descartada']],
+};
+const TSTATES = STATES.tarea;
+const stOf = (it) => it.state || (it.done ? 'hecha' : it.kind === 'idea' ? 'cruda' : 'pendiente');
+const stLabel = (it) => STATES[it.kind].find((x) => x[0] === stOf(it))?.[1] || '';
 const WHO = ['Yo', 'Agente'];
 const whoOf = (w) => (!w || w === 'Yo' ? 'Yo' : 'Agente');            // older names (Claude, Qwen…) are the agent
 const whoList = () => WHO;
@@ -856,7 +903,7 @@ function taskEdit(fn) { if (!taskSnapped) { snap(); taskSnapped = true; } fn(); 
 function openTask(it) {
   if (!it) return;
   clearTimeout(peekT); peekBox.classList.remove('on');
-  taskOpen = it.id; taskSnapped = false; planAt = it.kind === 'tarea' ? plansOf(it).length - 1 : 0; paintTask();
+  taskOpen = it.id; taskSnapped = false; planAt = plansOf(it).length - 1; paintTask();
   const box = $('#task'); box.hidden = false;
   box.querySelector('.tk-in').animate([{ opacity: 0, transform: 'translateY(10px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
   if (!it.text) box.querySelector('.tk-title').focus();
@@ -873,29 +920,27 @@ function closeTask() {
 function paintTask() {
   const it = taskNow(); if (!it) return closeTask();
   const idea = it.kind === 'idea', st = idea ? 'idea' : stOf(it), where = it.at && nd(it.at) ? nestPath(it.at) : '', inDocs = docsUsing(it);
-  const plans = idea ? null : plansOf(it), pl = plans?.[planAt];
+  const plans = plansOf(it), pl = plans[planAt];
   const comments = (it.log || []).map((e, i) => ({ ...e, i })).filter((e) => !e.auto);
   $('#task .tk-in').innerHTML = `
     <header class="tk-h st-${st}">
       <span class="tk-k" title="${DEF[it.kind]}">${idea ? '💡 Idea' : 'Tarea'}</span>
-      ${idea ? '<span class="tk-def">' + DEF.idea.slice(6) + '</span>' : `<span class="tk-st">${TSTATES.map(([k, l]) => `<button data-st="${k}" class="s-${k}${k === st ? ' on' : ''}">${l}</button>`).join('')}</span>`}
+      ${`<span class="tk-st">${STATES[it.kind].map(([k, l]) => `<button data-st="${k}" class="s-${k}${k === st ? ' on' : ''}">${l}</button>`).join('')}</span>`}
       <button class="tk-x" title="Cerrar (Esc)">×</button>
     </header>
     <div class="tk-body">
       <div class="tk-title" contenteditable="true" spellcheck="false" data-ph="${idea ? 'La idea, en una línea…' : 'Qué hay que hacer, en una línea…'}">${esc(it.text || '')}</div>
       <div class="tk-meta">
-        ${idea ? '' : `<span class="tk-lab">Para</span>${WHO.map((w) => `<button class="tk-who w-${w === 'Yo' ? 'yo' : 'ag'}${whoOf(it.who) === w ? ' on' : ''}" data-who="${w}">${w}</button>`).join('')}`}
+        ${`<span class="tk-lab">Para</span>${WHO.map((w) => `<button class="tk-who w-${w === 'Yo' ? 'yo' : 'ag'}${whoOf(it.who) === w ? ' on' : ''}" data-who="${w}">${w}</button>`).join('')}`}
         ${where || inDocs.length ? `<span class="tk-where"><span class="tk-lab">En</span>${where ? `<button data-go-at title="Ir allí">${esc(where)}</button>` : ''}${inDocs.map((d) => `<button data-go-doc="${d.id}" title="Abrir el documento">📄 ${esc(d.title)}</button>`).join('')}</span>` : ''}
       </div>
-      ${idea ? `<div class="tk-sec">Qué idea es</div>
-      <div class="tk-area" contenteditable="true" spellcheck="false" data-f="body" data-ph="Cuéntala…">${esc(it.body || '')}</div>`
-      : `<div class="tk-sec tk-plan-h"><span>El plan</span>
+      ${`<div class="tk-sec tk-plan-h"><span>${idea ? 'La idea' : 'El plan'}</span>
         <span class="tk-ver">${plans.length > 1 ? `<button data-pv="-1" ${planAt ? '' : 'disabled'} title="Versión anterior">‹</button><span>Versión ${planAt + 1} de ${plans.length} · ${whenStr(pl.t)}</span><button data-pv="1" ${planAt < plans.length - 1 ? '' : 'disabled'} title="Versión siguiente">›</button>` : ''}
         <button class="tk-newver" title="Guarda esta versión tal como está y empieza otra a partir de ella">＋ Nueva versión</button></span></div>
-      <div class="tk-area${planAt < plans.length - 1 ? ' old' : ''}" contenteditable="true" spellcheck="false" data-plan="${planAt}" data-ph="Cómo se va a hacer…">${esc(pl.text || '')}</div>`}
+      <div class="tk-area${planAt < plans.length - 1 ? ' old' : ''}" contenteditable="true" spellcheck="false" data-plan="${planAt}" data-ph="${idea ? 'Cuéntala…' : 'Cómo se va a hacer…'}">${esc(pl.text || '')}</div>`}
       <div class="tk-sec">A tener en cuenta</div>
       <div class="tk-area" contenteditable="true" spellcheck="false" data-f="notes" data-ph="${idea ? 'Lo que la limita o la condiciona…' : 'Lo importante para hacerla bien…'}">${esc(it.notes || '')}</div>
-      ${idea ? '' : `<div class="tk-sec">Comentarios</div>
+      ${`<div class="tk-sec">Comentarios</div>
       <div class="tk-log">${comments.length ? comments.map((e) => `<div class="tk-e by-${whoOf(e.by) === 'Yo' ? 'yo' : 'ag'}"><div class="tk-e-h"><b>${whoOf(e.by)}</b><time>${whenStr(e.t)}</time><button data-rm-log="${e.i}" title="Borrar el comentario">×</button></div><span>${esc(e.text)}</span></div>`).join('') : '<p class="tk-none">Por ahora nadie ha dejado aquí un comentario.</p>'}</div>
       <div class="tk-say"><span class="tk-by">${WHO.map((w) => `<button class="w-${w === 'Yo' ? 'yo' : 'ag'}${commentBy === w ? ' on' : ''}" data-by="${w}">${w}</button>`).join('')}</span>
         <div class="tk-log-in" contenteditable="true" spellcheck="false" data-ph="Lo que se ha hecho, lo que se piensa… (Enter)"></div></div>`}
@@ -1032,7 +1077,17 @@ function restoreFrom(el) {   // the reverse: out of the dock, growing whole into
     { duration: 400, easing: 'cubic-bezier(.2,.8,.25,1)' });
 }
 $('#ed-min').onclick = minimize;
-$('#ed-task').onclick = () => { if (!ed) return; const it = newItem('tarea', '', null); save(); ed.insertAtCursor('{tarea ' + it.n + '}'); openTask(it); };
+function edItemMenu(kind, anchor) {
+  if (!ed || !cur) return;
+  const d = nd(cur), name = kind === 'idea' ? 'idea' : 'tarea', plural = kind === 'idea' ? 'ideas' : 'tareas';
+  const insert = { label: kind === 'idea' ? '💡 Insertar una idea aquí' : '☐ Insertar una tarea aquí', run: () => { const it = newItem(kind, '', null); save(); ed.insertAtCursor('{' + kind + ' ' + it.n + '}'); openTask(it); } };
+  const see = d.kids.length > 1
+    ? [{ label: `Ver las ${plural} de todo el documento`, run: () => openList(kind, cur) }, ...d.kids.map((k) => ({ label: `Ver las de la pestaña «${nd(k).title}»`, run: () => openList(kind, k) }))]
+    : [{ label: `Ver las ${plural} de este documento`, run: () => openList(kind, cur) }];
+  askChoice(anchor, kind === 'idea' ? 'Ideas' : 'Tareas', '', [insert, ...see]);
+}
+$('#ed-task').onclick = (e) => edItemMenu('tarea', e.currentTarget);
+$('#ed-idea').onclick = (e) => edItemMenu('idea', e.currentTarget);
 $('#dock').addEventListener('click', (e) => {
   const x = e.target.closest('.dk-x'), k = e.target.closest('.dk'); if (!k) return;
   const id = k.dataset.doc, m = mins.find((q) => q.id === id);
