@@ -1028,3 +1028,9 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 .cm-line.cm-h1, .ied .cm-line.cm-h1 { background: none; padding-left: .7em !important; padding-top: .8em !important; padding-bottom: .45em !important; }
 .cm-line.cm-h1.cm-hfirst, .ied .cm-line.cm-h1.cm-hfirst { padding-top: 0 !important; }
 .doc.near .rh1 { padding: .6em 0 .35em .7em; }
+
+/* a page in a frame wears the frame's colour: its ## / ### bands and its title pills */
+.tinted .cm-line.cm-h2, .doc.tinted.near .rh2 { background: color-mix(in srgb, var(--tint) 75%, #fff); }
+.tinted .cm-line.cm-h3, .doc.tinted.near .rh3 { background: color-mix(in srgb, var(--tint) 38%, #fff); }
+.tinted .cm-hmark { background: color-mix(in srgb, var(--tint) 55%, #5a4660); }
+.tinted .cm-hmark:hover { background: color-mix(in srgb, var(--tint) 35%, #3b2a40); }

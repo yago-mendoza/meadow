@@ -271,10 +271,17 @@ $('#z-fit').onclick = () => {
 
 // ---- rendering -----------------------------------------------------------------------------------------------------
 const palHTML = () => `<div class="pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</div>`;
+function docTint(d) {
+  if (!d || d.place !== 'canvas') return '';
+  const el = elOf(d.id), [w, h] = el ? sizeOf(el, d) : [DOC_W, 260], cx = d.x + w / 2, cy = d.y + h / 2;
+  const f = S.frames.filter((g) => cx > g.x && cx < g.x + g.w && cy > g.y && cy < g.y + g.h).sort((p, q) => p.w * p.h - q.w * q.h)[0];
+  return f?.color || '';
+}
 function docHTML(d, n) {
   const text = readable((d.text || '').replace(/^\s*#{1,6}\s+.*(\n|$)/, '').replace(/^\n+/, ''));
   const words = (text.match(/\S+/g) || []).length;
-  return `<div class="doc${sel.has(d.id) ? ' sel' : ''}" data-id="${d.id}" data-k="d" style="left:${d.x}px;top:${d.y}px;z-index:${d.z || 0};--s:${d.s || 1}">
+  const tint = docTint(d);
+  return `<div class="doc${sel.has(d.id) ? ' sel' : ''}${tint ? ' tinted' : ''}" data-id="${d.id}" data-k="d" style="left:${d.x}px;top:${d.y}px;z-index:${d.z || 0};--s:${d.s || 1}${tint ? ';--tint:' + tint : ''}">
     <div class="page">
       <div class="dtitle">${esc(d.name)}</div>
       <div class="dbody">${text ? esc(text.split('\n').slice(0, 14).join('\n')) : NOTHING_DOC}</div>
@@ -2352,6 +2359,7 @@ function openEditor(id, push = true) {
   $('#ed').classList.add('open');
   if (!ed) ed = createEditor($('#ed-body'), edApi);
   ed.setDoc(d.text || '');
+  const tint = docTint(d); $('#ed').classList.toggle('tinted', !!tint); if (tint) $('#ed').style.setProperty('--tint', tint); else $('#ed').style.removeProperty('--tint');
   fillHead(); ed.focus();
 }
 function fillHead() {
