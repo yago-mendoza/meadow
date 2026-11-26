@@ -239,3 +239,8 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .ar-add { margin-top: 6px; padding: 7px 12px; border-radius: 10px; text-align: left; font-size: 12.5px; color: #a99cab; }
 .ar-add:hover { background: #efe9f0; color: var(--accent); }
 .mr.k-area { background: #fbf9fc; border: 1px solid #e4dce8; }
+/* every area reads as a button; the open one stands out */
+.ar { background: #fbfafc; border: 1px solid #e4dde8; box-shadow: 0 1px 2px rgba(60, 40, 70, .06); }
+.ar:hover { background: #fff; border-color: #d5cadb; box-shadow: var(--shadow); }
+.ar.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 3px 10px rgba(113, 75, 103, .28); }
+.ar.on i { color: rgba(255, 255, 255, .75); }
