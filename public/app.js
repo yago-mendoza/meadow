@@ -333,7 +333,7 @@ function renderAreas(peek) {
     cols.push({ pid, ids: nd(pid).kids.filter((k) => nd(k)?.kind === 'area') });
     const nx = chain[lv]; if (!nx || lv + 1 >= depth) break; pid = nx;   // always as many columns as levels: an area with none inside shows an empty one
   }
-  const btn = (k, i) => { const a = nd(k), g = isGroup(a); return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><span class="ar-t">${esc(a.title)}</span><i>${a.kids.length || ''}</i><b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
+  const btn = (k, i) => { const a = nd(k), g = isGroup(a); return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span><i>${a.kids.length || ''}</i><b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
   const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b></span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.map(btn).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; paintHov(); }   // unchanged: leave it (keeps hover, double clicks)
@@ -445,7 +445,7 @@ function renderList() {
     </div>${body || `<p class="none">${all.length ? 'Nada con estos filtros.' : kind === 'tarea' ? 'Sin tareas todavía.' : 'Sin ideas todavía.'}</p>`}`;
   for (const b of document.querySelectorAll('#list nav button')) b.classList.toggle('on', b.dataset.l === listTab);
 }
-function renderAll() { tidy(); renderAreas(); renderTop(); renderStage(); renderMap(); renderDrawer(); renderList(); renderDock(); if (cur) renderEdHead(); }
+function renderAll() { tidy(); renderAreas(); renderTop(); renderStage(); renderMap(); renderDrawer(); renderList(); renderDock(); if (cur) renderEdHead(); paintSel(); }
 
 // ---- zooming in and out of frames (the frame grows from where it was / shrinks back to its place) -------------------
 function glideFrom(el, r0, ms = 420) {
@@ -1030,6 +1030,132 @@ $('#task').addEventListener('click', (e) => {
   }
 });
 
+// ---- selecting, to copy context by hand -------------------------------------------------------------------------------
+// A click goes round: with everything inside (solid edge) → only itself (dashed) → out. Ideas and tasks: in or out.
+// The pill at the bottom says what is in and copies it as one Markdown text.
+const SEL = new Map(JSON.parse(localStorage.getItem('meadow.sel.' + P) || '[]'));   // id → 'all' | 'self'
+const selInc = Object.assign({ ideas: true, tareas: true, texto: true }, JSON.parse(localStorage.getItem('meadow.selinc') || '{}'));
+let selMode = false;
+const selKeep = () => { localStorage.setItem('meadow.sel.' + P, JSON.stringify([...SEL])); localStorage.setItem('meadow.selinc', JSON.stringify(selInc)); };
+const isItemId = (id) => [...S.tasks, ...S.ideas].some((x) => x.id === id);
+function selRotate(id, item) {
+  const m = SEL.get(id);
+  if (item) m ? SEL.delete(id) : SEL.set(id, 'all');
+  else if (!m) SEL.set(id, 'all'); else if (m === 'all') SEL.set(id, 'self'); else SEL.delete(id);
+  selKeep(); paintSel();
+}
+function setSelMode(on) {
+  selMode = on; document.body.classList.toggle('selmode', on); $('#sel-btn').classList.toggle('on', on);
+  if (on) { $('#list').classList.add('closed'); toast('Clic: con todo lo de dentro · otro clic: solo él · otro: fuera'); }
+  paintSel();
+}
+// what is inside something chosen «with everything» is in too (lighter)
+function selUnder(id) { for (const [k, m] of SEL) if (m === 'all' && k !== id && nd(k) && nd(id) && isIn(id, k)) return true; return false; }
+function paintSel() {
+  for (const el of document.querySelectorAll('.sel-all, .sel-self, .sel-in')) el.classList.remove('sel-all', 'sel-self', 'sel-in');
+  const mark = (el, id) => { const m = SEL.get(id); if (m) el.classList.add(m === 'all' ? 'sel-all' : 'sel-self'); else if (selUnder(id)) el.classList.add('sel-in'); };
+  for (const el of document.querySelectorAll('#stage .fr[data-id], #stage .dc[data-id], #areas .ar[data-area]')) mark(el, el.dataset.id || el.dataset.area);
+  for (const el of document.querySelectorAll('#stage .ft[data-tab]')) mark(el, el.dataset.tab);
+  for (const el of document.querySelectorAll('#stage [data-pg]')) mark(el, el.dataset.pg);
+  for (const el of document.querySelectorAll('#stage .it[data-it]')) { const it = [...S.tasks, ...S.ideas].find((x) => x.id === el.dataset.it); if (SEL.has(el.dataset.it)) el.classList.add('sel-all'); else if (it && placeOf(it) && (SEL.get(placeOf(it)) === 'all' || selUnder(placeOf(it)))) el.classList.add('sel-in'); }
+  paintSelPill();
+}
+// ---- the context, as Markdown ----
+const KNAME = { area: 'Apartado', frame: 'Marco', ftab: 'Pestaña', doc: 'Documento', dtab: 'Página' };
+function itemMD(it, pad = '') {
+  const head = it.kind === 'idea' ? `${pad}- 💡 ${it.text || '…'} (idea · ${stLabel(it)})` : `${pad}- [${it.done ? 'x' : ' '}] ${it.text || '…'} (tarea · ${stLabel(it)}${whoOf(it.who) === 'Agente' ? ' · para el agente' : ''})`;
+  const plan = (it.plans?.length ? it.plans.at(-1).text : it.body) || '';
+  const lines = [head];
+  if (plan.trim()) lines.push(`${pad}  ${it.kind === 'idea' ? 'La idea' : 'El plan'}: ${plan.trim().replace(/\n/g, '\n' + pad + '  ')}`);
+  if ((it.notes || '').trim()) lines.push(`${pad}  A tener en cuenta: ${it.notes.trim().replace(/\n/g, '\n' + pad + '  ')}`);
+  const bl = it.kind === 'tarea' ? blockers(it).filter((x) => !x.done) : [];
+  if (bl.length) lines.push(`${pad}  La bloquean: ${bl.map((x) => '«' + (x.text || '…') + '»').join(', ')}`);
+  for (const e of (it.log || []).filter((e) => !e.auto)) lines.push(`${pad}  ${whoOf(e.by)} (${whenStr(e.t)}): ${e.text}`);
+  return lines.join('\n');
+}
+const itemOn = (it) => (it.kind === 'idea' ? selInc.ideas : selInc.tareas);
+function buildContext() {
+  const out = [`# Contexto · ${nd(S.root).title}`], stats = { docs: 0, pages: 0, titles: 0, tareas: 0, ideas: 0, frames: 0 };
+  const seenItems = new Set();
+  const implicit = (n) => (n.kind === 'ftab' || n.kind === 'dtab') && parent(n.id)?.kids.length === 1;
+  const textOf = (t) => (t || '').replace(TOKEN_RE, (m, k, n) => { const it = listOf(k).find((x) => x.n === +n); return it ? `[${k}: ${it.text || '…'}]` : m; });
+  // Markdown has six levels and the tree is deeper: every container is a «##» section named by its whole path,
+  // a page is «###», and the titles inside a text go three levels down. A container with nothing of its own shows
+  // no empty heading (its path is in what follows), unless it was chosen «only itself».
+  const where = (id) => pathOf(id).filter((x) => x.kind !== 'project' && !implicit(x)).map((x) => x.title).join(' › ');
+  const take = (list) => { const l = list.filter((it) => itemOn(it) && !seenItems.has(it.id)); l.forEach((it) => { seenItems.add(it.id); stats[it.kind === 'idea' ? 'ideas' : 'tareas']++; }); return l; };
+  const walk = (id, inherit) => {
+    const n = nd(id); if (!n) return;
+    const mode = SEL.get(id) || (inherit ? 'all' : null);
+    if (mode && n.kind !== 'project' && !(n.kind === 'ftab' && implicit(n))) {
+      const here = mode === 'all' ? take(itemsAt(id)) : [];
+      if (n.kind === 'frame') stats.frames++;
+      if (n.kind === 'doc') { stats.docs++; out.push('', `## Documento: ${where(id)}`); }
+      else if (n.kind === 'dtab') {
+        stats.pages++;
+        if (!implicit(n)) out.push('', `### Página: ${n.title}`);
+        else if (SEL.get(id) || !SEL.get(parent(id).id) && !inherit) out.push('', `## Documento: ${where(parent(id).id)}`);
+        if (mode === 'all' && selInc.texto && (n.text || '').trim()) {
+          out.push('', textOf(n.text).trim().replace(/^(#{1,6})(?=\s)/gm, (h) => '#'.repeat(Math.min(6, h.length + 3))));
+          stats.titles += (n.text.match(/^#{1,6}\s/gm) || []).length;
+        }
+        if (mode === 'all') here.push(...take([...S.tasks, ...S.ideas].filter((it) => (n.text || '').includes(token(it)))));
+      } else if (mode === 'self' || here.length) out.push('', `## ${KNAME[n.kind] || ''}: ${where(id)}`);
+      if (here.length) out.push('', here.map((it) => itemMD(it)).join('\n'));
+    }
+    for (const k of n.kids) walk(k, mode === 'all');
+  };
+  walk(S.root, false);
+  const loose = [...S.tasks, ...S.ideas].filter((it) => SEL.has(it.id) && !seenItems.has(it.id));
+  if (loose.length) {
+    out.push('', '## Tareas e ideas');
+    for (const it of loose) { const p = placeOf(it); out.push('', itemMD(it) + (p ? `\n  En: ${nestPath(p)}` : '')); stats[it.kind === 'idea' ? 'ideas' : 'tareas']++; }
+  }
+  const text = out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  return { text, stats, words: (text.match(/\S+/g) || []).length, bytes: new Blob([text]).size };
+}
+function paintSelPill() {
+  const pill = $('#selpill'); const any = SEL.size > 0;
+  pill.classList.toggle('on', any || selMode);
+  if (!any) { pill.innerHTML = '<span class="sp-hint">Toca marcos, documentos, páginas, ideas o tareas para elegir qué copiar.</span><button class="sp-done">Listo</button>'; return; }
+  const c = buildContext(), s = c.stats;
+  const kb = c.bytes < 1024 ? c.bytes + ' B' : (c.bytes / 1024).toLocaleString('es', { maximumFractionDigits: 1 }) + ' KB';
+  const bits = [[s.frames, 'marco', 'marcos'], [s.docs, 'documento', 'documentos'], [s.pages, 'página', 'páginas'], [s.titles, 'título', 'títulos'], [s.tareas, 'tarea', 'tareas'], [s.ideas, 'idea', 'ideas']].filter((x) => x[0]).map(([n, a, b]) => `<b>${n}</b> ${n === 1 ? a : b}`);
+  pill.innerHTML = `<span class="sp-sum">${bits.join(' · ') || 'Nada con texto todavía'}<i>${c.words.toLocaleString('es')} palabras · ${kb}</i></span>
+    <span class="sp-inc"><button data-inc="texto" class="${selInc.texto ? 'on' : ''}" title="Incluir el texto de las páginas">¶ Texto</button><button data-inc="tareas" class="${selInc.tareas ? 'on' : ''}" title="Incluir las tareas">☐ Tareas</button><button data-inc="ideas" class="${selInc.ideas ? 'on' : ''}" title="Incluir las ideas">💡 Ideas</button></span>
+    <button class="sp-clear" title="Quitar toda la selección">Vaciar</button><button class="sp-copy">Copiar contexto</button>${selMode ? '<button class="sp-done" title="Salir de seleccionar (Esc)">Listo</button>' : '<button class="sp-more" title="Seguir seleccionando">◳</button>'}`;
+}
+async function copyContext() {
+  const { text, words } = buildContext();
+  try { await navigator.clipboard.writeText(text); }
+  catch { const ta = document.createElement('textarea'); ta.value = text; document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  window.__lastContext = text;
+  toast(`Contexto copiado · ${words.toLocaleString('es')} palabras`);
+}
+$('#sel-btn').onclick = () => setSelMode(!selMode);
+$('#selpill').addEventListener('click', (e) => {
+  const t = e.target;
+  const inc = t.closest('[data-inc]'); if (inc) { selInc[inc.dataset.inc] = !selInc[inc.dataset.inc]; selKeep(); return paintSelPill(); }
+  if (t.closest('.sp-clear')) { SEL.clear(); selKeep(); return paintSel(); }
+  if (t.closest('.sp-copy')) return copyContext();
+  if (t.closest('.sp-done')) return setSelMode(false);
+  if (t.closest('.sp-more')) return setSelMode(true);
+});
+// in selection mode a click chooses instead of opening (entering a frame, its buttons and the column still work)
+addEventListener('click', (e) => {
+  if (!selMode) return;
+  const t = e.target;
+  if (t.closest('#selpill, #top, .fr-in, .fr-out, .fr-x, .ft-add, .fr-pal, .fr-see, #pick, #toasts')) return;
+  const arEl = t.closest('#areas .ar');   // an area: its box, or the left part of its button
+  if (arEl && (t.closest('.ar-sel') || e.clientX - arEl.getBoundingClientRect().left < 36)) { e.preventDefault(); e.stopPropagation(); return selRotate(arEl.dataset.area); }
+  if (!t.closest('#stage')) return;
+  const it = t.closest('.it[data-it]'), pg = t.closest('[data-pg]'), ft = t.closest('.ft[data-tab]'), dc = t.closest('.dc[data-id]'), fr = t.closest('.fr[data-id]');
+  const pick = it ? [it.dataset.it, true] : pg ? [pg.dataset.pg] : ft ? [ft.dataset.tab] : dc ? [dc.dataset.id] : fr ? [fr.dataset.id] : null;
+  if (!pick) return;
+  e.preventDefault(); e.stopPropagation(); selRotate(pick[0], pick[1]);
+}, true);
+addEventListener('dblclick', (e) => { if (selMode && e.target.closest('#stage')) { e.preventDefault(); e.stopPropagation(); } }, true);
+
 // ---- the editor: a document, its tabs (pages), the writing ----------------------------------------------------------
 let ed = null, cur = null, curTab = null;
 const $ed = $('#ed');
@@ -1341,6 +1467,7 @@ addEventListener('keydown', (e) => {
   const typing = e.target.closest?.('input, textarea, [contenteditable="true"], .cm-editor');
   if (e.key === 'Escape') {
     if (taskOpen) { e.preventDefault(); return closeTask(); }
+    if (selMode) { e.preventDefault(); return setSelMode(false); }
     if ($('#pick').classList.contains('on')) return $('#pick').classList.remove('on');
     if (document.querySelector('.pop')) return;
     if (!$('#map').classList.contains('mini')) return mapOpen(false);
