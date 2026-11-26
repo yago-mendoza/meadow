@@ -9,8 +9,17 @@
 <link rel="stylesheet" href="tree.css">
 </head>
 <body>
+<section id="home" hidden>
+  <div class="hm-in">
+    <h1>🌿 Meadow</h1>
+    <div class="hm-actions"><button id="hm-new" class="hm-btn main">＋ Nuevo proyecto</button><button id="hm-add" class="hm-btn">📂 Abrir carpeta…</button></div>
+    <h2>Proyectos</h2>
+    <div id="hm-list"></div>
+    <p class="hm-root">Los proyectos nuevos se guardan en <b id="hm-root"></b> · <button id="hm-root-ch">Cambiar…</button></p>
+  </div>
+</section>
 <header id="top">
-  <div class="brand">🌿</div>
+  <button class="brand" id="to-home" title="Inicio: todos los proyectos">🌿</button>
   <nav id="crumbs"></nav>
   <div class="grow"></div>
   <div id="tools"></div>

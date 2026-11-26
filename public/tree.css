@@ -244,3 +244,32 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .ar:hover { background: #fff; border-color: #d5cadb; box-shadow: var(--shadow); }
 .ar.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 3px 10px rgba(113, 75, 103, .28); }
 .ar.on i { color: rgba(255, 255, 255, .75); }
+
+/* the start screen */
+#home { position: fixed; inset: 0; z-index: 200; background: #f6f6fa; overflow: auto; }
+#home[hidden] { display: none; }
+.hm-in { max-width: 780px; margin: 0 auto; padding: 70px 28px 40px; }
+#home h1 { margin: 0 0 22px; font: 700 30px "Segoe UI", sans-serif; color: #2f2735; }
+#home h2 { margin: 34px 0 10px; font: 700 12px "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #a397a5; }
+.hm-actions { display: flex; gap: 10px; }
+.hm-btn { padding: 11px 18px; border-radius: 12px; background: #fff; box-shadow: var(--shadow); font-weight: 600; font-size: 14px; color: #4a3f4d; }
+.hm-btn:hover { box-shadow: var(--shadow-up); transform: translateY(-1px); }
+.hm-btn.main { background: var(--accent); color: #fff; }
+#hm-list { display: flex; flex-direction: column; gap: 8px; }
+.hm-p { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: #fff; box-shadow: 0 1px 2px rgba(60, 40, 70, .06); cursor: pointer; border: 1px solid #ece6ee; }
+.hm-p:hover { box-shadow: var(--shadow-up); border-color: #ddd3e0; }
+.hm-p.gone { opacity: .55; cursor: default; }
+.hm-ico { width: 38px; height: 38px; border-radius: 11px; background: #eef6ea; display: grid; place-items: center; font-size: 19px; flex: none; }
+.hm-t { flex: 1; min-width: 0; } .hm-t b { display: block; font-size: 15px; color: #2f2735; }
+.hm-t small { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-when { font-size: 12px; color: #a397a5; }
+.hm-acts { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+.hm-p:hover .hm-acts { opacity: 1; }
+.hm-acts button { padding: 5px 9px; border-radius: 8px; font-size: 12px; color: #7a6f80; background: #f6f2f6; }
+.hm-acts button:hover { color: var(--accent); background: #efe7ef; }
+.hm-newrow input { flex: 1; border: 0; outline: none; font: 600 15px "Segoe UI", sans-serif; color: #2f2735; }
+.hm-root { margin-top: 26px; font-size: 13px; color: var(--muted); }
+.hm-root b { color: #5a4e5c; font-weight: 600; }
+.hm-root button { color: var(--accent); font-weight: 600; text-decoration: underline; }
+#top .brand { font-size: 20px; padding: 2px 4px; border-radius: 8px; }
+#top .brand:hover { background: #efe9f0; }

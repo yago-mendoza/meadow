@@ -15,6 +15,7 @@ const stage = $('#stage');
 
 // ---- the store ------------------------------------------------------------------------------------------------------
 let S = null, rev = 0;
+const P = new URLSearchParams(location.search).get('p');
 const nd = (id) => S.nodes[id];
 let PAR = new Map();                                         // child id → parent id (rebuilt on every change)
 function reindex() { PAR = new Map(); for (const n of Object.values(S.nodes)) for (const k of n.kids || []) PAR.set(k, n.id); }
@@ -46,7 +47,11 @@ const readable = (t) => (t || '')
 
 // ---- loading, saving, the old board turned into the tree -------------------------------------------------------------
 async function load() {
-  const j = await (await fetch('/api/state')).json();
+  if (!P) return showHome();
+  const r = await fetch('/api/state?p=' + encodeURIComponent(P)); if (!r.ok) return showHome('Ese proyecto ya no está en la lista.');
+  const j = await r.json();
+  document.title = (j.project?.name || 'Meadow') + ' · Meadow';
+  fetch('/api/projects/opened', { method: 'POST', body: JSON.stringify({ id: P }) });
   rev = j.rev || 0;
   const st = j.state;
   if (st?.v === 2) S = st;
@@ -60,10 +65,7 @@ function ensureAreas() {
   const root = nd(S.root);
   if (root.kids.every((k) => nd(k)?.kind === 'area') && root.kids.length) return;
   const frames = root.kids.filter((k) => nd(k)?.kind !== 'area'), areas = root.kids.filter((k) => nd(k)?.kind === 'area');
-  if (!areas.length) {
-    const p = mk('area', 'PRINCIPIOS'), u = mk('area', 'UIX');
-    u.kids.push(...frames); root.kids = [p.id, u.id]; S.area = u.id;
-  } else { nd(areas[0]).kids.push(...frames); root.kids = areas; }
+  if (!areas.length) { const g = mk('area', 'General'); g.kids.push(...frames); root.kids = [g.id]; S.area = g.id; } else { nd(areas[0]).kids.push(...frames); root.kids = areas; }
   save();
 }
 function fresh() {
@@ -128,13 +130,13 @@ function save() { dirty = true; clearTimeout(saveT); saveT = setTimeout(flush, 4
 async function flush() {
   saveT = null; if (!dirty) return; dirty = false;
   try {
-    const r = await fetch('/api/state?rev=' + rev, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(S) });
+    const r = await fetch('/api/state?p=' + encodeURIComponent(P) + '&rev=' + rev, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(S) });
     if (r.status === 409) { toast('Meadow ha cambiado en otra pestaña. Recarga esta para seguir.', [['Recargar', () => location.reload()]], 0); return; }
     if (!r.ok) { dirty = true; toast('No se pudo guardar (' + r.status + ')'); return; }
     rev = (await r.json()).rev;
   } catch { dirty = true; toast('No se pudo guardar; reintento en 2 s'); setTimeout(flush, 2000); }
 }
-addEventListener('beforeunload', () => { if (dirty) navigator.sendBeacon?.('/api/state?rev=' + rev, new Blob([JSON.stringify(S)], { type: 'application/json' })); });
+addEventListener('beforeunload', () => { if (dirty) navigator.sendBeacon?.('/api/state?p=' + encodeURIComponent(P) + '&rev=' + rev, new Blob([JSON.stringify(S)], { type: 'application/json' })); });
 
 const undo = [];
 function snap() { undo.push(JSON.stringify({ nodes: S.nodes, drawer: S.drawer, ideas: S.ideas, tasks: S.tasks, seq: S.seq })); if (undo.length > 80) undo.shift(); }
@@ -969,6 +971,44 @@ addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && cur) { e.preventDefault(); return openLinker(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing && !cur) { e.preventDefault(); doUndo(); }
 });
+
+// ---- the start screen: every project, new, open a folder, move, where they are kept ----------------------------------
+const ago = (t) => { if (!t) return ''; const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : new Date(t).toLocaleDateString('es', { day: 'numeric', month: 'short' }); };
+async function api(url, body) { const r = await fetch(url, { method: body === undefined ? 'GET' : 'POST', body: body === undefined ? undefined : JSON.stringify(body) }); const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error || r.status); return j; }
+async function showHome(note) {
+  $('#home').hidden = false; document.title = 'Meadow';
+  if (note) toast(note);
+  paintHome(await api('/api/projects'));
+}
+function paintHome(L) {
+  $('#hm-root').textContent = L.root;
+  const ps = [...L.projects].sort((a, b) => (b.opened || b.updated || '').localeCompare(a.opened || a.updated || ''));
+  $('#hm-list').innerHTML = ps.map((p) => `<div class="hm-p${p.exists ? '' : ' gone'}" data-p="${p.id}">
+      <div class="hm-ico">🌿</div><div class="hm-t"><b>${esc(p.name)}</b><small>${esc(p.path)}</small></div>
+      <span class="hm-when">${p.exists ? esc(ago(p.opened || p.updated)) : 'no está en su carpeta'}</span>
+      <span class="hm-acts"><button data-mv="${p.id}" title="Moverlo a otra carpeta">Mover…</button><button data-rm="${p.id}" title="Quitarlo de la lista (no borra nada)">Quitar</button></span>
+    </div>`).join('') || '<p class="none">Todavía no hay proyectos. Crea uno.</p>';
+}
+$('#home').addEventListener('click', async (e) => {
+  const t = e.target;
+  try {
+    if (t.closest('#hm-new')) {
+      const box = document.createElement('div'); box.className = 'hm-p hm-newrow'; box.innerHTML = '<div class="hm-ico">🌿</div><input placeholder="Nombre del proyecto…">';
+      $('#hm-list').prepend(box); const inp = box.querySelector('input'); inp.focus();
+      inp.onkeydown = async (ev) => { if (ev.key === 'Escape') box.remove(); if (ev.key === 'Enter' && inp.value.trim()) { const j = await api('/api/projects', { name: inp.value.trim() }); location.href = '/?p=' + j.id; } };
+      return;
+    }
+    if (t.closest('#hm-add')) { toast('Elige la carpeta en la ventana que se abre…'); const j = await api('/api/projects/add', {}); if (j.id) location.href = '/?p=' + j.id; return; }
+    const mv = t.closest('[data-mv]'); if (mv) { toast('Elige a dónde moverlo en la ventana que se abre…'); paintHome(await api('/api/projects/move', { id: mv.dataset.mv })); return toast('Movido'); }
+    const rm = t.closest('[data-rm]'); if (rm) return askChoice(rm, '¿Quitarlo de la lista?', 'Su carpeta y sus datos se quedan donde están; puedes volver a abrirlo con «Abrir carpeta…».', [{ label: 'Quitar de la lista', danger: true, run: async () => paintHome(await api('/api/projects/remove', { id: rm.dataset.rm })) }]);
+    if (t.closest('#hm-root-ch')) return askChoice(t.closest('#hm-root-ch'), '¿Dónde guardo los proyectos?', 'Eliges la carpeta en la ventana que se abre.', [
+      { label: 'Cambiar la carpeta y llevar allí los proyectos que hay en la actual', run: async () => { const j = await api('/api/root', { move: true }); if (!j.cancelled) { paintHome(j); toast(j.failed.length ? `Movidos ${j.moved.length}; no pude mover ${j.failed.length}` : `Hecho: ${j.moved.length} movidos`); } } },
+      { label: 'Solo para los proyectos nuevos', run: async () => { const j = await api('/api/root', { move: false }); if (!j.cancelled) paintHome(j); } },
+    ]);
+    const card = t.closest('.hm-p[data-p]'); if (card && !card.classList.contains('gone')) location.href = '/?p=' + card.dataset.p;
+  } catch (err) { toast('No se pudo: ' + err.message); }
+});
+$('#to-home').onclick = () => { flush(); location.href = '/'; };
 
 window.meadow = { get S() { return S; }, render: () => renderAll() };   // for tests and the console
 load();
