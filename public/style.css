@@ -939,3 +939,12 @@ body.dragging .item.circle .cin { display: none; }
 .cin button[data-c="del"]:hover { background: #e7a3a3; color: #fff; }
 .cin i { width: 1px; margin: 8px 0; background: #dbe5f3; }
 .item.circle.tarea:hover > .x { display: none; }
+
+/* a warning with choices (deleting a frame or a tab) */
+.pk-note { margin: 0 6px 8px; font-size: 12.5px; color: #6a5e6c; }
+.pk-opts { display: flex; flex-direction: column; gap: 4px; padding: 2px; }
+.pk-opt { text-align: left; padding: 8px 10px; border-radius: 9px; font-size: 13px; color: #3a2f3f; }
+.pk-opt:hover { background: #f6f1f5; }
+.pk-opt.danger { color: #b8443f; font-weight: 600; }
+.pk-opt.danger:hover { background: #fbecec; }
+.pk-opt.cancel { color: #8a7f8f; border-top: 1px solid var(--line); border-radius: 0 0 9px 9px; margin-top: 2px; }

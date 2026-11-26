@@ -326,7 +326,7 @@ const NOTHING_DOC = `<div class="nothing doc-nothing"><svg viewBox="0 0 80 50" w
 const frameHTML = (f) => `<div class="frame${sel.has(f.id) ? ' sel' : ''}" data-id="${f.id}" data-k="f" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;--bg:${f.color}">
   <div class="fdesc${f.desc ? '' : ' empty'}${pinnedTo(f.id).some((t) => t.pin.side === 'desc' && t.pin.tab === activeTab(f)) ? ' has-pins' : ''}" title="Clic para escribir la descripción">${esc(f.desc || '')}</div>${NOTHING_FRAME}
   <div class="ftabs">${tabsOf(f).map((t, i) => { const on = t.id === activeTab(f); const n = on ? 0 : tabCount(f, t.id);
-    return `<div class="ftab${on ? ' on' : ''}" data-tab="${t.id}"><span class="ftitle">${esc(t.title)}</span>${n ? `<i class="tn">${n}</i>` : ''}${on ? `<button class="f-add" title="Crear un marco dentro de este">＋</button><button class="x" title="${i ? 'Quitar esta pestaña (su contenido pasa a la primera)' : 'Borrar el marco (no lo de dentro)'}">×</button>` : ''}</div>`; }).join('')}<button class="tab-add" title="Nueva pestaña">＋</button>${palHTML()}</div>
+    return `<div class="ftab${on ? ' on' : ''}" data-tab="${t.id}"><span class="ftitle">${esc(t.title)}</span>${n ? `<i class="tn">${n}</i>` : ''}${on ? `<button class="f-add" title="Crear un marco dentro de este">＋</button><button class="x" title="${tabsOf(f).length > 1 ? 'Borrar esta pestaña' : 'Borrar el marco'}">×</button>` : ''}</div>`; }).join('')}<button class="tab-add" title="Nueva pestaña">＋</button>${palHTML()}</div>
   <div class="edge e-t"></div><div class="edge e-b"></div><div class="edge e-l"></div><div class="edge e-r"></div><div class="rs c-tl" data-c="tl"></div><div class="rs c-tr" data-c="tr"></div><div class="rs c-bl" data-c="bl"></div><div class="rs c-br" data-c="br"></div></div>`;
 // A frame's tabs: the first is its title; the active one decides what is shown inside.
 function tabsOf(f) { if (!f.tabs?.length) f.tabs = [{ id: 'tab-' + f.id, title: f.title || '' }]; f.tabs[0].title = f.title || ''; return f.tabs; }
@@ -941,6 +941,57 @@ function fitFrame(f, near) {
   f.x = Math.round(x0 - pad); f.y = Math.round(y0 - pad); f.w = Math.round(x1 - x0 + pad * 2); f.h = Math.round(y1 - y0 + pad * 2);
   return true;
 }
+// ---- deleting a frame or a tab: it warns, and says how much goes ----
+function askChoice(anchor, title, note, options) {
+  const pop = $('#pick'), r = anchor.getBoundingClientRect();
+  pop.innerHTML = `<div class="pk-h">${title}</div>${note ? `<p class="pk-note">${note}</p>` : ''}<div class="pk-opts">${options.map((o, i) => `<button class="pk-opt${o.danger ? ' danger' : ''}" data-i="${i}">${o.label}</button>`).join('')}<button class="pk-opt cancel">Cancelar</button></div>`;
+  Object.assign(pop.style, { left: Math.min(innerWidth - 330, Math.max(8, r.left - 20)) + 'px', top: Math.min(innerHeight - 260, r.bottom + 8) + 'px' });
+  pop.classList.add('on');
+  pop.onclick = (e) => { const b = e.target.closest('.pk-opt'); if (!b) return; pop.classList.remove('on'); if (b.dataset.i != null) options[+b.dataset.i].run(); };
+}
+// what a frame holds, in every tab: things inside, their edge and docked circles, nested frames; and its own circles
+function frameHoldings(f) {
+  const keep = new Set(sel); sel.clear(); sel.add(f.id);
+  const ids = new Set(collectMoving(false).map((m) => m.o.id)); sel.clear(); for (const id of keep) sel.add(id);
+  for (const o of things()) if (o.ftab?.f === f.id) { ids.add(o.id); for (const t of [...pinnedTo(o.id), ...(S.docs.includes(o) ? docked(o) : [])]) ids.add(t.id); }
+  for (const t of pinnedTo(f.id)) ids.add(t.id);
+  for (const it of [...S.ideas, ...S.tasks]) if (it.stackOf && ids.has(it.stackOf)) ids.add(it.id);
+  ids.delete(f.id);
+  return [...ids].filter((id) => find(id));
+}
+function tabHoldings(f, tid) {
+  const ids = new Set();
+  for (const o of things()) if (o.ftab?.f === f.id && o.ftab.t === tid) { ids.add(o.id); for (const t of [...pinnedTo(o.id), ...(S.docs.includes(o) ? docked(o) : [])]) ids.add(t.id); }
+  for (const t of pinnedTo(f.id)) if (t.pin.side === 'desc' && t.pin.tab === tid) ids.add(t.id);
+  for (const g of S.frames) if (g !== f && ids.size && g.ftab?.f === f.id && g.ftab.t === tid) ids.add(g.id);
+  for (const it of [...S.ideas, ...S.tasks]) if (it.stackOf && ids.has(it.stackOf)) ids.add(it.id);
+  return [...ids].filter((id) => find(id));
+}
+const isCircle = (id) => { const k = find(id)?.k; return k === 'i' || k === 't'; };
+const countText = (ids) => { const n = ids.filter((id) => !isCircle(id)).length, c = ids.length - n; return [n ? `${n} ${n === 1 ? 'cosa' : 'cosas'}` : '', c ? `${c} ${c === 1 ? 'idea o tarea' : 'ideas y tareas'}` : ''].filter(Boolean).join(' y '); };
+function askFrameDelete(f, anchor) {
+  const all = frameHoldings(f), circles = all.filter(isCircle), name = esc(f.title || 'sin título');
+  if (!all.length) return removeIds([f.id]);
+  askChoice(anchor, `¿Borrar el marco «${name}»?`, `Tiene ${countText(all)}, en todas sus pestañas.`, [
+    { label: 'Borrar el marco y todo lo que tiene', danger: true, run: () => removeIds([f.id, ...all]) },
+    ...(circles.length ? [{ label: `Borrar solo sus ideas y tareas (${circles.length})`, run: () => removeIds(circles) }] : []),
+    { label: 'Borrar solo el marco: lo de dentro se queda', run: () => removeIds([f.id]) },
+  ]);
+}
+function askTabDelete(f, tid, anchor) {
+  const t = tabsOf(f).find((x) => x.id === tid), all = tabHoldings(f, tid), circles = all.filter(isCircle);
+  const dropTab = () => {
+    snap();
+    if (t === tabsOf(f)[0]) f.title = tabsOf(f)[1].title;            // the next tab now names the frame
+    f.tabs = tabsOf(f).filter((x) => x.id !== tid); f.active = tabsOf(f)[0].id;
+    for (const o of things()) if (o.ftab?.f === f.id && o.ftab.t === tid) delete o.ftab;
+  };
+  if (!all.length) { dropTab(); save(); render(); return toast('Pestaña borrada', [['Deshacer', doUndo]]); }
+  askChoice(anchor, `¿Borrar la pestaña «${esc(t.title || 'sin título')}»?`, `Tiene ${countText(all)}. Las otras pestañas no se tocan.`, [
+    { label: 'Borrar la pestaña y todo lo suyo', danger: true, run: () => { removeIds(all); dropTab(); save(); render(); } },
+    ...(circles.length ? [{ label: `Borrar solo sus ideas y tareas (${circles.length})`, run: () => removeIds(circles) }] : []),
+  ]);
+}
 // A frame inside a frame: first, which of the things in it go inside the new one (a menu with ticks).
 function frameInside(outer) {
   const holds = (o, el) => { const [w, h] = el ? sizeOf(el, o) : [0, 0]; const cx = o.x + w / 2, cy = o.y + h / 2; return cx > outer.x && cx < outer.x + outer.w && cy > outer.y && cy < outer.y + outer.h; };
@@ -1481,12 +1532,10 @@ vp.addEventListener('click', (e) => {
     if (nt) editInline(nt, (v) => { t.title = v || `Pestaña ${tabsOf(f).length}`; save(); render(); }, true);
     return;
   }
-  const tx = e.target.closest('.ftab:not(:first-child) .x');
+  const tx = e.target.closest('.ftab .x');
   if (tx) {
-    const f = find(tx.closest('.frame').dataset.id).o, tid = tx.closest('.ftab').dataset.tab; snap();
-    for (const o of things()) if (o.ftab?.f === f.id && o.ftab.t === tid) o.ftab.t = tabsOf(f)[0].id;
-    f.tabs = tabsOf(f).filter((t) => t.id !== tid); f.active = tabsOf(f)[0].id; save(); render();
-    return toast('Pestaña quitada; lo suyo pasa a la primera', [['Deshacer', doUndo]]);
+    const f = find(tx.closest('.frame').dataset.id).o, tid = tx.closest('.ftab').dataset.tab;
+    return tabsOf(f).length > 1 ? askTabDelete(f, tid, tx) : askFrameDelete(f, tx);
   }
   const fa = e.target.closest('.f-add');
   if (fa) return frameInside(find(fa.closest('.frame').dataset.id).o);
@@ -2166,7 +2215,11 @@ addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
   if (e.key === 'Enter' && $('#backpill').classList.contains('on')) { e.preventDefault(); $('#backpill').click(); }
   else if (e.key === ' ') { space = true; vp.classList.add('space'); e.preventDefault(); }
-  else if ((e.key === 'Delete' || e.key === 'Backspace') && sel.size) removeIds([...sel]);
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && sel.size) {
+    const only = sel.size === 1 && find([...sel][0]);
+    if (only?.k === 'f') { const el = elOf(only.o.id)?.querySelector('.ftab.on') || elOf(only.o.id); return askFrameDelete(only.o, el); }   // a frame alone: it warns
+    removeIds([...sel]);
+  }
   else if (mod && key === 'z') { e.preventDefault(); doUndo(); }
   else if (mod && key === 'a') { e.preventDefault(); for (const el of world.querySelectorAll('[data-k]')) sel.add(el.dataset.id); paintSel(); }
   else if (mod && key === 'c' && sel.size) {
