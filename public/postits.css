@@ -1,0 +1,54 @@
+/* Free post-its: a translucent paper layer over the project screen (see postits.js). */
+
+.pi-layer { z-index: var(--pi-z, 95); overflow: hidden; }
+body.pi-dragging, body.pi-dragging * { user-select: none !important; cursor: grabbing !important; }
+
+.pi { position: absolute; pointer-events: auto; box-sizing: border-box; padding: 22px 12px 14px;
+  background: linear-gradient(170deg, color-mix(in srgb, var(--c) 70%, #fff) 0%, var(--c) 55%, color-mix(in srgb, var(--c) 92%, #b9a38a) 100%);
+  border-radius: 3px 3px 10px 3px;
+  box-shadow: 0 1px 2px rgba(70, 50, 40, .10), 0 6px 16px rgba(70, 50, 40, .12);
+  transform: rotate(var(--rot, 0deg)); transform-origin: 50% 0;
+  opacity: .88; cursor: grab; touch-action: none;
+  transition: opacity .16s, box-shadow var(--pi-dur, 340ms) var(--pi-smooth, ease), transform var(--pi-dur, 340ms) var(--pi-snap, ease); }
+.pi:hover, .pi:focus-within { opacity: 1; }
+.pi.drag { transform: rotate(0deg) scale(1.03); opacity: 1;
+  box-shadow: 0 3px 6px rgba(70, 50, 40, .10), 0 18px 36px rgba(70, 50, 40, .20); }
+.pi.sizing { opacity: 1; }
+.pi.gone { pointer-events: none; }
+
+/* A little strip of washi tape holding it on. */
+.pi-tape { position: absolute; left: 14px; top: -8px; width: 48px; height: 18px;
+  background: rgba(255, 255, 255, .55); border-left: 1px dashed rgba(160, 140, 130, .25); border-right: 1px dashed rgba(160, 140, 130, .25);
+  box-shadow: 0 1px 2px rgba(70, 50, 40, .08); transform: rotate(-4deg); cursor: grab; }
+
+.pi-text { height: 100%; overflow: auto; outline: none; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: 14px/1.45 "Segoe Print", "Segoe UI", sans-serif; color: #4a3f3a; cursor: text; scrollbar-width: none; }
+.pi-text::-webkit-scrollbar { display: none; }
+.pi-text::selection { background: rgba(113, 75, 103, .18); }
+
+/* Hover row: colours and delete. */
+.pi-tools { position: absolute; top: 4px; right: 5px; display: flex; align-items: center; gap: 3px;
+  opacity: 0; pointer-events: none; transition: opacity .16s; }
+.pi:hover .pi-tools, .pi:focus-within .pi-tools { opacity: 1; pointer-events: auto; }
+.pi.drag .pi-tools, .pi.fold .pi-tools { opacity: 0 !important; pointer-events: none !important; }
+.pi-tools button { border: 0; padding: 0; margin: 0; cursor: pointer; font: inherit; }
+.pi-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--d);
+  box-shadow: inset 0 0 0 1px rgba(70, 50, 40, .22); transition: transform .12s; }
+.pi-dot:hover { transform: scale(1.25); }
+.pi-dot.on { box-shadow: inset 0 0 0 1px rgba(70, 50, 40, .22), 0 0 0 1.5px rgba(74, 63, 58, .45); }
+.pi-del { width: 16px; height: 16px; margin-left: 3px; border-radius: 50%; background: transparent; color: #8a7a72;
+  font-size: 15px !important; line-height: 15px; }
+.pi-del:hover { background: rgba(74, 63, 58, .1); color: #4a3f3a; }
+
+/* Resize corner: a soft dog-ear that shows on hover. */
+.pi-grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, rgba(74, 63, 58, .14) 50%); border-radius: 0 0 10px 0;
+  opacity: 0; transition: opacity .16s; }
+.pi:hover .pi-grip { opacity: 1; }
+
+/* Folded: only the tape and the first words. */
+.pi-peek { display: none; }
+.pi.fold { padding: 10px 12px 0; border-radius: 3px 3px 8px 3px; }
+.pi.fold .pi-text, .pi.fold .pi-grip { display: none; }
+.pi.fold .pi-peek { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font: 12.5px/16px "Segoe Print", "Segoe UI", sans-serif; color: #4a3f3a; }

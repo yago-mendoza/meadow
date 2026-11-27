@@ -328,7 +328,7 @@ function docHTML(id) {
     ${thumbs(id)}${circles(id)}<button class="dc-x" title="Borrar o guardar en el cajón">×</button>
   </article>`;
 }
-const EMPTY_HTML = `<div class="empty-meadow"><svg class="meadow-empty" viewBox="0 0 360 200" aria-hidden="true">
+const EMPTY_HTML = `<div class="empty-meadow"><svg class="em-frame" preserveAspectRatio="none"><rect x="1" y="1" rx="30" ry="30" width="calc(100% - 2px)" height="calc(100% - 2px)"/></svg><svg class="meadow-empty" viewBox="0 0 360 200" aria-hidden="true">
   <defs>
     <linearGradient id="mg-g1" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#7fb08a"/><stop offset="1" stop-color="#b9dcb8"/></linearGradient>
     <linearGradient id="mg-g2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#93bf8f"/><stop offset="1" stop-color="#d4ecc9"/></linearGradient>
@@ -336,6 +336,8 @@ const EMPTY_HTML = `<div class="empty-meadow"><svg class="meadow-empty" viewBox=
     <radialGradient id="mg-sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff3d6"/><stop offset="1" stop-color="#fff3d6" stop-opacity="0"/></radialGradient>
   </defs>
   <circle cx="270" cy="58" r="46" fill="url(#mg-sun)"/>
+  <g class="mg-cloud c1"><ellipse cx="0" cy="0" rx="22" ry="8" fill="#f1ecf6"/><ellipse cx="-10" cy="-5" rx="12" ry="8" fill="#f4f0f8"/><ellipse cx="9" cy="-6" rx="10" ry="7" fill="#f4f0f8"/></g>
+  <g class="mg-cloud c2"><ellipse cx="0" cy="0" rx="16" ry="6" fill="#f3eff7"/><ellipse cx="-6" cy="-4" rx="9" ry="6" fill="#f6f2f9"/><ellipse cx="7" cy="-4" rx="8" ry="5" fill="#f6f2f9"/></g>
   <path d="M10 178 C 80 168, 140 172, 190 170 S 300 166, 350 176" fill="none" stroke="#e4d9e8" stroke-width="2" stroke-linecap="round"/>
   <g class="mg-far">
     <path class="mg-b b1" d="M70 176 C 68 150, 74 128, 66 104" stroke="url(#mg-g3)"/>
@@ -373,17 +375,29 @@ const EMPTY_HTML = `<div class="empty-meadow"><svg class="meadow-empty" viewBox=
     <path d="M237 140 C 226 134, 220 128, 218 120 C 228 122, 234 130, 237 140 Z" fill="#a8d1a0"/>
     <g class="mg-daisy"><g fill="#fffdf8" stroke="#eee6dc" stroke-width=".6"><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(0 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(40 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(80 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(120 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(160 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(200 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(240 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(280 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(320 238 102)"/></g><circle cx="238" cy="102" r="4.2" fill="#f4cf6a"/></g>
   </g>
+  <g class="mg-stem s5">
+    <path d="M322 178 C 322 164, 318 154, 322 142" fill="none" stroke="url(#mg-g1)" stroke-width="2" stroke-linecap="round"/>
+    <g class="mg-bell"><path d="M322 142 C 330 142, 332 150, 328 154 C 326 151, 318 151, 316 154 C 312 150, 314 142, 322 142 Z" fill="#c9c4f0"/><path d="M316 154 C 318 156, 326 156, 328 154" fill="none" stroke="#b3acea" stroke-width="1"/></g>
+  </g>
+  <g class="mg-bug"><ellipse cx="0" cy="0" rx="3.6" ry="3" fill="#e0706a"/><path d="M0 -3 L0 3" stroke="#7a3a3a" stroke-width=".7"/><circle cx="-1.4" cy="-.6" r=".7" fill="#5a2a2a"/><circle cx="1.5" cy=".9" r=".7" fill="#5a2a2a"/><circle cx="0" cy="-3.6" r="1.4" fill="#4a3a3a"/></g>
+  <g class="mg-pebbles"><ellipse cx="140" cy="177" rx="7" ry="3" fill="#ece5ef"/><ellipse cx="150" cy="178" rx="4" ry="2" fill="#e6dfea"/><ellipse cx="258" cy="175" rx="6" ry="2.6" fill="#ece5ef"/></g>
   <g class="mg-fly"><g class="mg-wings">
     <path d="M0 0 C -9 -10, -16 -4, -11 3 C -7 7, -2 4, 0 0 Z" fill="#e7c3ea"/><path d="M0 0 C 9 -10, 16 -4, 11 3 C 7 7, 2 4, 0 0 Z" fill="#d9b5e6"/>
     <path d="M0 1 C -6 4, -8 10, -3 10 C 0 9, 0 5, 0 1 Z" fill="#f1d3ee"/><path d="M0 1 C 6 4, 8 10, 3 10 C 0 9, 0 5, 0 1 Z" fill="#e5c3ec"/></g>
     <path d="M0 -3 L0 7" stroke="#8a6a8e" stroke-width="1.4" stroke-linecap="round"/></g>
   <g class="mg-seeds"><circle class="sd d1" cx="120" cy="60" r="2" fill="#d8cde0"/><circle class="sd d2" cx="230" cy="44" r="1.6" fill="#e2d6ea"/><circle class="sd d3" cx="150" cy="30" r="1.4" fill="#d8cde0"/></g>
 </svg><p>Aquí todavía no ha crecido nada</p><small>Arrastra un <b>Marco</b> o un <b>Documento</b> desde arriba</small></div>`;
+function looseCard(id, alone) {
+  const l = itemsAt(id);
+  if (!l.length) return `<div class="loose-its lz-empty" data-id="${id}"></div>`;
+  const row = (it) => `<div class="lc-row" data-it="${it.id}" data-drag="item:${it.id}"><i class="it ${it.kind} st-${stOf(it)}${it.done ? ' done' : ''}">${it.kind === 'idea' ? '💡' : ''}</i><span>${esc(it.text) || '…'}</span></div>`;
+  return `<div class="loose-its lc${alone ? ' alone' : ''}" data-id="${id}"><div class="lc-h">${icon('bulb')}<b>En este apartado</b><i>${l.length}</i></div>${l.map(row).join('')}<span class="its"></span></div>`;
+}
 function renderStage() {
   const f = nd(S.focus);
   const before = measure(stage, '.fr[data-id], .dc[data-id]');
   stage.innerHTML = f.kind === 'project' || f.kind === 'area'
-    ? `<div class="grid${f.kids.length ? '' : ' is-empty'}" data-drop="into" data-id="${f.id}">${((lc) => `<div class="loose-its${lc ? '' : ' lz-empty'}" data-id="${f.id}">${lc}</div>`)(circles(f.id, 12, false))}${f.kids.length ? '' : EMPTY_HTML}${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}<div class="fr-new" data-drop="into" data-id="${f.id}"><button class="new-frame">＋ Marco</button></div></div>`
+    ? `<div class="grid${f.kids.length ? '' : ' is-empty'}" data-drop="into" data-id="${f.id}">${looseCard(f.id, false)}${f.kids.length ? '' : EMPTY_HTML}${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}</div>`
     : `<div class="solo">${frameHTML(f.id, 0)}</div>`;
   if (!skipFlip) flip(stage, before, () => 1, { sel: '.dc[data-id]', appear: false });
 }
@@ -433,6 +447,8 @@ function crHide() { $('#crmenu')?.classList.remove('on'); }
 $('#crumbs').addEventListener('pointerover', (e) => { const b = e.target.closest('.cr.alt'); if (!b) return; clearTimeout(crT); crMenu(b); });
 $('#crumbs').addEventListener('pointerout', (e) => { if (e.target.closest('.cr.alt')) { clearTimeout(crT); crT = setTimeout(crHide, 160); } });
 const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo']];
+$('#tools').addEventListener('pointerover', () => document.body.classList.add('tool-hover'));
+$('#tools').addEventListener('pointerleave', () => document.body.classList.remove('tool-hover'));
 $('#tools').innerHTML = TOOLS.map(([k, ico, name]) => `<button class="tool t-${k}" data-drag="new:${k}" title="${k === 'tarea' || k === 'idea' ? DEF[k].replace(/'/g, '') + ' ' : ''}Clic: crear aquí · arrastra: crear donde lo sueltes"><span class="ico">${ico}</span>${name}</button>`).join('');
 
 // the map: every node as a rectangle inside its parent; a frame's (or page's) only tab adds no level
@@ -927,6 +943,7 @@ addEventListener('click', (e) => {
   const fx = t.closest('.fr-x'); if (fx) return askDelete(fx.closest('.fr').dataset.id, fx);
   const fo2 = t.closest('.fr-opt'); if (fo2) return frameOptions(fo2, fo2.closest('.fr').dataset.id);
   const dx = t.closest('.dc-x'); if (dx) return askDelete(dx.closest('.dc').dataset.id, dx);
+  const lcr = t.closest('.lc-row'); if (lcr) return openTask([...S.ideas, ...S.tasks].find((x) => x.id === lcr.dataset.it));
   const itc = t.closest('.it'); if (itc) return itemClick(itc.dataset.it, itc);
   const pg = t.closest('.dc-tabs span[data-pg]'); if (pg) { const dc2 = pg.closest('.dc'); return openDoc(dc2.dataset.id, pg.dataset.pg, dc2); }   // a tab of a document opens it there
   const dc = t.closest('.dc'); if (dc && !t.closest('.its')) return openDoc(dc.dataset.id, null, dc);
@@ -1104,7 +1121,7 @@ function showPeek(el, focus) {
   const r = el.getBoundingClientRect();
   peekBox.dataset.id = it.id;
   peekBox.className = 'k-' + it.kind + (it.done ? ' done' : '') + ' st-' + stOf(it);
-  peekBox.innerHTML = `${barHTML(it)}<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea · ' + stLabel(it) : 'Tarea · ' + stLabel(it) + (whoOf(it.who) === 'Agente' ? ' · para el agente' : '')}</span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="A la papelera"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Descartar</span></button></div>${true ? `<div class="ip-t ip-open" title="Abrir">${esc(it.text || '…')}${it.body ? `<small>${esc(it.body.slice(0, 160))}${it.body.length > 160 ? '…' : ''}</small>` : ''}</div>` : `<div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`}`;
+  peekBox.innerHTML = `${barHTML(it)}<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea · ' + stLabel(it) : 'Tarea · ' + stLabel(it) + (whoOf(it.who) === 'Agente' ? ' · para el agente' : '')}</span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="A la papelera"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Descartar</span></button></div>${true ? `<div class="ip-t ip-open" title="Abrir">${esc(it.text || '…')}${it.body ? `<small>${esc(it.body.slice(0, 160))}${it.body.length > 160 ? '…' : ''}</small>` : '<small class="ip-nodesc">Sin descripción</small>'}</div>` : `<div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`}`;
   const left = Math.min(innerWidth - 300, Math.max(8, r.left + r.width / 2 - 145));
   Object.assign(peekBox.style, { left: left + 'px', top: r.bottom + 10 + 'px' }); peekBox.style.setProperty('--ax', (r.left + r.width / 2 - left) + 'px');
   peekBox.classList.add('on');
