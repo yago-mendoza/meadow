@@ -374,7 +374,7 @@ function crMenu(btn) {
   let m = $('#crmenu'); if (!m) { m = document.createElement('div'); m.id = 'crmenu'; document.body.append(m);
     m.onpointerenter = () => clearTimeout(crT); m.onpointerleave = () => { crT = setTimeout(crHide, 160); };
     m.onclick = (e) => { const b = e.target.closest('[data-go]'); if (!b) return; crHide(); focusTo(b.dataset.go); }; }
-  m.innerHTML = sibs.map((k) => `<button data-go="${k}" class="${k === id ? 'on' : ''}"><span>${esc(nd(k).title)}</span>${nb(k)}</button>`).join('');
+  m.innerHTML = sibs.map((k) => `<button data-go="${k}" class="${k === id ? 'on' : ''}">${icon(k === id ? 'check' : 'area')}<span>${esc(nd(k).title)}</span>${nb(k)}</button>`).join('');
   const r = btn.getBoundingClientRect(); m.style.left = r.left + 'px'; m.style.top = r.bottom + 4 + 'px'; m.classList.add('on');
 }
 function crHide() { $('#crmenu')?.classList.remove('on'); }
@@ -832,7 +832,7 @@ addEventListener('click', (e) => {
   }
   const fx = t.closest('.fr-x'); if (fx) return askDelete(fx.closest('.fr').dataset.id, fx);
   const fo2 = t.closest('.fr-opt'); if (fo2) { const f = nd(fo2.closest('.fr').dataset.id);
-    return askChoice(fo2, esc(f.title), '', [{ label: f.square ? '◜ Esquinas redondas' : '◻ Esquinas rectas', run: () => { snap(); f.square = f.square ? undefined : true; save(); renderAll(); } }]); }
+    return askChoice(fo2, esc(f.title), '', [{ label: f.square ? 'Esquinas redondas' : 'Esquinas rectas', run: () => { snap(); f.square = f.square ? undefined : true; save(); renderAll(); } }]); }
   const dx = t.closest('.dc-x'); if (dx) return askDelete(dx.closest('.dc').dataset.id, dx);
   const itc = t.closest('.it'); if (itc) return itemClick(itc.dataset.it, itc);
   const pg = t.closest('.dc-tabs span[data-pg]'); if (pg) { const dc2 = pg.closest('.dc'); return openDoc(dc2.dataset.id, pg.dataset.pg, dc2); }   // a tab of a document opens it there
@@ -1521,7 +1521,7 @@ function openDrawing(d) {
 }
 function closeDrawing() {
   const d = dwNow(); if (!dwOpen) return;
-  if (d?.fresh && !d.shapes.length) S.drawings.splice(S.drawings.indexOf(d), 1);
+  if (d?.fresh && !d.shapes.length && !d.bg) S.drawings.splice(S.drawings.indexOf(d), 1);
   if (d) delete d.fresh;
   dwOpen = null; $('#draw').hidden = true; save(); renderAll();
 }
@@ -1829,7 +1829,7 @@ $('#ed-min').onclick = minimize;
 function edItemMenu(kind, anchor) {
   if (!ed || !cur) return;
   const d = nd(cur), name = kind === 'idea' ? 'idea' : 'tarea', plural = kind === 'idea' ? 'ideas' : 'tareas';
-  const insert = { label: kind === 'idea' ? '💡 Insertar una idea aquí' : '☐ Insertar una tarea aquí', run: () => { const it = newItem(kind, '', null); save(); ed.insertAtCursor('{' + kind + ' ' + it.n + '}'); openTask(it); } };
+  const insert = { label: kind === 'idea' ? 'Insertar una idea aquí' : 'Insertar una tarea aquí', run: () => { const it = newItem(kind, '', null); save(); ed.insertAtCursor('{' + kind + ' ' + it.n + '}'); openTask(it); } };
   const see = d.kids.length > 1
     ? [{ label: `Ver las ${plural} de todo el documento`, run: () => openList(kind, cur) }, ...d.kids.map((k) => ({ label: `Ver las de la pestaña «${nd(k).title}»`, run: () => openList(kind, k) }))]
     : [{ label: `Ver las ${plural} de este documento`, run: () => openList(kind, cur) }];
@@ -2035,9 +2035,35 @@ function popEdit(anchor, value, onDone) {
   box.addEventListener('keydown', (e) => { if (e.key === 'Enter') end(true); if (e.key === 'Escape') { e.stopPropagation(); end(false); } });
   box.addEventListener('blur', () => end(true));
 }
+const ICO = {
+  trash: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M10 11v6M14 11v6"/>',
+  drawer: '<path d="M4 4h16v5H4zM5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/>',
+  edit: '<path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3zM14 7l3 3"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  layers: '<path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5"/>',
+  imageOff: '<path d="M3 3l18 18M21 15V5a1 1 0 0 0-1-1H8M4 6v13a1 1 0 0 0 1 1h13M4 16l5-5 4 4M14 10.5l1.5-1.5L21 15"/>',
+  colMinus: '<path d="M4 4h6v16H4zM14 4h6v16h-6M15 12h4"/>',
+  folderMove: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM10 13h6M13 10l3 3-3 3"/>',
+  folderNew: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 10v6M9 13h6"/>',
+  broom: '<path d="M14 4l6 6M12 6l6 6-5 5H8l-3-3v-3zM5 14l-2 6 6-2"/>',
+  list: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+  round: '<path d="M4 20v-8a8 8 0 0 1 8-8h8"/>',
+  square: '<path d="M4 20V4h16"/>',
+  bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+  task: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
+  area: '<rect x="4" y="5" width="16" height="14" rx="3"/><path d="M4 10h16"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+};
+const icon = (k) => (ICO[k] ? `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICO[k]}</svg>` : '');
+// which icon goes with an option, read from what it says (so every menu gets them)
+const ICO_BY = [[/cajón/i, 'drawer'], [/^Borrar|^Quitarlas/, 'trash'], [/^Editar/, 'edit'], [/^Mostrar/, 'eye'], [/^Ocultar/, 'eyeOff'], [/delante/, 'layers'],
+  [/Quitar el dibujo/, 'imageOff'], [/Quitar la columna/, 'colMinus'], [/Cambiar la carpeta/, 'folderMove'], [/proyectos nuevos/, 'folderNew'], [/^Vaciar/, 'broom'],
+  [/^Ver las/, 'list'], [/redondas/, 'round'], [/rectas/, 'square'], [/una idea/, 'bulb'], [/una tarea/, 'task']];
+const icoFor = (label) => ICO_BY.find(([re]) => re.test(label))?.[1];
 function askChoice(anchor, title, note, options) {
   const pop = $('#pick'), r = anchor.getBoundingClientRect();
-  pop.innerHTML = `<div class="pk-h">${title}</div>${note ? `<p class="pk-note">${note}</p>` : ''}<div class="pk-opts">${options.map((o, i) => `<button class="pk-opt${o.danger ? ' danger' : ''}" data-i="${i}">${o.label}</button>`).join('')}<button class="pk-opt cancel">Cancelar</button></div>`;
+  pop.innerHTML = `<div class="pk-h">${title}</div>${note ? `<p class="pk-note">${note}</p>` : ''}<div class="pk-opts">${options.map((o, i) => `<button class="pk-opt${o.danger ? ' danger' : ''}" data-i="${i}">${icon(o.ico || icoFor(o.label))}<span>${o.label}</span></button>`).join('')}<button class="pk-opt cancel">Cancelar</button></div>`;
   Object.assign(pop.style, { left: Math.min(innerWidth - 330, Math.max(8, r.left - 20)) + 'px', top: Math.min(innerHeight - 220, r.bottom + 8) + 'px' });
   pop.classList.add('on');
   pop.onclick = (e) => { const b = e.target.closest('.pk-opt'); if (!b) return; pop.classList.remove('on'); if (b.dataset.i != null) options[+b.dataset.i].run(); };

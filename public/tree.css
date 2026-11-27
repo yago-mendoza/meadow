@@ -1198,3 +1198,12 @@ body.drag-hang .grid > .loose-its.lz-empty { display: flex; min-height: 34px; bo
 #list-who:empty { display: none; }
 /* a question asked from inside the drawing sheet shows above it */
 body:has(#draw:not([hidden])) #pick { z-index: 320; }
+
+/* icons beside what a menu option does */
+.ico { width: 16px; height: 16px; flex: none; }
+.pk-opt { display: flex; align-items: center; gap: 10px; }
+.pk-opt .ico { color: #9a8da0; }
+.pk-opt:hover .ico { color: var(--accent); }
+.pk-opt.danger .ico { color: #c0566a; }
+#crmenu button .ico { color: #b0a3b5; }
+#crmenu button.on .ico { color: var(--accent); }
