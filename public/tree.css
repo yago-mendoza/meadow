@@ -1196,3 +1196,5 @@ body.drag-hang .grid > .loose-its.lz-empty { display: flex; min-height: 34px; bo
 #list nav button { flex: 1; }
 .gal { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 #list-who:empty { display: none; }
+/* a question asked from inside the drawing sheet shows above it */
+body:has(#draw:not([hidden])) #pick { z-index: 320; }

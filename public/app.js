@@ -1473,10 +1473,10 @@ function bgOf(d) {
 async function dwImport(file) {
   const d = dwNow(); if (!d || !file || !file.type.startsWith('image/')) return;
   let src; try { src = await createImageBitmap(file); } catch { return toast('No pude leer esa imagen'); }
-  const c = document.createElement('canvas'); c.width = DW_W; c.height = DW_H; const x = c.getContext('2d');
-  const sc = Math.min(DW_W / src.width, DW_H / src.height), w = Math.round(src.width * sc), h = Math.round(src.height * sc);
-  x.imageSmoothingQuality = 'high'; x.drawImage(src, Math.round((DW_W - w) / 2), Math.round((DW_H - h) / 2), w, h);
-  const img = x.getImageData(0, 0, DW_W, DW_H), px = img.data;
+  const IW = DW_W / 2, IH = DW_H / 2, c = document.createElement('canvas'); c.width = IW; c.height = IH; const x = c.getContext('2d');
+  const sc = Math.min(IW / src.width, IH / src.height), w = Math.round(src.width * sc), h = Math.round(src.height * sc);
+  x.imageSmoothingQuality = 'high'; x.drawImage(src, Math.round((IW - w) / 2), Math.round((IH - h) / 2), w, h);
+  const img = x.getImageData(0, 0, IW, IH), px = img.data;
   const pal = [...new Set([...DW_COLORS.top, ...DW_COLORS.left, ...DW_COLORS.right, '#fffdf8', '#ffffff', '#1f1a24'])].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
   for (let i = 0; i < px.length; i += 4) {
     if (px[i + 3] < 128) { px[i + 3] = 0; continue; }
@@ -1485,7 +1485,14 @@ async function dwImport(file) {
     px[i] = best[0]; px[i + 1] = best[1]; px[i + 2] = best[2]; px[i + 3] = 255;
   }
   x.putImageData(img, 0, 0);
-  dwEdit(() => { d.bg = c.toDataURL('image/png'); });
+  const big = document.createElement('canvas'); big.width = DW_W; big.height = DW_H; const bx = big.getContext('2d'); bx.imageSmoothingEnabled = false; bx.drawImage(c, 0, 0, DW_W, DW_H);
+  const url = big.toDataURL('image/png');
+  if (!d.shapes.length) return dwEdit(() => { d.bg = url; });
+  // figures already there: in front of the picture, or gone
+  askChoice($('#draw .dw-img'), 'Ya hay figuras en este dibujo', '', [
+    { label: 'Dejarlas delante de la imagen', run: () => dwEdit(() => { d.bg = url; }) },
+    { label: 'Quitarlas y quedarme solo con la imagen', danger: true, run: () => dwEdit(() => { d.bg = url; d.shapes = []; dwSel.clear(); }) },
+  ]);
 }
 function drawThumb(d) {
   const bg = bgOf(d), key = d.id + ':' + (d.v || 0) + ':' + d.shapes.length + ':' + (d.bg ? (bg ? d.bg.length : 'wait') : '');
