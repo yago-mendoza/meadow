@@ -1633,3 +1633,16 @@ body.dragging #drawer:not(.open) #dr-list { clip-path: inset(0 0 100% 0 round 14
 #top { background: color-mix(in srgb, var(--page) 88%, transparent) !important; border-bottom-color: #e0d9e5 !important; }
 #home { background: #ecebf2; }
 .fr { box-shadow: 0 1px 3px rgba(60, 40, 70, .08); }
+/* documents keep a page's shape; only their size changes, on a grid where sizes fit together
+   (cell 84 × 104, gap 12): pequeño 2×2, mediano 3×3, grande 4×4, muy grande 5×5 — two small ones stacked match a large one's height */
+.dc-grid { grid-template-columns: repeat(auto-fill, 84px) !important; grid-auto-rows: 104px !important; gap: 12px !important; }
+.dc-grid > .dc.sz-s { grid-column: span 2 !important; grid-row: span 2 !important; }
+.dc-grid > .dc.sz-m { grid-column: span 3 !important; grid-row: span 3 !important; }
+.dc-grid > .dc.sz-l { grid-column: span 4 !important; grid-row: span 4 !important; }
+.dc-grid > .dc.sz-xl { grid-column: span 5 !important; grid-row: span 5 !important; }
+.dc-grid > .dc .dc-prev { columns: auto !important; }
+.dc-grid > .dc.sz-l .dc-prev, .dc-grid > .dc.sz-xl .dc-prev { font-size: 12px; }
+
+/* a list's card */
+.dc.lstc { display: flex; flex-direction: column; }
+.dc-ls { flex: 1; margin-top: 6px; overflow: hidden; }

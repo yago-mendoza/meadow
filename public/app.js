@@ -9,6 +9,7 @@ import { flip, measure, EASE } from './motion.js';
 import { createPostits } from './postits.js';
 import { createDiagram, diagramThumbSVG } from './diagram.js';
 import { ICON_SETS, ICONS, iconSVG } from './icons.js';
+import { createList, listSummaryHTML, blankList } from './list.js';
 
 const PASTEL = ['#fff1b8', '#ffd9c2', '#f9d0e3', '#e3d9f7', '#cfe5fb', '#cdeedd', '#e4ebd3', '#eceef2'];
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -324,7 +325,7 @@ function nIn(id) {
 const itemsIn = (id) => [...S.tasks, ...S.ideas].filter((it) => live(it) && inScope(it, id)).length;
 const nb = (id) => { const k = nIn(id) + itemsIn(id); return k ? `<i class="nb" data-in="${id}" title="Ver lo que hay dentro">${k}</i>` : ''; };
 const countIn = (id) => { let c = 0; const w = (x) => { for (const k of nd(x).kids) { if (['frame', 'doc'].includes(nd(k).kind)) c++; w(k); } }; w(id); return c; };
-const docWeight = (d) => d.kids.reduce((a, k) => a + (nd(k)?.text || '').length, 0) + (d.kids.length - 1) * 400 + (d.dia ? 1200 + (d.dg?.nodes || []).length * 120 : 0);
+const docWeight = (d) => (d.lst ? (d.lst.rows || []).length * 160 : 0) + d.kids.reduce((a, k) => a + (nd(k)?.text || '').length, 0) + (d.kids.length - 1) * 400 + (d.dia ? 1200 + (d.dg?.nodes || []).length * 120 : 0);
 let sizeCut = null;
 function docSize(id) {
   const d = nd(id); if (!d) return 's';
@@ -344,8 +345,9 @@ function kidsHTML(ids, one) {
 const nodeIcon = (n, size = 15) => (!n?.icon ? '' : ICONS[n.icon] ? `<span class="ar-ic nic">${iconSVG(n.icon, size)}</span>` : `<span class="ar-ic">${n.icon}</span>`);
 function docHTML(id) {
   const d = nd(id), at = activeTab(d), text = nd(at).text || '';
-  const prev = readable(text).split('\n').filter((l, i, a) => l.trim() || (i && a[i - 1].trim())).slice(0, { s: 10, m: 12, l: 20, xl: 28 }[docSize(id)]).join('\n');
+  const prev = readable(text).split('\n').filter((l, i, a) => l.trim() || (i && a[i - 1].trim())).slice(0, { s: 10, m: 18, l: 26, xl: 34 }[docSize(id)]).join('\n');
   const many = d.kids.length > 1;          // with tabs: its name, and its tabs right under it (what each holds stays inside)
+  if (d.lst) return `<article class="dc lstc sz-${docSize(id)}" data-id="${id}" data-drag="${id}" data-drop="doc"><h3 class="dc-title" title="Doble clic: renombrar">${nodeIcon(d, 16) || '<span class="ar-ic nic">' + icon('list') + '</span>'}${esc(d.title)}</h3><div class="dc-ls">${listSummaryHTML(d.lst)}</div>${circles(id)}<button class="dc-opt" title="Opciones">⋯</button><button class="dc-x" title="Borrar">×</button></article>`;
   if (d.dia) return `<article class="dc dia sz-${docSize(id) === 's' ? 'm' : docSize(id)}" data-id="${id}" data-drag="${id}" data-drop="doc"><h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}</h3><div class="dc-dg">${(d.dg?.nodes || []).length ? diagramThumbSVG(d.dg, 240, 160) : '<span class="dc-dg-empty">Diagrama vacío</span>'}</div>${circles(id)}<button class="dc-opt" title="Opciones del documento">⋯</button><button class="dc-x" title="Borrar">×</button></article>`;
   return `<article class="dc${many ? ' many' : ''} sz-${docSize(id)}" data-id="${id}" data-drag="${id}" data-drop="doc">
     <h3 class="dc-title" title="Doble clic: renombrar">${nodeIcon(d, 16)}${esc(d.title)}${nb(id)}</h3>
@@ -496,7 +498,7 @@ function crMenu(btn) {
 function crHide() { $('#crmenu')?.classList.remove('on'); }
 $('#crumbs').addEventListener('pointerover', (e) => { const b = e.target.closest('.cr.alt'); if (!b) return; clearTimeout(crT); crMenu(b); });
 $('#crumbs').addEventListener('pointerout', (e) => { if (e.target.closest('.cr.alt')) { clearTimeout(crT); crT = setTimeout(crHide, 160); } });
-const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo'], ['diagrama', '◇', 'Diagrama']];
+const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo'], ['diagrama', '◇', 'Diagrama'], ['lista', '☰', 'Lista']];
 $('#tools').addEventListener('pointerover', () => document.body.classList.add('tool-hover'));
 $('#tools').addEventListener('pointerleave', () => document.body.classList.remove('tool-hover'));
 $('#tools').innerHTML = TOOLS.map(([k, ico, name]) => (k === 'doc' ? '<span class="tool-sep"></span>' : '') + `<button class="tool t-${k}" data-drag="new:${k}" title="${k === 'tarea' || k === 'idea' ? DEF[k].replace(/'/g, '') + ' ' : ''}Clic: crear aquí · arrastra: crear donde lo sueltes"><span class="ico">${ico}</span>${name}</button>`).join('');
@@ -692,6 +694,7 @@ function srcOf(key) {
   if (key.startsWith('head:')) { const [, tab, line] = key.split(':'); return { head: { tab, line: +line } }; }
   if (key.startsWith('item:')) return { item: key.slice(5) };
   if (key === 'new:diagrama') return { make: 'doc', dia: true };
+  if (key === 'new:lista') return { make: 'doc', lst: true };
   if (key.startsWith('new:')) return { make: key.slice(4) };
   return { node: key };
 }
@@ -699,6 +702,7 @@ function labelOf(src) {
   if (src.head) { const l = (nd(src.head.tab)?.text || '').split('\n')[src.head.line - 1] || ''; return l.replace(/^#+\s*/, '# '); }
   if (src.item) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === src.item); return it ? (it.kind === 'idea' ? '💡 ' : '☐ ') + it.text : ''; }
   if (src.dia) return '◇ Diagrama nuevo';
+  if (src.lst) return '☰ Lista nueva';
   if (src.make) return { frame: '⬚ Marco nuevo', doc: '📄 Documento nuevo', idea: '💡 Idea nueva', tarea: '☐ Tarea nueva', dibujo: '🖍 Dibujo nuevo', postit: '🗒️ Post-it' }[src.make];
   const n = nd(src.node); return n ? ({ area: '▤ ', frame: '⬚ ', ftab: '▭ ', doc: '📄 ', dtab: '▭ ' }[n.kind] || '') + n.title : '';
 }
@@ -864,7 +868,7 @@ function drop(src, t) {
     const it = newItem(src.make, '', null); it.fresh = true; dropInText(it, t); return openTask(it);
   }
   if (src.item) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === src.item); if (it) it.at = t.pid; save(); renderAll(); return; }
-  if (src.make) return makeAt(src.dia ? 'diagrama' : src.make, t);
+  if (src.make) return makeAt(src.dia ? 'diagrama' : src.lst ? 'lista' : src.make, t);
   const before = src.node ? nd(src.node)?.kind : 'h';
   const becomes = t.kind === 'head' ? 'h' : t.kind === 'drawer' ? null : (t.forced || childKind(nd(t.pid).kind, { kind: before }));
   if (src.node && t.kind === 'place' && t.idx != null && PAR.get(src.node) === t.pid) { const oi = nd(t.pid).kids.indexOf(src.node); if (oi < t.idx) t.idx--; }
@@ -904,13 +908,14 @@ function makeAt(kind, t) {
     popEdit(el, '', (v) => { if (!v) { listOf(kind).splice(listOf(kind).indexOf(it), 1); } else it.text = v; save(); renderAll(); });
     return;
   }
-  const dia = kind === 'diagrama'; if (dia) kind = 'doc';
-  const g = { kind, title: dia ? 'Diagrama nuevo' : kind === 'frame' ? 'Marco nuevo' : 'Documento nuevo', body: '', kids: [] };
+  const dia = kind === 'diagrama', lst = kind === 'lista'; if (dia || lst) kind = 'doc';
+  const g = { kind, title: dia ? 'Diagrama nuevo' : lst ? 'Lista nueva' : kind === 'frame' ? 'Marco nuevo' : 'Documento nuevo', body: '', kids: [] };
   let id;
   if (t?.kind === 'head') { placeUnderHead(g, t.tab, t.line); save(); renderAll(); return; }
   if (t?.kind === 'drawer') { id = build(g, kind); S.drawer.push(id); }
   else if (t?.kind === 'place') id = place(g, t.pid, t.idx, t.forced);
   else id = place(g, defaultHome(kind));
+  if (lst) { nd(id).lst = blankList(); save(); renderAll(); return openList2(id); }
   if (dia) { nd(id).dia = true; nd(id).dg = { v: 1, nodes: [], edges: [] }; save(); renderAll(); return openDia(id); }
   save(); renderAll();
   const el = stage.querySelector(`[data-id="${id}"] .fr-title, .dc[data-id="${id}"] .dc-title`);
@@ -1947,6 +1952,7 @@ const $ed = $('#ed');
 function openDoc(id, tabId, fromEl) {
   const d = nd(id); if (!d) return;
   if (d.dia) return openDia(id);
+  if (d.lst) return openList2(id);
   ensureTab(d);
   cur = id; curTab = tabId && d.kids.includes(tabId) ? tabId : activeTab(d); d.active = curTab;
   if (mins.some((m) => m.id === id)) { mins = mins.filter((m) => m.id !== id); renderDock(); }
@@ -2035,7 +2041,19 @@ function openDia(id) {
   box.querySelector('.dia-ok').onclick = closeDia;
   requestAnimationFrame(() => { box.classList.add('in'); diaEd.fit?.(); });
 }
+let listOpen = null, listEd = null;
+function openList2(id) {
+  const d = nd(id); if (!d) return; listOpen = id; diaOpen = id;
+  const box = $('#dia'); box.hidden = false;
+  box.innerHTML = `<header class="dia-h"><span class="dia-k">☰ Lista</span><input class="dia-name" value="${esc(d.title)}" spellcheck="false"><span class="dia-where">${esc(nestPath(PAR.get(id)) || '')}</span><button class="dia-ok">Listo</button></header><div class="dia-c"></div>`;
+  listEd = createList(box.querySelector('.dia-c'), { data: d.lst || blankList(), onChange: (x) => { const n = nd(id); if (n) { n.lst = x; save(); } } });
+  box.querySelector('.dia-name').addEventListener('input', (e) => { if (e.target.value.trim()) { d.title = e.target.value.trim(); save(); } });
+  box.querySelector('.dia-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); e.stopPropagation(); });
+  box.querySelector('.dia-ok').onclick = closeDia;
+  requestAnimationFrame(() => box.classList.add('in'));
+}
 function closeDia() {
+  if (listOpen) { const id = listOpen; listOpen = null; diaOpen = null; try { const x = listEd?.getData(); if (x && nd(id)) nd(id).lst = x; listEd?.destroy(); } catch {} listEd = null; const box = $('#dia'); box.classList.remove('in'); box.hidden = true; box.innerHTML = ''; save(); return renderAll(); }
   if (!diaOpen) return; const id = diaOpen; diaOpen = null;
   try { const x = diaEd?.getData?.(); if (x && nd(id)) nd(id).dg = x; diaEd?.destroy(); } catch {}
   diaEd = null; const box = $('#dia'); box.classList.remove('in'); box.hidden = true; box.innerHTML = ''; save(); renderAll();
