@@ -1094,3 +1094,89 @@ body.dragging:not(.hit) { cursor: grabbing; }
 .loose-its.lz-empty { display: none; }
 body.drag-hang .grid > .loose-its.lz-empty { display: flex; min-height: 34px; border-radius: 14px; border: 1.5px dashed color-mix(in srgb, var(--accent) 18%, transparent); box-sizing: border-box; padding: 4px 10px; align-items: center; }
 #areas .ar .ar-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- progress: a bar with ticks. Tasks: blues to green; stopped, red (waits) or orange (paused). Ideas: one tick per task ---- */
+:root { --t0: #c9dbf3; --t1: #7fa9e0; --t2: #3f78c9; --tdone: #3e9b63; --twait: #d4574e; --tpause: #e8912f; }
+.pbar { display: inline-flex; gap: 3px; width: 92px; height: 7px; flex: none; }
+.pbar i { flex: 1; border-radius: 3px; background: #ebe6ee; box-shadow: inset 0 0 0 1px rgba(90, 70, 100, .06); }
+.pbar i.on:nth-child(1) { background: var(--t1); }
+.pbar i.on:nth-child(2), .pbar i.on:nth-child(3) { background: var(--t2); }
+.pbar.done i { background: var(--tdone) !important; }
+.pbar.stop-espera i { background: color-mix(in srgb, var(--twait) 16%, #fff); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--twait) 45%, transparent); }
+.pbar.stop-espera i.on { background: var(--twait) !important; }
+.pbar.stop-pausa i { background: color-mix(in srgb, var(--tpause) 16%, #fff); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tpause) 45%, transparent); }
+.pbar.stop-pausa i.on { background: var(--tpause) !important; }
+.pbar.idea i { background: #ebe6ee; }
+.pbar.idea i.on { background: var(--t0); }
+.pbar.idea i.s-plan { background: var(--t1); }
+.pbar.idea i.s-curso { background: var(--t2); }
+.pbar.idea i.s-hecha { background: var(--tdone); }
+.pbar.idea i.s-espera { background: var(--twait); }
+.pbar.idea i.s-pausa { background: var(--tpause); }
+
+/* the circles take the colour of how the task is */
+.it.tarea.st-pendiente { background: linear-gradient(135deg, #eef4fd, #d6e5fa); box-shadow: 0 0 0 1px #b9cfee, 0 1px 3px rgba(60, 40, 70, .15); }
+.it.tarea.st-plan { background: linear-gradient(135deg, #dbe8fb, #a9c7f0); box-shadow: 0 0 0 1px #7fa9e0, 0 1px 3px rgba(60, 40, 70, .15); }
+.it.tarea.st-plan::before { border-color: #3f78c9; }
+.it.tarea.st-curso { background: linear-gradient(135deg, #8db4ea, #3f78c9); box-shadow: 0 0 0 1px #2f63ad, 0 1px 3px rgba(60, 40, 70, .2); }
+.it.tarea.st-curso::before { border-color: #fff; background: linear-gradient(90deg, #fff 50%, transparent 50%); }
+.it.tarea.st-espera { background: linear-gradient(135deg, #f6c3bd, #d4574e); box-shadow: 0 0 0 1px #b8443f, 0 1px 3px rgba(60, 40, 70, .2); }
+.it.tarea.st-espera::before { border-color: #fff; background: transparent; }
+.it.tarea.st-pausa { background: linear-gradient(135deg, #fbd9ad, #e8912f); box-shadow: 0 0 0 1px #c97418, 0 1px 3px rgba(60, 40, 70, .2); }
+.it.tarea.st-pausa::before { border-color: #fff; background: transparent; }
+.it.idea.st-cumplida { background: linear-gradient(135deg, #dff3e5, #8fd0a5); box-shadow: 0 0 0 1px #3e9b63, 0 1px 3px rgba(60, 40, 70, .15); }
+
+/* the card: steps as one bar, the two ways of being stopped apart */
+.tk-steps { display: flex; gap: 3px; padding: 3px; border-radius: 12px; background: #f3eff5; }
+.tk-steps button { position: relative; padding: 6px 11px 9px; border-radius: 9px; font: 600 12px "Segoe UI", sans-serif; color: #8a7d8e; }
+.tk-steps button::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 3px; height: 3px; border-radius: 2px; background: #e3dce7; }
+.tk-steps button.on::after { background: var(--t2); }
+.tk-steps button:nth-child(2).on::after { background: var(--t1); }
+.tk-steps button.cur { background: #fff; color: #2f2735; box-shadow: 0 1px 3px rgba(60, 40, 70, .12); }
+.tk-steps button:nth-child(4).cur { color: var(--tdone); }
+.tk-steps:has(button:nth-child(4).cur) button.on::after { background: var(--tdone); }
+.tk-steps.stop-espera button.on::after { background: var(--twait); }
+.tk-steps.stop-pausa button.on::after { background: var(--tpause); }
+.tk-steps.locked button { cursor: not-allowed; opacity: .6; }
+.tk-steps button:hover:not(.cur) { color: #4a3f4d; background: rgba(255, 255, 255, .6); }
+.tk-stops { display: flex; gap: 4px; margin-left: 6px; }
+.tk-stops button { padding: 6px 10px; border-radius: 9px; font: 600 12px "Segoe UI", sans-serif; color: #a397a5; border: 1px dashed #e0d7e4; }
+.tk-stops button[data-stop="espera"].on, .tk-stops button[data-stop="espera"]:hover { color: #fff; background: var(--twait); border-color: var(--twait); }
+.tk-stops button[data-stop="pausa"].on, .tk-stops button[data-stop="pausa"]:hover { color: #fff; background: var(--tpause); border-color: var(--tpause); }
+.tk-prog { display: flex; align-items: center; gap: 10px; }
+.tk-prog .pbar { width: 140px; height: 8px; }
+.tk-prog small { font: 12px "Segoe UI", sans-serif; color: #8a7d8e; }
+.tk-mk { margin-left: 8px; padding: 6px 12px; border-radius: 9px; background: color-mix(in srgb, var(--t2) 12%, #fff); color: #2f63ad; font: 600 12.5px "Segoe UI", sans-serif; }
+.tk-mk:hover { background: var(--t2); color: #fff; }
+.tk-from { display: inline-flex; align-items: center; gap: 6px; }
+.tk-from button { padding: 3px 9px; border-radius: 8px; background: #fbf3dc; color: #7a5a1a; font: 600 12px "Segoe UI", sans-serif; }
+.tk-kids { display: flex; flex-direction: column; gap: 4px; }
+.tk-kids button { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; background: #faf8fb; text-align: left; }
+.tk-kids button:hover { background: #f3eef5; }
+.tk-kids button .pbar { width: 60px; }
+.tk-kids button > span:not(.pbar) { flex: 1; font: 600 13px "Segoe UI", sans-serif; color: #3a2f3f; }
+.tk-kids button small { font: 11.5px "Segoe UI", sans-serif; color: #a397a5; }
+
+/* the hover card: its bar on top */
+#ipeek > .pbar { display: flex; width: auto; margin: 10px 12px 0; }
+
+/* the side list: Yo | Agente side by side on top; a bar on each row; the bin at the foot */
+#list-who { display: flex; margin: 8px 12px 0; padding: 3px; border-radius: 12px; background: #f3eff5; gap: 3px; }
+#list-who button { flex: 1; padding: 7px; border-radius: 9px; font: 600 13px "Segoe UI", sans-serif; color: #8a7d8e; }
+#list-who button.w-yo.on { background: #3f78c9; color: #fff; }
+#list-who button.w-ag.on { background: #e8912f; color: #fff; }
+#list-who button:not(.on):hover { background: #fff; }
+.lmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.lmain > .pbar { width: 70px; height: 5px; }
+.lf-row button.stop.on { background: var(--twait); color: #fff; border-color: var(--twait); }
+.lfoot { position: sticky; bottom: 0; padding: 10px 4px 4px; background: linear-gradient(transparent, #fff 30%); }
+.lbin { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 10px; font: 600 12.5px "Segoe UI", sans-serif; color: #8a7d8e; background: #f4f0f5; }
+.lbin i { font-style: normal; min-width: 18px; height: 18px; border-radius: 9px; background: #e3dce7; display: inline-grid; place-items: center; font-size: 11px; }
+.lbin:hover, .lbin.on { background: #3a2f3f; color: #fff; }
+.lbin-h { margin: 10px 8px 4px; font: 700 12px "Segoe UI", sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #8a7d8e; }
+.lbin-acts { display: flex; gap: 6px; margin-top: 4px; }
+.lbin-acts button { padding: 4px 9px; border-radius: 7px; font: 600 11.5px "Segoe UI", sans-serif; background: #f4f0f5; color: #5a4f5d; }
+.lbin-acts button[data-kill] { color: #c0566a; }
+.lbin-acts button:hover { background: #fff; box-shadow: 0 0 0 1px #e3dce7; }
+/* a chip of something in the bin, in a text: faded */
+.cm-chip.st-papelera { opacity: .4; text-decoration: line-through; }
