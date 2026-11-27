@@ -1381,3 +1381,38 @@ body:has(.grid.is-empty) #tools .tool:hover { outline: 1.5px dashed color-mix(in
 .ip-nodesc { font-style: italic; color: #b3a8b6 !important; }
 .grid.is-empty { flex-direction: row; align-items: flex-start; min-height: calc(100vh - 170px); }
 .grid.is-empty { min-height: calc(100vh - 210px); }
+
+#task footer { display: flex; justify-content: flex-end; gap: 6px; }
+.tk-del, #task footer .tk-rm { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 9px; font: 600 12.5px "Segoe UI", sans-serif; color: #a397a5; }
+.tk-del .ico, #task footer .tk-rm .ico { width: 15px; height: 15px; }
+.tk-del:hover { background: #fbecec; color: #c0566a; }
+#task footer .tk-rm:hover { background: #f4eef5; color: #5a4f5d; }
+
+/* an idea → a task: a small line inside the idea, made only on Enter */
+.tk-mk { display: inline-flex; align-items: center; gap: 6px; }
+.tk-mk .ico { width: 15px; height: 15px; }
+.tk-mk.on { background: var(--t2); color: #fff; }
+.tk-compose { display: flex; align-items: center; gap: 8px; margin: 0 22px; padding: 8px 10px; border-radius: 12px; background: #eef4fd; box-shadow: inset 0 0 0 1.5px #b9cfee; animation: nv-in .18s ease; }
+.tk-compose > .ico { color: #3f78c9; }
+.tk-cin { flex: 1; border: 0; outline: none; background: none; font: 600 14px "Segoe UI", sans-serif; color: #2f2735; }
+.tk-cok { padding: 5px 12px; border-radius: 8px; background: #3f78c9; color: #fff; font: 600 12.5px "Segoe UI", sans-serif; }
+.tk-cno { width: 24px; height: 24px; border-radius: 7px; color: #8a9fc0; font-size: 16px; }
+.tk-cno:hover { background: #fff; }
+
+/* the area's ideas and tasks: their own column on the right */
+#area-its { position: fixed; right: 0; top: 56px; bottom: 0; width: 230px; padding: 16px 12px; overflow: auto; z-index: 12; background: linear-gradient(90deg, #fbf8ef, #fdfbf5); box-shadow: inset 1px 0 0 #efe6d0; display: none; }
+body.has-aits #area-its { display: block; }
+body.has-aits #stage { right: 230px; }
+.ai-h { display: flex; align-items: center; gap: 7px; padding: 10px 6px 6px; color: #9a8a62; }
+.ai-h:first-child { padding-top: 2px; }
+.ai-h .ico { width: 15px; height: 15px; color: #d3b25e; }
+.ai-h b { font: 700 11.5px "Segoe UI", sans-serif; letter-spacing: .05em; text-transform: uppercase; }
+.ai-h i { font: 600 11px "Segoe UI", sans-serif; font-style: normal; color: #c2b089; }
+#area-its .lc-row { background: rgba(255, 255, 255, .7); margin-bottom: 4px; box-shadow: 0 0 0 1px #f1e8d2; }
+#area-its .lc-row:hover { background: #fff; }
+#area-its.drop-on { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent) !important; }
+
+/* the finder: a window in the middle (Spotlight-like), not a panel from the right */
+#list { right: auto !important; bottom: auto !important; left: 50% !important; top: 84px !important; width: min(680px, 92vw) !important; height: min(560px, calc(100vh - 140px)); transform: translateX(-50%); z-index: 150 !important; border-radius: 20px !important;
+  box-shadow: 0 24px 70px rgba(60, 40, 70, .28), 0 0 0 100vmax rgba(60, 40, 70, .14) !important; transition: opacity .16s, transform .22s cubic-bezier(.22, 1, .36, 1); }
+#list.closed { transform: translateX(-50%) translateY(-8px) scale(.98) !important; opacity: 0; pointer-events: none; box-shadow: none !important; }

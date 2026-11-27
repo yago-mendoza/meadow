@@ -6,6 +6,7 @@
 // Ideas and tasks hang on any node, or on a line (written in the text).
 import { createEditor, LINK_RE, TAG_RE, TOKEN_RE } from './editor.bundle.js';
 import { flip, measure, EASE } from './motion.js';
+import { createPostits } from './postits.js';
 
 const PASTEL = ['#fff1b8', '#ffd9c2', '#f9d0e3', '#e3d9f7', '#cfe5fb', '#cdeedd', '#e4ebd3', '#eceef2'];
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -61,6 +62,9 @@ async function load() {
   else S = fresh();
   S.ideas ||= []; S.tasks ||= []; S.drawings ||= []; S.drawer ||= []; S.seq ||= { idea: 0, tarea: 0, doc: 0 }; S.focus ||= S.root;
   ensureAreas();
+  S.postits ||= [];
+  PI ||= createPostits($('#postits'), { notes: S.postits, onChange: (arr) => { S.postits = arr; save(); } });
+  PI.setNotes(S.postits); PI.setVisible(SET.postits !== false);
   for (const t of S.tasks) if (t.state === 'bloqueada') { t.state = t.before && t.before !== 'bloqueada' ? t.before : 'pendiente'; t.stop = 'espera'; delete t.before; }
   for (const i of S.ideas) { if (i.state === 'descartada') i.trash ||= Date.now(); delete i.state; }
   for (const it of [...S.ideas, ...S.tasks]) if (!it.at && isBlank(it) && !tabsUsing(it).length) listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);   // empty and nowhere: gone
@@ -130,7 +134,7 @@ function migrate(o) {
   }
   return S;
 }
-let saveT = null, dirty = false;
+let saveT = null, dirty = false, PI = null;
 function save() { dirty = true; clearTimeout(saveT); saveT = setTimeout(flush, 400); }
 async function flush() {
   saveT = null; if (!dirty) return; dirty = false;
@@ -387,6 +391,16 @@ const EMPTY_HTML = `<div class="empty-meadow"><svg class="em-frame" preserveAspe
     <path d="M0 -3 L0 7" stroke="#8a6a8e" stroke-width="1.4" stroke-linecap="round"/></g>
   <g class="mg-seeds"><circle class="sd d1" cx="120" cy="60" r="2" fill="#d8cde0"/><circle class="sd d2" cx="230" cy="44" r="1.6" fill="#e2d6ea"/><circle class="sd d3" cx="150" cy="30" r="1.4" fill="#d8cde0"/></g>
 </svg><p>Aquí todavía no ha crecido nada</p><small>Arrastra un <b>Marco</b> o un <b>Documento</b> desde arriba</small></div>`;
+function paintAreaItems(id) {
+  const col = $('#area-its'), l = id ? itemsAt(id) : [];
+  document.body.classList.toggle('has-aits', !!l.length);
+  if (!l.length) { col.innerHTML = ''; return; }
+  const row = (it) => `<div class="lc-row" data-it="${it.id}" data-drag="item:${it.id}"><i class="it ${it.kind} st-${stOf(it)}${it.done ? ' done' : ''}">${it.kind === 'idea' ? '💡' : ''}</i><span>${esc(it.text) || '…'}</span></div>`;
+  const ideas = l.filter((x) => x.kind === 'idea'), tasks = l.filter((x) => x.kind === 'tarea');
+  col.dataset.id = id;
+  col.innerHTML = (ideas.length ? `<div class="ai-h">${icon('bulb')}<b>Ideas</b><i>${ideas.length}</i></div>${ideas.map(row).join('')}` : '')
+    + (tasks.length ? `<div class="ai-h">${icon('task')}<b>Tareas</b><i>${tasks.length}</i></div>${tasks.map(row).join('')}` : '');
+}
 function looseCard(id, alone) {
   const l = itemsAt(id);
   if (!l.length) return `<div class="loose-its lz-empty" data-id="${id}"></div>`;
@@ -397,8 +411,9 @@ function renderStage() {
   const f = nd(S.focus);
   const before = measure(stage, '.fr[data-id], .dc[data-id]');
   stage.innerHTML = f.kind === 'project' || f.kind === 'area'
-    ? `<div class="grid${f.kids.length ? '' : ' is-empty'}" data-drop="into" data-id="${f.id}">${looseCard(f.id, false)}${f.kids.length ? '' : EMPTY_HTML}${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}</div>`
+    ? `<div class="grid${f.kids.length ? '' : ' is-empty'}" data-drop="into" data-id="${f.id}"><div class="loose-its lz-empty" data-id="${f.id}"></div>${f.kids.length ? '' : EMPTY_HTML}${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}</div>`
     : `<div class="solo">${frameHTML(f.id, 0)}</div>`;
+  paintAreaItems(f.kind === 'area' || f.kind === 'project' ? f.id : null);
   if (!skipFlip) flip(stage, before, () => 1, { sel: '.dc[data-id]', appear: false });
 }
 let skipFlip = false;
@@ -446,7 +461,7 @@ function crMenu(btn) {
 function crHide() { $('#crmenu')?.classList.remove('on'); }
 $('#crumbs').addEventListener('pointerover', (e) => { const b = e.target.closest('.cr.alt'); if (!b) return; clearTimeout(crT); crMenu(b); });
 $('#crumbs').addEventListener('pointerout', (e) => { if (e.target.closest('.cr.alt')) { clearTimeout(crT); crT = setTimeout(crHide, 160); } });
-const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo']];
+const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo'], ['postit', '🗒️', 'Post-it']];
 $('#tools').addEventListener('pointerover', () => document.body.classList.add('tool-hover'));
 $('#tools').addEventListener('pointerleave', () => document.body.classList.remove('tool-hover'));
 $('#tools').innerHTML = TOOLS.map(([k, ico, name]) => `<button class="tool t-${k}" data-drag="new:${k}" title="${k === 'tarea' || k === 'idea' ? DEF[k].replace(/'/g, '') + ' ' : ''}Clic: crear aquí · arrastra: crear donde lo sueltes"><span class="ico">${ico}</span>${name}</button>`).join('');
@@ -551,7 +566,7 @@ function renderList() {
   $('#fd-scope').innerHTML = scope && nd(scope) ? `<span class="fd-in-chip">${icon(KIND_ICO[nd(scope).kind] || 'area')}${esc(nd(scope).title)}<button data-lscope="" title="En todo el proyecto">×</button></span>` : '';
   const binN = [...S.tasks, ...S.ideas].filter((x) => x.trash).length;
   $('#fd-kinds').innerHTML = FD_KINDS.map(([v, l]) => `<button data-l="${v}" class="${k === v ? 'on' : ''}">${l}</button>`).join('')
-    + `<span class="lf-gap"></span>${scope ? '' : `<button class="fd-here" data-lscope="here" title="Solo lo que estás viendo">Aquí</button>`}<button class="fd-bin${k === 'bin' ? ' on' : ''}" data-l="bin" title="Papelera: lo descartado">${icon('trash')}${binN ? `<i>${binN}</i>` : ''}</button>`;
+    + `<span class="lf-gap"></span>${scope ? '' : `<button class="fd-here" data-lscope="here" title="Solo lo que estás viendo">Aquí</button>`}<button class="fd-bin${k === 'bin' ? ' on' : ''}" data-l="bin" title="Papelera: lo descartado">${icon('bin')}${binN ? `<i>${binN}</i>` : ''}</button>`;
   const place = (p) => `<button class="fd-row" ${p.kind === 'head' ? `data-go-head="${p.id}"` : `data-go-node="${p.id}"`}>${icon(KIND_ICO[p.kind])}<span><b>${esc(p.title || '…')}</b><small>${esc(relPath(p.at, scope))}</small></span></button>`;
   const row = (it) => `<div class="lrow st-${stOf(it)}${it.done ? ' done' : ''}" data-it="${it.id}">${it.kind === 'idea' ? '<span class="lic">💡</span>' : `<button class="lchk${it.done ? ' on' : ''}" data-chk="${it.id}" title="${it.done ? 'Reabrir' : 'Hecha'}"></button>`}<div class="lmain">${barHTML(it)}<div class="ltx">${esc(it.text) || '…'}</div><div class="lsub">${whoOf(it.who) === 'Agente' ? '<b class="lwho">Agente</b>' : ''}${stLabel(it) ? `<b class="lst s-${stOf(it)}">${stLabel(it)}</b>` : ''}${esc(relPath(placeOf(it), scope))}</div>${it.trash ? `<div class="lbin-acts"><button data-unbin="${it.id}">Recuperar</button><button data-kill="${it.id}">Borrar para siempre</button></div>` : ''}</div></div>`;
   const draws = () => (S.drawings || []).filter((d) => (nd(d.at) ? !scope || d.at === scope || isIn(d.at, scope) : !scope) && (!q || relPath(d.at).toLowerCase().includes(q))).sort((a, b) => (b.created || 0) - (a.created || 0));
@@ -572,7 +587,7 @@ function renderList() {
     const on = listSt.tarea || new Set(STEPS.map((s) => s[0]).filter((x) => x !== 'hecha')), l = fdItems('tarea', q, scope);
     html = who + `<div class="lf-row">${STEPS.map(([v, lab]) => chip(`data-lst="${v}"`, lab, on.has(v))).join('')}${chip('data-lstop', 'Paradas', listStop, ' class="stop" title="Solo las que esperan a otras o están en pausa"')}</div>` + (l.map(row).join('') || none('Ninguna tarea con estos filtros.'));
   } else if (k === 'dibujos') { const l = draws(); html = l.length ? gal(l) : none('Ningún dibujo.'); }
-  else if (k === 'bin') { const l = [...fdItems('idea', q, scope, true), ...fdItems('tarea', q, scope, true)].sort((a, b) => b.trash - a.trash); html = `<div class="lbin-h">${icon('trash')}<b>Papelera</b><small>lo descartado</small></div>` + (l.map(row).join('') || none('La papelera está vacía.')); }
+  else if (k === 'bin') { const l = [...fdItems('idea', q, scope, true), ...fdItems('tarea', q, scope, true)].sort((a, b) => b.trash - a.trash); html = `<div class="lbin-h">${icon('bin')}<b>Papelera</b><small>lo descartado</small></div>` + (l.map(row).join('') || none('La papelera está vacía.')); }
   box.innerHTML = html;
 }
 function openFinder(scope, text) {
@@ -589,7 +604,7 @@ function goPlace(id) {   // a place found: go there (a document opens; a page op
   if (n.kind === 'ftab') { parent(id).active = id; return focusTo(parent(id).id); }
   return focusTo(id);
 }
-function renderAll() { tidy(); renderAreas(); renderTop(); renderStage(); renderMap(); renderDrawer(); renderList(); renderDock(); if (cur) renderEdHead(); paintSel(); }
+function renderAll() { if (PI && S.postits) PI.setNotes(S.postits); tidy(); renderAreas(); renderTop(); renderStage(); renderMap(); renderDrawer(); renderList(); renderDock(); if (cur) renderEdHead(); paintSel(); }
 
 // ---- zooming in and out of frames (the frame grows from where it was / shrinks back to its place) -------------------
 function glideFrom(el, r0, ms = 420) {
@@ -644,7 +659,7 @@ function srcOf(key) {
 function labelOf(src) {
   if (src.head) { const l = (nd(src.head.tab)?.text || '').split('\n')[src.head.line - 1] || ''; return l.replace(/^#+\s*/, '# '); }
   if (src.item) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === src.item); return it ? (it.kind === 'idea' ? '💡 ' : '☐ ') + it.text : ''; }
-  if (src.make) return { frame: '⬚ Marco nuevo', doc: '📄 Documento nuevo', idea: '💡 Idea nueva', tarea: '☐ Tarea nueva', dibujo: '🖍 Dibujo nuevo' }[src.make];
+  if (src.make) return { frame: '⬚ Marco nuevo', doc: '📄 Documento nuevo', idea: '💡 Idea nueva', tarea: '☐ Tarea nueva', dibujo: '🖍 Dibujo nuevo', postit: '🗒️ Post-it' }[src.make];
   const n = nd(src.node); return n ? ({ area: '▤ ', frame: '⬚ ', ftab: '▭ ', doc: '📄 ', dtab: '▭ ' }[n.kind] || '') + n.title : '';
 }
 addEventListener('pointermove', (e) => {
@@ -673,12 +688,14 @@ addEventListener('pointerup', () => {
 function targetAt(x, y) {
   const el = hitThrough(x, y); if (!el) return null;
   const src = drag.src;
+  if (src.make === 'postit') return y > 64 ? { kind: 'postit', x, y, ok: true } : null;   // a post-it goes anywhere below the top bar
   if ((src.item || src.make === 'idea' || src.make === 'tarea') && ed && cur && el.closest('#ed-body .cm-content, #ed-body .cm-scroller')) {
     const v = ed.view, pos = v.posAtCoords({ x, y }, false); if (pos == null) return null;
     const line = v.state.doc.lineAt(pos), top = v.coordsAtPos(line.from), bot = v.coordsAtPos(line.to, -1) || top; if (!top) return null;
     const after = y > (top.top + (bot?.bottom ?? top.bottom)) / 2, r = v.contentDOM.getBoundingClientRect();
     return { kind: 'text', line: line.number, after, el: v.contentDOM, ok: true, y: after ? (bot?.bottom ?? top.bottom) : top.top, x0: r.left, w: r.width };
   }
+  if ((src.item || src.make === 'idea' || src.make === 'tarea') && el.closest('#area-its') && $('#area-its').dataset.id) return { kind: src.item ? 'hang' : 'place', pid: $('#area-its').dataset.id, el: $('#area-its'), ok: true };
   if (el.closest('#areas')) {
     const itemKind = src.item ? [...S.tasks, ...S.ideas].find((x) => x.id === src.item)?.kind : (src.make === 'idea' || src.make === 'tarea') ? src.make : null;
     const isDoc = src.make === 'doc' || (src.node && nd(src.node)?.kind === 'doc');
@@ -828,6 +845,7 @@ function drop(src, t) {
 }
 // creating: where it was dropped, or (a click) where you are
 function makeAt(kind, t) {
+  if (kind === 'postit') { if (SET.postits === false) { SET.postits = true; localStorage.setItem('meadow.set', JSON.stringify(SET)); applySet(); } const r = stage.getBoundingClientRect(); return PI?.add(t?.x ?? r.left + r.width / 2, t?.y ?? r.top + r.height / 3); }
   if (!t && !cur && PICK && nd(PICK)) {   // clicked, not dragged: into the place picked last
     const p = nd(PICK);
     if (kind === 'dibujo' || kind === 'idea' || kind === 'tarea') t = { kind: 'place', pid: PICK };
@@ -1213,13 +1231,13 @@ function blockListHTML(it) {
 }
 // the plan has versions: the last is the current one; the older ones stay, to look back with the arrows
 const plansOf = (it) => (it.plans ||= [{ t: it.created || Date.now(), text: it.body || '' }]);
-let taskOpen = null, taskSnapped = false, planAt = 0, commentBy = 'Yo';
+let taskOpen = null, taskSnapped = false, planAt = 0, commentBy = 'Yo', ideaCompose = false;
 const taskNow = () => [...S.tasks, ...S.ideas].find((x) => x.id === taskOpen);
 function taskEdit(fn) { if (!taskSnapped) { snap(); taskSnapped = true; } fn(); save(); }
 function openTask(it) {
   if (!it) return;
   clearTimeout(peekT); peekBox.classList.remove('on');
-  taskOpen = it.id; taskSnapped = false; blockPick = null; planAt = plansOf(it).length - 1; paintTask();
+  taskOpen = it.id; taskSnapped = false; blockPick = null; ideaCompose = false; planAt = plansOf(it).length - 1; paintTask();
   const box = $('#task'); box.hidden = false;
   box.querySelector('.tk-in').animate([{ opacity: 0, transform: 'translateY(10px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
   if (!it.text) box.querySelector('.tk-title').focus();
@@ -1256,8 +1274,14 @@ function navClick(e) {
 function closeNav() { const b = $('#itnav'); if (b) b.hidden = true; navState = null; }
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && navState && !$('#itnav').hidden && !taskOpen) { e.stopPropagation(); closeNav(); } }, true);
 addEventListener('click', (e) => { const m = e.target.closest('.nb[data-in]'); if (!m || justDragged || e.ctrlKey || e.metaKey) return; e.preventDefault(); e.stopPropagation(); openFinder(m.dataset.in, ''); }, true);
+function composeTask(it) {
+  const v = ($('#task .tk-cin')?.value || '').trim(); if (!v) return $('#task .tk-cin')?.focus();
+  taskEdit(() => { const nt = newItem('tarea', v, it.at); nt.from = it.id; nt.who = it.who; });
+  ideaCompose = false; paintTask(); renderAll(); toast('Tarea creada a partir de la idea');
+}
 function closeTask() {
   if (!taskOpen) return;
+  ideaCompose = false;
   if (document.activeElement?.closest?.('#task')) document.activeElement.blur();
   const it = taskNow();                                     // left empty: it was never made
   const written = it && (it.text || it.body || it.notes || (it.plans || []).some((p) => p.text) || (it.log || []).some((e) => !e.auto));
@@ -1278,7 +1302,7 @@ function paintTask() {
   $('#task .tk-in').innerHTML = `
     <header class="tk-h st-${st}">
       <span class="tk-k" title="${DEF[it.kind]}">${idea ? '💡 Idea' : 'Tarea'}</span>
-      ${idea ? `${stLabel(it) ? `<span class="tk-prog"><small>${stLabel(it)}</small></span>` : ''}<button class="tk-mk" title="Crear una tarea a partir de esta idea (quedan enlazadas)">→ Tarea</button>`
+      ${idea ? `${stLabel(it) ? `<span class="tk-prog"><small>${stLabel(it)}</small></span>` : ''}<button class="tk-mk${ideaCompose ? ' on' : ''}" title="Una tarea que nace de esta idea (quedan enlazadas)">${icon('task')}Tarea</button>`
         : `<span class="tk-steps${waits(it) && activeBlockers(it).length ? ' locked' : ''}${stopOf(it) ? ' stop-' + stopOf(it) : ''}">${STEPS.map(([k, l], i) => `<button data-st="${k}" class="${i <= STEPS.findIndex((x) => x[0] === stepOf(it)) && i ? 'on' : ''}${k === stepOf(it) ? ' cur' : ''}">${l}</button>`).join('')}</span>
         <span class="tk-stops"><button data-stop="espera" class="${it.stop === 'espera' ? 'on' : ''}" title="Espera a que otras tareas estén hechas">Espera a…</button><button data-stop="pausa" class="${it.stop === 'pausa' ? 'on' : ''}" title="Parada a mano">En pausa</button></span>`}
       <button class="tk-x" title="Cerrar (Esc)">×</button>
@@ -1294,6 +1318,7 @@ function paintTask() {
       ${blockers(it).map((t) => `<span class="tk-dep${t.done ? ' done' : ''}"><button data-open="${t.id}" title="Abrir">${esc(t.text || '…')}</button><button data-unblock="${t.id}" title="Ya no la bloquea">×</button></span>`).join('')}
       <button class="tk-bl-add" title="Añadir una tarea a la que espera">＋</button>
     </div>` : ''}
+    ${idea && ideaCompose ? `<div class="tk-compose">${icon('task')}<input class="tk-cin" placeholder="La tarea, en una línea…" value="${esc(it.text || '')}"><button class="tk-cok">Crear</button><button class="tk-cno" title="No crearla (Esc)">×</button></div>` : ''}
     <div class="tk-body">
       <div class="tk-title" contenteditable="true" spellcheck="false" data-ph="${idea ? 'La idea, en una línea…' : 'Qué hay que hacer, en una línea…'}">${esc(it.text || '')}</div>
       <div class="tk-meta">
@@ -1314,7 +1339,7 @@ function paintTask() {
       ${idea && ideaTasks(it).length ? `<div class="tk-sec">Sus tareas</div><div class="tk-kids">${ideaTasks(it).map((t) => `<button data-open="${t.id}">${barHTML(t)}<span>${esc(t.text || '…')}</span><small>${stLabel(t)}</small></button>`).join('')}</div>` : ''}
       ${!idea && dependents(it).length ? `<div class="tk-sec">Al terminarla siguen</div><div class="tk-frees">${dependents(it).map((d) => `<button data-open="${d.id}">🔓 ${esc(d.text || '…')}</button>`).join('')}</div>` : ''}
     </div>
-    <footer><button class="tk-rm">🗑 ${idea ? 'Descartar la idea' : 'Descartar la tarea'}</button></footer>`;
+    <footer>${idea ? '' : `<button class="tk-del">${icon('trash')}Borrar</button>`}<button class="tk-rm">${icon('bin')}${idea ? 'Descartar la idea' : 'Descartar'}</button></footer>`;
 }
 $('#task').addEventListener('input', (e) => {
   const it = taskNow(); if (!it) return;
@@ -1331,6 +1356,7 @@ $('#task').addEventListener('paste', (e) => {
 });
 $('#task').addEventListener('keydown', (e) => {
   const it = taskNow(); if (!it) return;
+  if (e.target.matches('.tk-cin')) { if (e.key === 'Enter') { e.preventDefault(); return composeTask(it); } if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ideaCompose = false; return paintTask(); } return; }
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); return closeTask(); }
   if (e.key !== 'Enter' || e.shiftKey) return;
   if (e.target.classList.contains('tk-title')) { e.preventDefault(); $('#task .tk-area').focus(); }
@@ -1354,7 +1380,9 @@ $('#task').addEventListener('click', (e) => {
     if (sp.dataset.stop === 'espera') { blockPick = new Set(it.blockedBy || []); blockQ = ''; paintTask(); return $('#task .tk-bl-q')?.focus(); }
     taskEdit(() => setStop(it, 'pausa')); paintTask(); return renderAll();
   }
-  if (t.closest('.tk-mk')) { let nt; taskEdit(() => { nt = newItem('tarea', it.text || '', it.at); nt.from = it.id; nt.who = it.who; }); renderAll(); return openTask(nt); }
+  if (t.closest('.tk-mk')) { ideaCompose = !ideaCompose; paintTask(); const c = $('#task .tk-cin'); if (c) { c.focus(); c.select(); } return; }
+  if (t.closest('.tk-cno')) { ideaCompose = false; return paintTask(); }
+  if (t.closest('.tk-cok')) return composeTask(it);
   const pk = t.closest('[data-pick]'); if (pk) { blockPick.has(pk.dataset.pick) ? blockPick.delete(pk.dataset.pick) : blockPick.add(pk.dataset.pick); return paintTask(); }
   if (t.closest('.tk-bl-cancel')) { blockPick = null; return paintTask(); }
   if (t.closest('.tk-bl-ok')) { const ids = [...blockPick]; blockPick = null; taskEdit(() => { it.blockedBy = ids; setStop(it, 'espera'); }); paintTask(); return renderAll(); }
@@ -1371,6 +1399,7 @@ $('#task').addEventListener('click', (e) => {
   const rl = t.closest('[data-rm-log]'); if (rl) { taskEdit(() => it.log.splice(+rl.dataset.rmLog, 1)); return paintTask(); }
   if (t.closest('[data-go-at]')) { const at = it.at; closeTask(); return focusTo(nd(at).kind === 'ftab' ? parent(at).id : at); }
   const gd = t.closest('[data-go-doc]'); if (gd) { closeTask(); return openDoc(gd.dataset.goDoc); }
+  if (t.closest('.tk-del')) { taskOpen = null; $('#task').hidden = true; snap(); dropItem(it); save(); renderAll(); ed?.refresh?.(); return toast('Tarea borrada', [['Deshacer', doUndo]]); }
   if (t.closest('.tk-rm')) {
     taskOpen = null; $('#task').hidden = true;
     snap(); toBin(it);
@@ -1848,8 +1877,8 @@ function newDrawing(at) {
 addEventListener('click', (e) => { const th = e.target.closest('.dw-th'); if (!th || selMode) return; e.preventDefault(); e.stopPropagation(); openDrawing((S.drawings || []).find((d) => d.id === th.dataset.draw)); }, true);
 
 // ---- settings (kept on this computer) ----
-const SET = Object.assign({ pics: true }, JSON.parse(localStorage.getItem('meadow.set') || '{}'));
-function applySet() { document.body.classList.toggle('no-pics', !SET.pics); for (const el of document.querySelectorAll('#settings [data-set]')) el.checked = !!SET[el.dataset.set]; }
+const SET = Object.assign({ pics: true, postits: true }, JSON.parse(localStorage.getItem('meadow.set') || '{}'));
+function applySet() { document.body.classList.toggle('no-pics', !SET.pics); PI?.setVisible(SET.postits !== false); for (const el of document.querySelectorAll('#settings [data-set]')) el.checked = !!SET[el.dataset.set]; }
 $('#set-btn').onclick = (e) => { e.stopPropagation(); $('#settings').hidden = !$('#settings').hidden; applySet(); };
 $('#settings').addEventListener('change', (e) => { const k = e.target.dataset.set; if (!k) return; SET[k] = e.target.checked; localStorage.setItem('meadow.set', JSON.stringify(SET)); applySet(); });
 addEventListener('pointerdown', (e) => { if (!e.target.closest('#settings, #set-btn')) $('#settings').hidden = true; }, true);
@@ -2178,6 +2207,7 @@ const ICO = {
   head: '<path d="M6 4v16M14 4v16M6 12h8M18 8l2-1v13"/>',
   image: '<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  bin: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M12 10.5a2.4 2.4 0 0 0-1.4 4.3c.3.2.4.5.4.9h2c0-.4.1-.7.4-.9a2.4 2.4 0 0 0-1.4-4.3zM11.2 17.6h1.6"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
 };
 const icon = (k) => (ICO[k] ? `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICO[k]}</svg>` : '');

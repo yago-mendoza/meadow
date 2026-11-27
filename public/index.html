@@ -7,6 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="tree.css">
+<link rel="stylesheet" href="postits.css">
 </head>
 <body>
 <section id="home" hidden>
@@ -26,11 +27,11 @@
   <button id="sel-btn" class="ib" title="Contexto: Ctrl+clic en lo que quieras para elegirlo; aquí sacas o guardas la barra">◳</button>
   <button id="set-btn" class="ib" title="Ajustes">⚙</button>
   <button id="list-btn" class="ib" title="Buscar (Ctrl+K, o empieza a escribir)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
-  <div id="settings" hidden><div class="st-h">Ajustes</div><label><input type="checkbox" data-set="pics"> Ver los dibujos en marcos y documentos</label></div>
+  <div id="settings" hidden><div class="st-h">Ajustes</div><label><input type="checkbox" data-set="pics"> Ver los dibujos en marcos y documentos</label><label><input type="checkbox" data-set="postits"> Ver los post-its</label></div>
 </header>
 
 <nav id="areas"></nav>
-<main id="stage"></main>
+<main id="stage"></main><aside id="area-its"></aside><div id="postits"></div>
 
 <div id="map" class="mini"><button id="map-pill" title="Ver todo el árbol">▦ <span>Mapa</span></button><div id="map-in"></div><button id="map-size" class="ib" title="Cerrar (Esc)">×</button></div>
 <div id="drawer" data-drop="drawer"><div class="dr-pull" title="El cajón: lo que sacas del árbol">🗄 <span>Cajón</span> <i id="dr-n"></i></div><div id="dr-list"></div></div>
