@@ -1584,3 +1584,26 @@ body.dragging:not(.drag-hang):not(.drag-make) #pins::after { content: "Acceso di
 body.dragging:not(.drag-hang):not(.drag-make) #corner-btn { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent), 0 1px 3px rgba(60, 40, 70, .12); }
 #corner-btn.drop-on { background: color-mix(in srgb, var(--accent) 12%, #fff); color: var(--accent); }
 body.dragging #drawer:not(.open) #dr-list { clip-path: inset(0 0 100% 0 round 14px) !important; opacity: 0 !important; pointer-events: none !important; }
+
+/* documents: four sizes on one grid (columns of 170, rows of 100, gaps of 14), filled densely: always aligned */
+.dc-grid { flex: 1 1 100%; display: grid; grid-template-columns: repeat(auto-fill, 170px); grid-auto-rows: 100px; grid-auto-flow: dense; gap: 14px; align-items: stretch; }
+.dc-grid > .dc { width: auto !important; height: auto !important; margin: 0; }
+.dc-grid > .dc.sz-s { grid-column: span 1; grid-row: span 2; }
+.dc-grid > .dc.sz-m { grid-column: span 2; grid-row: span 2; }
+.dc-grid > .dc.sz-l { grid-column: span 2; grid-row: span 3; }
+.dc-grid > .dc.sz-xl { grid-column: span 3; grid-row: span 3; }
+.dc-grid > .dc .dc-prev { max-height: none; flex: 1; }
+.dc-grid > .dc.sz-m .dc-prev, .dc-grid > .dc.sz-xl .dc-prev { columns: 2; column-gap: 18px; }
+/* the card's «⋯» and × sit just under its title line, never over the name */
+.dc-opt, .dc > .dc-x { top: 46px !important; }
+.dc-opt { right: 32px !important; }
+.dc > .dc-x { right: 8px !important; }
+/* the area's ideas-and-tasks column: a pale purple (yellow belongs to ideas) */
+#area-its { background: linear-gradient(90deg, #f1ebf4, #f6f2f8) !important; box-shadow: inset 1px 0 0 #e6dcea !important; }
+.ai-h { color: #8a7d8e !important; }
+.ai-h i { color: #b3a8b6 !important; }
+.ai-h .ico { color: #a397a5 !important; }
+#area-its .lc-row { box-shadow: 0 0 0 1px #ebe3ee !important; }
+#area-its .lc-row:hover { background: #fff !important; }
+#areas .ar.cr-hl { box-shadow: 0 0 0 2px var(--accent), 0 4px 14px rgba(113, 75, 103, .22) !important; transform: translateX(2px); transition: transform .15s, box-shadow .15s; }
+#areas .ar-sq.cr-hl { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--accent) !important; transform: scale(1.2); }

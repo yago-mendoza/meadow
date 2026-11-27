@@ -296,7 +296,7 @@ const nestedItems = (id) => [...S.tasks, ...S.ideas].filter((it) => live(it) && 
 const circles = (id, max = 4, deep = true) => { const all = itemsAt(id), l = all.slice(0, max), more = false; return l.length || more ? `<span class="its">${l.map((it) => `<i class="it ${it.kind}${it.done ? ' done' : ''}${' st-' + stOf(it) + (whoOf(it.who) === 'Agente' ? ' agent' : '') + (it.kind === 'tarea' && stOf(it) === 'bloqueada' && activeBlockers(it).length ? ' dep' : '')}" data-it="${it.id}" data-drag="item:${it.id}">${it.kind === 'idea' ? '💡' : ''}</i>`).join('')}${more ? `<button class="it-more" data-nav="${id}" title="Ver todas las de aquí y las de dentro">${all.length > max ? '+' + (all.length - max) : '…'}</button>` : ''}</span>` : ''; };
 function frameHTML(id, depth) {
   const f = nd(id), at = activeTab(f), t = nd(at), tabs = f.kids.map(nd);
-  const kids = t.kids.map((k) => (nd(k).kind === 'frame' ? (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)) : docHTML(k))).join('');
+  const kids = kidsHTML(t.kids, (k) => (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)));
   return `<section class="fr d${depth}${drawsAt(id).length ? ' has-pic' : ''}${f.square ? ' sq' : ''}${f.paper ? ' fb-' + f.paper : ''}" data-id="${id}" style="--bg:${f.color || PASTEL[4]}">${drawsAt(id).length ? `<div class="fr-pic">${thumbs(id)}</div>` : ''}
     <div class="fr-head">
       <span class="fr-title${tabs.length > 1 && at === tabs[0].id ? ' on' : ''}" data-drag="${id}" data-tab0="${tabs[0].id}" title="${tabs.length > 1 ? 'Clic: su primera pestaña · ' : ''}Arrastra para moverlo · doble clic: renombrar">${esc(f.title)}</span>${nb(id)}${tabs.length > 1 && at === tabs[0].id ? `<button class="fr-tx" data-tab0="${tabs[0].id}" title="Borrar esta pestaña (la siguiente pasa a ser la primera)">×</button>` : ''}
@@ -323,13 +323,30 @@ function nIn(id) {
 const itemsIn = (id) => [...S.tasks, ...S.ideas].filter((it) => live(it) && inScope(it, id)).length;
 const nb = (id) => { const k = nIn(id) + itemsIn(id); return k ? `<i class="nb" data-in="${id}" title="Ver lo que hay dentro">${k}</i>` : ''; };
 const countIn = (id) => { let c = 0; const w = (x) => { for (const k of nd(x).kids) { if (['frame', 'doc'].includes(nd(k).kind)) c++; w(k); } }; w(id); return c; };
+const docWeight = (d) => d.kids.reduce((a, k) => a + (nd(k)?.text || '').length, 0) + (d.kids.length - 1) * 400 + (d.dia ? 1200 + (d.dg?.nodes || []).length * 120 : 0);
+let sizeCut = null;
+function docSize(id) {
+  const d = nd(id); if (!d) return 's';
+  if (!sizeCut) {
+    const ws = Object.values(S.nodes).filter((n) => n.kind === 'doc' && PAR.has(n.id)).map(docWeight).sort((a, b) => a - b), q = (p) => ws[Math.min(ws.length - 1, Math.floor(p * ws.length))];
+    sizeCut = ws.length >= 5 ? [q(.25), q(.5), q(.8)] : [300, 1500, 5000];
+  }
+  const w = docWeight(d); return w <= sizeCut[0] ? 's' : w <= sizeCut[1] ? 'm' : w <= sizeCut[2] ? 'l' : 'xl';
+}
+// documents that come one after another sit in one grid (rows and columns of fixed size, filled densely)
+function kidsHTML(ids, one) {
+  const out = []; let run = [];
+  const flush = () => { if (run.length) out.push(`<div class="dc-grid">${run.map(docHTML).join('')}</div>`); run = []; };
+  for (const k of ids) { if (nd(k)?.kind === 'doc') run.push(k); else { flush(); out.push(one(k)); } }
+  flush(); return out.join('');
+}
 function docHTML(id) {
   const d = nd(id), at = activeTab(d), text = nd(at).text || '';
-  const prev = readable(text).split('\n').filter((l, i, a) => l.trim() || (i && a[i - 1].trim())).slice(0, 12).join('\n');
+  const prev = readable(text).split('\n').filter((l, i, a) => l.trim() || (i && a[i - 1].trim())).slice(0, { s: 10, m: 12, l: 20, xl: 28 }[docSize(id)]).join('\n');
   const many = d.kids.length > 1;          // with tabs: its name, and its tabs right under it (what each holds stays inside)
-  if (d.dia) return `<article class="dc dia${d.size ? ' sz-' + d.size : ''}" data-id="${id}" data-drag="${id}" data-drop="doc"><h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}</h3><div class="dc-dg">${(d.dg?.nodes || []).length ? diagramThumbSVG(d.dg, 240, 160) : '<span class="dc-dg-empty">Diagrama vacío</span>'}</div>${circles(id)}<button class="dc-opt" title="Opciones del documento">⋯</button><button class="dc-x" title="Borrar">×</button></article>`;
-  return `<article class="dc${many ? ' many' : ''}${d.size ? ' sz-' + d.size : ''}${d.paper ? ' pp-' + d.paper : ''}" data-id="${id}" data-drag="${id}" data-drop="doc">
-    <h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}${nb(id)}</h3>
+  if (d.dia) return `<article class="dc dia sz-${docSize(id) === 's' ? 'm' : docSize(id)}" data-id="${id}" data-drag="${id}" data-drop="doc"><h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}</h3><div class="dc-dg">${(d.dg?.nodes || []).length ? diagramThumbSVG(d.dg, 240, 160) : '<span class="dc-dg-empty">Diagrama vacío</span>'}</div>${circles(id)}<button class="dc-opt" title="Opciones del documento">⋯</button><button class="dc-x" title="Borrar">×</button></article>`;
+  return `<article class="dc${many ? ' many' : ''} sz-${docSize(id)}" data-id="${id}" data-drag="${id}" data-drop="doc">
+    <h3 class="dc-title" title="Doble clic: renombrar">${d.icon ? `<span class="ar-ic">${d.icon}</span> ` : ''}${esc(d.title)}${nb(id)}</h3>
     ${many ? `<div class="dc-tabs">${d.kids.map((k) => `<span data-pg="${k}" class="${k === at ? 'on' : ''}">${esc(nd(k).title)}${nb(k)}</span>`).join('')}</div><div class="dc-lines"></div>`
       : prev ? `<div class="dc-prev">${esc(prev).replace(/^(#{1,6})\s+(.*)$/gm, '<b class="h$1">$2</b>')}</div>` : '<div class="dc-lines" title="Página en blanco"></div>'}
     ${thumbs(id)}${circles(id)}<button class="dc-opt" title="Opciones del documento">⋯</button><button class="dc-x" title="Borrar o guardar en el cajón">×</button>
@@ -411,10 +428,11 @@ function looseCard(id, alone) {
   return `<div class="loose-its lc${alone ? ' alone' : ''}" data-id="${id}"><div class="lc-h">${icon('bulb')}<b>En este apartado</b><i>${l.length}</i></div>${l.map(row).join('')}<span class="its"></span></div>`;
 }
 function renderStage() {
+  sizeCut = null;
   const f = nd(S.focus);
   const before = measure(stage, '.fr[data-id], .dc[data-id]');
   stage.innerHTML = f.kind === 'project' || f.kind === 'area'
-    ? `<div class="grid${f.kids.length ? '' : ' is-empty'}" data-drop="into" data-id="${f.id}"><div class="loose-its lz-empty" data-id="${f.id}"></div>${f.kids.length ? '' : EMPTY_HTML}${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}</div>`
+    ? `<div class="grid${f.kids.length ? '' : ' is-empty'}" data-drop="into" data-id="${f.id}"><div class="loose-its lz-empty" data-id="${f.id}"></div>${f.kids.length ? '' : EMPTY_HTML}${kidsHTML(f.kids, (k) => frameHTML(k, 0))}</div>`
     : `<div class="solo">${frameHTML(f.id, 0)}</div>`;
   paintAreaItems(f.kind === 'area' || f.kind === 'project' ? f.id : null);
   if (!skipFlip) flip(stage, before, () => 1, { sel: '.dc[data-id]', appear: false });
@@ -1948,7 +1966,7 @@ function closeDoc() {
 function renderEdHead() {
   const d = nd(cur); if (!d) return;
   backlinks();
-  $('#ed-name').value = d.title; $('#ed').dataset.paper = d.paper || '';
+  $('#ed-name').value = d.title; 
   const tint = pathOf(cur).reverse().find((n) => n.kind === 'frame')?.color;
   $ed.classList.toggle('tinted', !!tint); if (tint) $ed.style.setProperty('--tint', tint); else $ed.style.removeProperty('--tint');
   const p = pathOf(cur).slice(0, -1);
@@ -2329,6 +2347,8 @@ function frameOptions(anchor, id) {
 // a document: card size, paper (also in the editor)
 function docOptions(anchor, id) {
   const d = nd(id);
+  optsPop(anchor, () => [{ label: 'Icono', small: true, now: d.icon || '', set: (v) => { d.icon = v || undefined; }, tiles: [['', 'Ninguno', '<i class="fo-none"></i>'], ...AREA_ICONS.map((e) => [e, e, `<i class="fo-emo">${e}</i>`])] }], 300);
+  return;
   optsPop(anchor, () => [
     { label: 'Tamaño', now: d.size || 'm', set: (v) => { d.size = v === 'm' ? undefined : v; }, tiles: [['s', 'Pequeña', tileBox('sz-s')], ['m', 'Mediana', tileBox('sz-m')], ['l', 'Grande', tileBox('sz-l')]] },
     { label: 'Papel', now: d.paper || 'plain', set: (v) => { d.paper = v === 'plain' ? undefined : v; }, tiles: [['plain', 'Liso', tileBox('pp-plain')], ['ruled', 'Rayado', tileBox('pp-ruled')], ['grid', 'Cuadriculado', tileBox('pp-grid')]] },
@@ -2445,3 +2465,10 @@ $('#to-home').onclick = () => { flush(); location.href = '/'; };
 
 window.meadow = { get S() { return S; }, render: () => renderAll() };   // for tests and the console
 load();
+
+// hovering a place in the crumbs (or in their menu) lights it up in its column, so you see which one you mean
+function crLight(id) {
+  for (const el of document.querySelectorAll('#areas .cr-hl')) el.classList.remove('cr-hl');
+  if (id) for (const el of document.querySelectorAll(`#areas .ar[data-area="${id}"], #areas .ar-sq[data-sq="${id}"]`)) el.classList.add('cr-hl');
+}
+document.addEventListener('pointerover', (e) => { const b = e.target.closest('#crmenu [data-go], #crumbs .cr[data-go]'); crLight(b ? b.dataset.go : null); });
