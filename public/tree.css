@@ -1308,3 +1308,36 @@ body:has(#draw:not([hidden])) #pick { z-index: 320; }
 .fo-shape { width: 38px; height: 26px; border: 2px solid currentColor; border-bottom: 0; border-right: 0; opacity: .8; }
 .fo-shape.round { border-top-left-radius: 14px; }
 .fo-shape.square { border-top-left-radius: 2px; }
+
+/* an empty place: a little meadow swaying in the wind */
+.empty-meadow { flex: 1 1 100%; display: flex; flex-direction: column; align-items: center; padding: 30px 0 10px; pointer-events: none; }
+.meadow-empty { width: 340px; max-width: 80%; overflow: visible; }
+.empty-meadow p { margin: 6px 0 2px; font: 600 15px "Segoe UI", sans-serif; color: #8a7d8e; }
+.empty-meadow small { font: 12.5px "Segoe UI", sans-serif; color: #b3a8b6; }
+.empty-meadow small b { font-weight: 600; color: #9a8da0; }
+.mg-b { fill: none; stroke-width: 2.2; stroke-linecap: round; }
+.mg-far .mg-b { stroke-width: 1.6; opacity: .8; }
+.mg-b, .mg-stem { transform-box: fill-box; transform-origin: 50% 100%; animation: mg-sway 5.5s ease-in-out infinite; }
+.b1 { animation-delay: -1.2s; } .b2 { animation-delay: -3.1s; animation-duration: 6.4s; } .b3 { animation-delay: -2.2s; }
+.b4 { animation-delay: -.4s; animation-duration: 4.8s; } .b5 { animation-delay: -2.6s; } .b6 { animation-delay: -1.7s; animation-duration: 5s; } .b7 { animation-delay: -3.8s; }
+.mg-stem.s1 { animation-duration: 6.2s; animation-name: mg-sway-soft; } .mg-stem.s2 { animation-delay: -2s; animation-duration: 4.6s; } .mg-stem.s3 { animation-delay: -1s; animation-duration: 4.2s; }
+.mg-bud { transform-box: fill-box; transform-origin: 50% 100%; animation: mg-nod 6.2s ease-in-out infinite; }
+@keyframes mg-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
+@keyframes mg-sway-soft { 0%, 100% { transform: rotate(-1.6deg); } 50% { transform: rotate(2.4deg); } }
+@keyframes mg-nod { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(5deg); } }
+.sd { animation: mg-drift 9s linear infinite; opacity: 0; }
+.d2 { animation-delay: -3s; animation-duration: 11s; } .d3 { animation-delay: -6s; animation-duration: 10s; }
+@keyframes mg-drift { 0% { transform: translate(0, 0); opacity: 0; } 12% { opacity: .9; } 80% { opacity: .7; } 100% { transform: translate(90px, -26px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .mg-b, .mg-stem, .mg-bud, .sd { animation: none; } .sd { opacity: .6; } }
+
+.meadow-empty { width: 460px; }
+.b8 { animation-delay: -2.9s; animation-duration: 5.2s; } .b9 { animation-delay: -1.4s; } .b10 { animation-delay: -3.3s; animation-duration: 6s; }
+.mg-stem.s4 { animation-delay: -3s; animation-duration: 5.8s; animation-name: mg-sway-soft; }
+.mg-fly { animation: mg-fly 16s ease-in-out infinite; }
+.mg-wings { transform-box: fill-box; transform-origin: 50% 50%; animation: mg-flap .32s ease-in-out infinite alternate; }
+@keyframes mg-flap { from { transform: scaleX(1); } to { transform: scaleX(.35); } }
+@keyframes mg-fly { 0% { transform: translate(60px, 70px) rotate(-8deg); } 25% { transform: translate(150px, 40px) rotate(6deg); } 50% { transform: translate(236px, 84px) rotate(-4deg); } 62% { transform: translate(238px, 88px) rotate(0deg); } 75% { transform: translate(300px, 46px) rotate(8deg); } 100% { transform: translate(60px, 70px) rotate(-8deg); } }
+.grid.is-empty { flex-direction: column; align-items: center; }
+.grid.is-empty > .fr-new { flex: none; width: 260px; }
+@media (prefers-reduced-motion: reduce) { .mg-fly, .mg-wings { animation: none; } }
+.grid.is-empty > .fr-new { align-self: center; min-height: 84px; }

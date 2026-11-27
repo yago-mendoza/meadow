@@ -328,11 +328,62 @@ function docHTML(id) {
     ${thumbs(id)}${circles(id)}<button class="dc-x" title="Borrar o guardar en el cajón">×</button>
   </article>`;
 }
+const EMPTY_HTML = `<div class="empty-meadow"><svg class="meadow-empty" viewBox="0 0 360 200" aria-hidden="true">
+  <defs>
+    <linearGradient id="mg-g1" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#7fb08a"/><stop offset="1" stop-color="#b9dcb8"/></linearGradient>
+    <linearGradient id="mg-g2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#93bf8f"/><stop offset="1" stop-color="#d4ecc9"/></linearGradient>
+    <linearGradient id="mg-g3" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#a6c9a0"/><stop offset="1" stop-color="#e3f2da"/></linearGradient>
+    <radialGradient id="mg-sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff3d6"/><stop offset="1" stop-color="#fff3d6" stop-opacity="0"/></radialGradient>
+  </defs>
+  <circle cx="270" cy="58" r="46" fill="url(#mg-sun)"/>
+  <path d="M10 178 C 80 168, 140 172, 190 170 S 300 166, 350 176" fill="none" stroke="#e4d9e8" stroke-width="2" stroke-linecap="round"/>
+  <g class="mg-far">
+    <path class="mg-b b1" d="M70 176 C 68 150, 74 128, 66 104" stroke="url(#mg-g3)"/>
+    <path class="mg-b b2" d="M240 172 C 242 146, 236 124, 246 102" stroke="url(#mg-g3)"/>
+    <path class="mg-b b3" d="M300 176 C 298 156, 304 140, 296 120" stroke="url(#mg-g3)"/>
+  </g>
+  <g class="mg-mid">
+    <path class="mg-b b4" d="M110 176 C 108 140, 120 110, 108 76" stroke="url(#mg-g2)"/>
+    <path class="mg-b b5" d="M126 176 C 128 150, 122 128, 134 104" stroke="url(#mg-g2)"/>
+    <path class="mg-b b6" d="M212 174 C 214 140, 204 112, 216 84" stroke="url(#mg-g2)"/>
+    <path class="mg-b b7" d="M268 176 C 266 150, 274 132, 264 108" stroke="url(#mg-g2)"/>
+  </g>
+  <g class="mg-stem s1">
+    <path d="M168 176 C 166 140, 176 108, 170 70" fill="none" stroke="url(#mg-g1)" stroke-width="3" stroke-linecap="round"/>
+    <path d="M171 112 C 186 100, 200 102, 206 92 C 194 90, 180 96, 171 112 Z" fill="#a8d1a0"/>
+    <path d="M170 132 C 154 124, 142 128, 134 120 C 146 116, 160 120, 170 132 Z" fill="#9cc896"/>
+    <g class="mg-bud"><ellipse cx="170" cy="64" rx="7" ry="10" fill="#f3c7d6"/><path d="M164 68 C 166 60, 174 60, 176 68" fill="#e7a9bf"/></g>
+  </g>
+  <g class="mg-stem s2">
+    <path d="M196 176 C 196 160, 192 150, 196 138" fill="none" stroke="url(#mg-g1)" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M196 142 C 186 132, 184 124, 188 118 C 196 124, 198 132, 196 142 Z" fill="#b3dbaa"/>
+    <path d="M196 140 C 204 130, 210 128, 214 122 C 212 132, 206 138, 196 140 Z" fill="#a3d09a"/>
+  </g>
+  <g class="mg-stem s3">
+    <path d="M90 176 C 92 164, 88 156, 92 148" fill="none" stroke="url(#mg-g1)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M92 150 C 86 144, 86 138, 89 134 C 94 139, 95 145, 92 150 Z" fill="#b9dfb0"/>
+  </g>
+  <g class="mg-mid">
+    <path class="mg-b b8" d="M150 176 C 152 156, 146 140, 152 122" stroke="url(#mg-g2)"/>
+    <path class="mg-b b9" d="M286 176 C 284 160, 290 146, 284 132" stroke="url(#mg-g2)"/>
+    <path class="mg-b b10" d="M52 178 C 54 162, 50 150, 56 136" stroke="url(#mg-g3)"/>
+  </g>
+  <g class="mg-stem s4">
+    <path d="M236 176 C 234 150, 242 128, 238 104" fill="none" stroke="url(#mg-g1)" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M237 140 C 226 134, 220 128, 218 120 C 228 122, 234 130, 237 140 Z" fill="#a8d1a0"/>
+    <g class="mg-daisy"><g fill="#fffdf8" stroke="#eee6dc" stroke-width=".6"><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(0 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(40 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(80 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(120 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(160 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(200 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(240 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(280 238 102)"/><ellipse cx="238" cy="94" rx="3.2" ry="8" transform="rotate(320 238 102)"/></g><circle cx="238" cy="102" r="4.2" fill="#f4cf6a"/></g>
+  </g>
+  <g class="mg-fly"><g class="mg-wings">
+    <path d="M0 0 C -9 -10, -16 -4, -11 3 C -7 7, -2 4, 0 0 Z" fill="#e7c3ea"/><path d="M0 0 C 9 -10, 16 -4, 11 3 C 7 7, 2 4, 0 0 Z" fill="#d9b5e6"/>
+    <path d="M0 1 C -6 4, -8 10, -3 10 C 0 9, 0 5, 0 1 Z" fill="#f1d3ee"/><path d="M0 1 C 6 4, 8 10, 3 10 C 0 9, 0 5, 0 1 Z" fill="#e5c3ec"/></g>
+    <path d="M0 -3 L0 7" stroke="#8a6a8e" stroke-width="1.4" stroke-linecap="round"/></g>
+  <g class="mg-seeds"><circle class="sd d1" cx="120" cy="60" r="2" fill="#d8cde0"/><circle class="sd d2" cx="230" cy="44" r="1.6" fill="#e2d6ea"/><circle class="sd d3" cx="150" cy="30" r="1.4" fill="#d8cde0"/></g>
+</svg><p>Aquí todavía no ha crecido nada</p><small>Arrastra un <b>Marco</b> o un <b>Documento</b> desde arriba</small></div>`;
 function renderStage() {
   const f = nd(S.focus);
   const before = measure(stage, '.fr[data-id], .dc[data-id]');
   stage.innerHTML = f.kind === 'project' || f.kind === 'area'
-    ? `<div class="grid" data-drop="into" data-id="${f.id}">${((lc) => `<div class="loose-its${lc ? '' : ' lz-empty'}" data-id="${f.id}">${lc}</div>`)(circles(f.id, 12, false))}${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}<div class="fr-new" data-drop="into" data-id="${f.id}"><button class="new-frame">＋ Marco</button></div></div>`
+    ? `<div class="grid${f.kids.length ? '' : ' is-empty'}" data-drop="into" data-id="${f.id}">${((lc) => `<div class="loose-its${lc ? '' : ' lz-empty'}" data-id="${f.id}">${lc}</div>`)(circles(f.id, 12, false))}${f.kids.length ? '' : EMPTY_HTML}${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}<div class="fr-new" data-drop="into" data-id="${f.id}"><button class="new-frame">＋ Marco</button></div></div>`
     : `<div class="solo">${frameHTML(f.id, 0)}</div>`;
   if (!skipFlip) flip(stage, before, () => 1, { sel: '.dc[data-id]', appear: false });
 }
