@@ -351,3 +351,10 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 .cm-line.cm-li { padding-left: calc(22px + var(--lv, 0) * 20px) !important; text-indent: -14px; }
 .cm-bullet { display: inline-block; width: 14px; text-indent: 0; }
 .cm-bullet::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #9a8aa2; vertical-align: middle; margin: 0 5px 2px 1px; }
+
+/* a title's level marks («##») sit at the right of its line, quiet until you come near; still a click to split, a drag to move */
+.cm-line.cm-h { position: relative; padding-right: 46px !important; }
+.cm-line.cm-h .cm-hmark { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); margin: 0; vertical-align: 0; opacity: .45; font-size: .58em; }
+.cm-line.cm-h:hover .cm-hmark { opacity: 1; }
+.cm-line.cm-h .cm-hmark:hover { transform: translateY(-50%) scale(1.08); }
+.cm-hsp { font-size: 0; }

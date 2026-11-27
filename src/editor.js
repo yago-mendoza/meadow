@@ -124,6 +124,7 @@ function decorateLine(line, out) {
     out.push(Decoration.line({ class: `cm-h cm-h${d}${line.number === 1 ? ' cm-hfirst' : ''}` }).range(base));
     out.push(Decoration.mark({ class: 'cm-hmark', attributes: { 'data-d': String(hm[1].length), title: 'Clic: dividir en secciones de este nivel' } })
       .range(base, base + hm[1].length));
+    out.push(Decoration.mark({ class: 'cm-hsp' }).range(base + hm[1].length, base + hm[0].length));   // the space after the marks takes no room: the marks sit at the right
     skip = hm[0].length;
   } else if (tm) {
     out.push(Decoration.line({ class: 'cm-tagline', attributes: { style: `--h:${hue(tm[2].trim().toUpperCase())}` } }).range(base));
