@@ -1,0 +1,54 @@
+/* Meadow diagrams: the editor's surface and its few controls. The drawing itself carries its own colours inline,
+   so thumbnails look the same without this file. */
+
+.dg {
+  position: relative; width: 100%; height: 100%; overflow: hidden; outline: none; box-sizing: border-box;
+  user-select: none; -webkit-user-select: none; touch-action: none;
+  background-color: #fdfbfe; background-image: radial-gradient(circle at 1px 1px, #e4dce8 1px, transparent 1.5px);
+  font-family: "Segoe UI", sans-serif; color: #3a2f3f;
+}
+.dg-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.dg text { pointer-events: none; }
+.dg [data-n] { cursor: move; }
+.dg [data-e] { cursor: pointer; }
+.dg-dot { cursor: crosshair; }
+.dg-dot circle + circle { fill: #fff; stroke: #714b67; stroke-width: 1.4; transition: fill .12s; }
+.dg-dot:hover circle + circle { fill: #714b67; }
+.dg-rs { cursor: nwse-resize; fill: #fff; stroke: #714b67; stroke-width: 1.4; }
+.dg-band { fill: rgba(113, 75, 103, .05); stroke: #714b67; stroke-width: 1; stroke-dasharray: 4 3; }
+.dg.dg-grab, .dg.dg-grab * { cursor: grab !important; }
+.dg.dg-panning, .dg.dg-panning * { cursor: grabbing !important; }
+
+.dg-hint { position: absolute; inset: 0; display: grid; place-items: center; color: #b6abba; font-size: 15px; pointer-events: none; }
+.dg-hint[hidden] { display: none; }
+.dg-title { position: absolute; top: 14px; left: 18px; max-width: 50%; font-size: 13px; color: #8b8492; pointer-events: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* the bar that follows the selection */
+.dg-bar { position: absolute; top: 0; left: 0; z-index: 2; display: flex; align-items: center; gap: 1px; padding: 4px;
+  background: #fff; border: 1px solid #ece6ee; border-radius: 12px; box-shadow: 0 6px 18px rgba(70, 40, 70, .08); }
+.dg-bar[hidden] { display: none; }
+.dg-bar button, .dg-zoom button { box-sizing: border-box; margin: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  display: grid; place-items: center; font: 12px "Segoe UI", sans-serif; }
+.dg-bar button { width: 30px; height: 30px; border-radius: 8px; color: #7a6f7f; }
+.dg-bar button:hover { background: #f6f1f5; color: #714b67; }
+.dg-bar button.on { background: #f1e9ef; color: #714b67; }
+.dg-bar .dg-sw, .dg-bar .dg-sw:hover, .dg-bar .dg-sw.on { width: 24px; background: none; }
+.dg-sw span { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; box-sizing: border-box; transition: transform .12s; }
+.dg-sw:hover span { transform: scale(1.12); }
+.dg-sw.on span { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #714b67; }
+.dg-sep { width: 1px; height: 20px; background: #ece6ee; margin: 0 4px; }
+.dg svg:not(.dg-svg) { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* zoom, bottom right */
+.dg-zoom { position: absolute; right: 14px; bottom: 14px; display: flex; align-items: center; gap: 2px; padding: 3px;
+  background: rgba(255, 255, 255, .85); border: 1px solid #ece6ee; border-radius: 10px; }
+.dg-zoom button { height: 26px; min-width: 26px; padding: 0 7px; border-radius: 7px; color: #8b8492; }
+.dg-zoom button:hover { background: #f6f1f5; color: #714b67; }
+.dg-zoom svg:not(.dg-svg) { width: 16px; height: 16px; }
+
+/* writing inside a box or on an arrow */
+.dg-ta { position: absolute; z-index: 1; box-sizing: content-box; margin: 0; padding: 0; border: 0; outline: 0; resize: none; overflow: hidden;
+  background: transparent; color: #3a2f3f; caret-color: #714b67; text-align: center; font-family: "Segoe UI", sans-serif;
+  font-weight: 400; letter-spacing: normal; white-space: pre-wrap; overflow-wrap: break-word; user-select: text; -webkit-user-select: text; }
+.dg-ta-e { background: #fff; color: #5b4f60; box-shadow: 0 0 0 1px #e3d7e1; }

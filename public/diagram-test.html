@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagrama · prueba</title>
+<link rel="stylesheet" href="diagram.css">
+<style>
+  html, body { margin: 0; height: 100%; }
+  #d { position: fixed; inset: 0; }
+  #thumb { position: fixed; left: 14px; bottom: 14px; background: #fff; border: 1px solid #ece6ee; border-radius: 12px; pointer-events: none; line-height: 0; }
+</style>
+</head>
+<body>
+<div id="d"></div>
+<div id="thumb"></div>
+<script type="module">
+import { createDiagram, diagramThumbSVG } from './diagram.js';
+
+// A sample: one node ("archivo") has no coordinates, to show the automatic layout.
+const data = {
+  v: 1,
+  nodes: [
+    { id: 'idea', x: 40, y: 60, w: 150, h: 70, text: 'Idea', shape: 'ellipse', color: '#ece3f7' },
+    { id: 'notas', x: 260, y: 60, text: 'Notas sueltas y lecturas', shape: 'note', color: '#f9eedb' },
+    { id: 'borrador', x: 260, y: 230, text: 'Borrador', color: '#e3edf9' },
+    { id: 'listo', x: 500, y: 215, text: '¿Se entiende?', shape: 'diamond', color: '#f7e4ec' },
+    { id: 'revisar', x: 500, y: 400, text: 'Revisar con calma', color: '#e5f3e4' },
+    { id: 'publicar', x: 760, y: 230, text: 'Publicar', color: '#dff2f0' },
+    { id: 'archivo', text: 'Guardar en el archivo', color: '#f6f2f7' },
+  ],
+  edges: [
+    { id: 'e1', from: 'idea', to: 'notas' },
+    { id: 'e2', from: 'idea', to: 'borrador' },
+    { id: 'e3', from: 'notas', to: 'borrador', dashed: true },
+    { id: 'e4', from: 'borrador', to: 'listo' },
+    { id: 'e5', from: 'listo', to: 'publicar', text: 'sí' },
+    { id: 'e6', from: 'listo', to: 'revisar', text: 'no' },
+    { id: 'e7', from: 'revisar', to: 'borrador' },
+    { id: 'e8', from: 'publicar', to: 'archivo' },
+  ],
+};
+
+const thumb = document.getElementById('thumb');
+thumb.innerHTML = diagramThumbSVG(data);
+window.dg = createDiagram(document.getElementById('d'), {
+  data,
+  title: 'Cómo nace un artículo',
+  onChange: (d) => { console.log('onChange ' + JSON.stringify(d)); thumb.innerHTML = diagramThumbSVG(d); },
+});
+</script>
+</body>
+</html>

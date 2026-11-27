@@ -7,6 +7,7 @@
 import { createEditor, LINK_RE, TAG_RE, TOKEN_RE } from './editor.bundle.js';
 import { flip, measure, EASE } from './motion.js';
 import { createPostits } from './postits.js';
+import { createDiagram, diagramThumbSVG } from './diagram.js';
 
 const PASTEL = ['#fff1b8', '#ffd9c2', '#f9d0e3', '#e3d9f7', '#cfe5fb', '#cdeedd', '#e4ebd3', '#eceef2'];
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -326,6 +327,7 @@ function docHTML(id) {
   const d = nd(id), at = activeTab(d), text = nd(at).text || '';
   const prev = readable(text).split('\n').filter((l, i, a) => l.trim() || (i && a[i - 1].trim())).slice(0, 12).join('\n');
   const many = d.kids.length > 1;          // with tabs: its name, and its tabs right under it (what each holds stays inside)
+  if (d.dia) return `<article class="dc dia${d.size ? ' sz-' + d.size : ''}" data-id="${id}" data-drag="${id}" data-drop="doc"><h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}</h3><div class="dc-dg">${(d.dg?.nodes || []).length ? diagramThumbSVG(d.dg, 240, 160) : '<span class="dc-dg-empty">Diagrama vacío</span>'}</div>${circles(id)}<button class="dc-opt" title="Opciones del documento">⋯</button><button class="dc-x" title="Borrar">×</button></article>`;
   return `<article class="dc${many ? ' many' : ''}${d.size ? ' sz-' + d.size : ''}${d.paper ? ' pp-' + d.paper : ''}" data-id="${id}" data-drag="${id}" data-drop="doc">
     <h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}${nb(id)}</h3>
     ${many ? `<div class="dc-tabs">${d.kids.map((k) => `<span data-pg="${k}" class="${k === at ? 'on' : ''}">${esc(nd(k).title)}${nb(k)}</span>`).join('')}</div><div class="dc-lines"></div>`
@@ -474,7 +476,7 @@ function crMenu(btn) {
 function crHide() { $('#crmenu')?.classList.remove('on'); }
 $('#crumbs').addEventListener('pointerover', (e) => { const b = e.target.closest('.cr.alt'); if (!b) return; clearTimeout(crT); crMenu(b); });
 $('#crumbs').addEventListener('pointerout', (e) => { if (e.target.closest('.cr.alt')) { clearTimeout(crT); crT = setTimeout(crHide, 160); } });
-const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo'], ['postit', '🗒️', 'Post-it']];
+const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo'], ['diagrama', '◇', 'Diagrama'], ['postit', '🗒️', 'Post-it']];
 $('#tools').addEventListener('pointerover', () => document.body.classList.add('tool-hover'));
 $('#tools').addEventListener('pointerleave', () => document.body.classList.remove('tool-hover'));
 $('#tools').innerHTML = TOOLS.map(([k, ico, name]) => `<button class="tool t-${k}" data-drag="new:${k}" title="${k === 'tarea' || k === 'idea' ? DEF[k].replace(/'/g, '') + ' ' : ''}Clic: crear aquí · arrastra: crear donde lo sueltes"><span class="ico">${ico}</span>${name}</button>`).join('');
@@ -666,12 +668,14 @@ addEventListener('pointerdown', (e) => {
 function srcOf(key) {
   if (key.startsWith('head:')) { const [, tab, line] = key.split(':'); return { head: { tab, line: +line } }; }
   if (key.startsWith('item:')) return { item: key.slice(5) };
+  if (key === 'new:diagrama') return { make: 'doc', dia: true };
   if (key.startsWith('new:')) return { make: key.slice(4) };
   return { node: key };
 }
 function labelOf(src) {
   if (src.head) { const l = (nd(src.head.tab)?.text || '').split('\n')[src.head.line - 1] || ''; return l.replace(/^#+\s*/, '# '); }
   if (src.item) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === src.item); return it ? (it.kind === 'idea' ? '💡 ' : '☐ ') + it.text : ''; }
+  if (src.dia) return '◇ Diagrama nuevo';
   if (src.make) return { frame: '⬚ Marco nuevo', doc: '📄 Documento nuevo', idea: '💡 Idea nueva', tarea: '☐ Tarea nueva', dibujo: '🖍 Dibujo nuevo', postit: '🗒️ Post-it' }[src.make];
   const n = nd(src.node); return n ? ({ area: '▤ ', frame: '⬚ ', ftab: '▭ ', doc: '📄 ', dtab: '▭ ' }[n.kind] || '') + n.title : '';
 }
@@ -835,7 +839,7 @@ function drop(src, t) {
     const it = newItem(src.make, '', null); it.fresh = true; dropInText(it, t); return openTask(it);
   }
   if (src.item) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === src.item); if (it) it.at = t.pid; save(); renderAll(); return; }
-  if (src.make) return makeAt(src.make, t);
+  if (src.make) return makeAt(src.dia ? 'diagrama' : src.make, t);
   const before = src.node ? nd(src.node)?.kind : 'h';
   const becomes = t.kind === 'head' ? 'h' : t.kind === 'drawer' ? null : (t.forced || childKind(nd(t.pid).kind, { kind: before }));
   if (src.node && t.kind === 'place' && t.idx != null && PAR.get(src.node) === t.pid) { const oi = nd(t.pid).kids.indexOf(src.node); if (oi < t.idx) t.idx--; }
@@ -875,12 +879,14 @@ function makeAt(kind, t) {
     popEdit(el, '', (v) => { if (!v) { listOf(kind).splice(listOf(kind).indexOf(it), 1); } else it.text = v; save(); renderAll(); });
     return;
   }
-  const g = { kind, title: kind === 'frame' ? 'Marco nuevo' : 'Documento nuevo', body: '', kids: [] };
+  const dia = kind === 'diagrama'; if (dia) kind = 'doc';
+  const g = { kind, title: dia ? 'Diagrama nuevo' : kind === 'frame' ? 'Marco nuevo' : 'Documento nuevo', body: '', kids: [] };
   let id;
   if (t?.kind === 'head') { placeUnderHead(g, t.tab, t.line); save(); renderAll(); return; }
   if (t?.kind === 'drawer') { id = build(g, kind); S.drawer.push(id); }
   else if (t?.kind === 'place') id = place(g, t.pid, t.idx, t.forced);
   else id = place(g, defaultHome(kind));
+  if (dia) { nd(id).dia = true; nd(id).dg = { v: 1, nodes: [], edges: [] }; save(); renderAll(); return openDia(id); }
   save(); renderAll();
   const el = stage.querySelector(`[data-id="${id}"] .fr-title, .dc[data-id="${id}"] .dc-title`);
   if (el) { el.scrollIntoView({ block: 'nearest' }); editInline(el, (v) => { if (v) { nd(id).title = v; save(); renderAll(); } }); }
@@ -1089,7 +1095,6 @@ function askDelete(id, anchor) {
   if (!inside && n.kind !== 'ftab') return drop();
   askChoice(anchor, `¿Qué hago con ${name} «${esc(n.title)}»?`, inside ? 'Tiene cosas dentro.' : '', [
     ...(canLift(n) ? [{ label: `Borrar solo ${name}: lo de dentro se queda en su sitio`, run: keep }] : []),
-    { label: 'Guardarlo en el cajón', run: aside },
     { label: `Borrar ${name} y todo lo suyo`, danger: true, run: drop },
   ]);
 }
@@ -1916,6 +1921,7 @@ let ed = null, cur = null, curTab = null;
 const $ed = $('#ed');
 function openDoc(id, tabId, fromEl) {
   const d = nd(id); if (!d) return;
+  if (d.dia) return openDia(id);
   ensureTab(d);
   cur = id; curTab = tabId && d.kids.includes(tabId) ? tabId : activeTab(d); d.active = curTab;
   if (mins.some((m) => m.id === id)) { mins = mins.filter((m) => m.id !== id); renderDock(); }
@@ -1971,7 +1977,34 @@ $('#ed-name').addEventListener('input', (e) => { const d = nd(cur); if (d && e.t
 $('#ed-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ed.focus(); } });
 $('#ed-close').onclick = closeDoc;
 let mins = JSON.parse(localStorage.getItem('meadow.mins') || '[]');
+function togglePin(id, on) { S.pins = (S.pins || []).filter((x) => x !== id); if (on) S.pins.push(id); }
+function renderPins() {
+  const l = (S.pins || []).filter((id) => nd(id) && PAR.has(id)), ico = { area: 'area', frame: 'frame', doc: 'doc' };
+  $('#pins').innerHTML = l.map((id) => `<button class="pin" data-pin="${id}" title="Ir a «${esc(nd(id).title)}»">${nd(id).icon ? `<span class="ar-ic">${nd(id).icon}</span>` : icon(ico[nd(id).kind] || 'area')}<span>${esc(nd(id).title)}</span><b class="pin-x" title="Quitar el atajo">×</b></button>`).join('');
+}
+$('#pins').addEventListener('click', (e) => {
+  const x = e.target.closest('.pin-x'); if (x) { e.stopPropagation(); snap(); togglePin(x.closest('.pin').dataset.pin, false); save(); return renderAll(); }
+  const p = e.target.closest('[data-pin]'); if (p) goPlace(p.dataset.pin);
+});
+let diaOpen = null, diaEd = null;
+function openDia(id) {
+  const d = nd(id); if (!d) return; diaOpen = id;
+  const box = $('#dia'); box.hidden = false;
+  box.innerHTML = `<header class="dia-h"><span class="dia-k">◇ Diagrama</span><input class="dia-name" value="${esc(d.title)}" spellcheck="false"><span class="dia-where">${esc(nestPath(PAR.get(id)) || '')}</span><button class="dia-ok">Listo</button></header><div class="dia-c"></div>`;
+  diaEd = createDiagram(box.querySelector('.dia-c'), { data: d.dg || { v: 1, nodes: [], edges: [] }, panOnDrag: true, onChange: (x) => { const n = nd(id); if (n) { n.dg = x; save(); } } });
+  box.querySelector('.dia-name').addEventListener('input', (e) => { if (e.target.value.trim()) { d.title = e.target.value.trim(); save(); } });
+  box.querySelector('.dia-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); e.stopPropagation(); });
+  box.querySelector('.dia-ok').onclick = closeDia;
+  requestAnimationFrame(() => { box.classList.add('in'); diaEd.fit?.(); });
+}
+function closeDia() {
+  if (!diaOpen) return; const id = diaOpen; diaOpen = null;
+  try { const x = diaEd?.getData?.(); if (x && nd(id)) nd(id).dg = x; diaEd?.destroy(); } catch {}
+  diaEd = null; const box = $('#dia'); box.classList.remove('in'); box.hidden = true; box.innerHTML = ''; save(); renderAll();
+}
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && diaOpen && !e.defaultPrevented && !e.target.closest?.('input, textarea, [contenteditable="true"]')) { e.preventDefault(); e.stopPropagation(); closeDia(); } });
 function renderDock() {
+  renderPins();
   mins = mins.filter((m) => nd(m.id)); localStorage.setItem('meadow.mins', JSON.stringify(mins));
   $('#dock').innerHTML = mins.map((m) => `<div class="dk" data-doc="${m.id}" title="Volver a «${esc(nd(m.id).title)}»"><span>📄</span>${esc(nd(m.id).title)}<button class="dk-x" title="Quitar de aquí">×</button></div>`).join('');
 }
@@ -2261,6 +2294,7 @@ function frameOptions(anchor, id) {
     { label: 'Esquinas', now: f.square ? 'sq' : 'round', set: (v) => { f.square = v === 'sq' || undefined; }, tiles: [['round', 'Redondas', '<i class="fo-shape round"></i>'], ['sq', 'Rectas', '<i class="fo-shape square"></i>']] },
     { label: 'Fondo', now: f.paper || 'plain', set: (v) => { f.paper = v === 'plain' ? undefined : v; }, tiles: [['plain', 'Liso', tileBox('bg-plain')], ['paper', 'Papel', tileBox('bg-paper')], ['dots', 'Puntos', tileBox('bg-dots')], ['grid', 'Cuadrícula', tileBox('bg-grid')]] },
     { label: 'Borde', now: f.edge || 'line', set: (v) => { f.edge = v === 'line' ? undefined : v; }, tiles: [['line', 'Línea', tileBox('bd-line')], ['dash', 'Discontinuo', tileBox('bd-dash')], ['none', 'Sin borde', tileBox('bd-none')]] },
+    { label: 'Atajo abajo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] },
     { label: 'Cabecera', now: f.headStyle || 'band', set: (v) => { f.headStyle = v === 'band' ? undefined : v; }, tiles: [['band', 'Franja', tileBox('hd-band')], ['plain', 'Solo título', tileBox('hd-plain')]] },
   ], 330);
 }
@@ -2269,6 +2303,7 @@ function docOptions(anchor, id) {
   const d = nd(id);
   optsPop(anchor, () => [
     { label: 'Tamaño', now: d.size || 'm', set: (v) => { d.size = v === 'm' ? undefined : v; }, tiles: [['s', 'Pequeña', tileBox('sz-s')], ['m', 'Mediana', tileBox('sz-m')], ['l', 'Grande', tileBox('sz-l')]] },
+    { label: 'Atajo abajo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] },
     { label: 'Papel', now: d.paper || 'plain', set: (v) => { d.paper = v === 'plain' ? undefined : v; }, tiles: [['plain', 'Liso', tileBox('pp-plain')], ['ruled', 'Rayado', tileBox('pp-ruled')], ['grid', 'Cuadriculado', tileBox('pp-grid')]] },
   ], 300);
 }
@@ -2276,7 +2311,7 @@ function docOptions(anchor, id) {
 const AREA_ICONS = ['🌱', '📚', '💼', '🎯', '🧪', '🏠', '🎨', '💡', '🛠️', '📈', '🧭', '❤️', '🎵', '✈️', '🧩', '⭐'];
 function areaOptions(anchor, id) {
   const a = nd(id);
-  optsPop(anchor, () => [{ label: 'Icono', small: true, now: a.icon || '', set: (v) => { a.icon = v || undefined; }, tiles: [['', 'Ninguno', '<i class="fo-none"></i>'], ...AREA_ICONS.map((e) => [e, e, `<i class="fo-emo">${e}</i>`])] }], 300);
+  optsPop(anchor, () => [{ label: 'Atajo abajo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] }, { label: 'Icono', small: true, now: a.icon || '', set: (v) => { a.icon = v || undefined; }, tiles: [['', 'Ninguno', '<i class="fo-none"></i>'], ...AREA_ICONS.map((e) => [e, e, `<i class="fo-emo">${e}</i>`])] }], 300);
 }
 function askChoice(anchor, title, note, options) {
   $('#pick').classList.remove('fo-pop'); $('#pick').style.width = '';
@@ -2290,6 +2325,7 @@ addEventListener('pointerdown', (e) => { if (!e.target.closest('#pick')) $('#pic
 
 // ---- keys -------------------------------------------------------------------------------------------------------------
 addEventListener('keydown', (e) => {
+  if (diaOpen) return;   // the diagram has its own keys
   const typing = e.target.closest?.('input, textarea, [contenteditable="true"], .cm-editor');
   if (e.key === 'Escape') {
     if (taskOpen) { e.preventDefault(); return closeTask(); }
