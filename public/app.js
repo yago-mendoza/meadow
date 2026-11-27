@@ -291,14 +291,14 @@ const circles = (id, max = 4, deep = true) => { const all = itemsAt(id), l = all
 function frameHTML(id, depth) {
   const f = nd(id), at = activeTab(f), t = nd(at), tabs = f.kids.map(nd);
   const kids = t.kids.map((k) => (nd(k).kind === 'frame' ? (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)) : docHTML(k))).join('');
-  return `<section class="fr d${depth}${drawsAt(id).length ? ' has-pic' : ''}" data-id="${id}" style="--bg:${f.color || PASTEL[4]}">${drawsAt(id).length ? `<div class="fr-pic">${thumbs(id)}</div>` : ''}
+  return `<section class="fr d${depth}${drawsAt(id).length ? ' has-pic' : ''}${f.square ? ' sq' : ''}" data-id="${id}" style="--bg:${f.color || PASTEL[4]}">${drawsAt(id).length ? `<div class="fr-pic">${thumbs(id)}</div>` : ''}
     <div class="fr-head">
       <span class="fr-title${tabs.length > 1 && at === tabs[0].id ? ' on' : ''}" data-drag="${id}" data-tab0="${tabs[0].id}" title="${tabs.length > 1 ? 'Clic: su primera pestaña · ' : ''}Arrastra para moverlo · doble clic: renombrar">${esc(f.title)}</span>${nb(id)}${tabs.length > 1 && at === tabs[0].id ? `<button class="fr-tx" data-tab0="${tabs[0].id}" title="Borrar esta pestaña (la siguiente pasa a ser la primera)">×</button>` : ''}
       <span class="fr-tabs" data-drop="tabs" data-id="${id}">${tabs.length > 1 ? tabs.slice(1).map((x) => `<span class="ft${x.id === at ? ' on' : ''}" data-tab="${x.id}" data-drag="${x.id}" data-id="${x.id}">${esc(x.title)}${nb(x.id)}${x.id === at ? '<button class="ft-x" title="Borrar esta pestaña">×</button>' : ''}</span>`).join('') : ''}<button class="ft-add" title="Nueva pestaña">＋</button></span>
       ${circles(id)}${tabs.length > 1 ? circles(at) : ''}
       <span class="grow"></span>
       <span class="fr-pal">${PASTEL.map((c) => `<i data-c="${c}" style="--d:${c}"></i>`).join('')}</span>
-      ${depth || S.focus !== id ? '<button class="fr-in" title="Entrar">⤢</button>' : '<button class="fr-out" title="Salir (Esc)">⤡ Salir</button>'}<button class="fr-x" title="Borrar o guardar en el cajón">×</button>
+      ${depth || S.focus !== id ? '<button class="fr-in" title="Entrar">⤢</button>' : '<button class="fr-out" title="Salir (Esc)">⤡ Salir</button>'}<button class="fr-opt" title="Opciones del marco">⋯</button><button class="fr-x" title="Borrar o guardar en el cajón">×</button>
     </div>
     <div class="fr-body" data-drop="into" data-id="${at}">${kids || '<div class="hint">Vacío · arrastra aquí documentos o marcos</div>'}</div>
   </section>`;
@@ -444,7 +444,16 @@ const hereId = () => (cur ? cur : S.focus);
 function inScope(it, sid) { const n = nd(sid); if (!n) return true; return [it.at, ...tabsUsing(it)].filter(Boolean).some((p) => p === sid || isIn(p, sid)); }
 function openList(kind, scope) { listTab = kind === 'idea' ? 'ideas' : 'tareas'; listScope = scope || null; $('#list').classList.remove('closed'); renderList(); }
 const scopeName = (id) => { const n = nd(id); if (!n) return ''; return n.kind === 'dtab' ? parent(id).title + ' › ' + n.title : n.title; };
+function renderGallery() {
+  const scope = listScope === 'here' ? hereId() : listScope;
+  const l = (S.drawings || []).filter((d) => (nd(d.at) ? !scope || d.at === scope || isIn(d.at, scope) : !scope)).sort((a, b) => (b.created || 0) - (a.created || 0));
+  $('#list-who').innerHTML = '';
+  $('#list-body').innerHTML = `<div class="lfil"><div class="lw">${listScope ? `<span class="lw-on">${PLACE_ICO[nd(scope)?.kind] || ''} ${esc(scopeName(scope))}<button data-lscope="" title="En todas partes">×</button></span>` : `<input class="lwq" placeholder="Dónde: un apartado, marco, documento…" value="${esc(listWQ)}">`}${listScope === 'here' ? '' : '<button class="lw-here" data-lscope="here" title="Lo que estás viendo">Aquí</button>'}<div class="lw-sug">${listScope ? '' : whereSug()}</div></div></div>
+    ${l.length ? `<div class="gal">${l.map((d) => `<button class="gal-it" data-gal="${d.id}"><img src="${drawThumb(d)}" alt=""><small>${nd(d.at) ? esc(nestPath(d.at) || nd(d.at).title) : '<i>Sin sitio</i>'}</small></button>`).join('')}</div>` : '<p class="none">Todavía no hay dibujos aquí.</p>'}`;
+  for (const b of document.querySelectorAll('#list nav button')) b.classList.toggle('on', b.dataset.l === listTab);
+}
 function renderList() {
+  if (listTab === 'dibujos') return renderGallery();
   const kind = listTab === 'ideas' ? 'idea' : 'tarea', bin = listOf(kind).filter((x) => x.trash), all = listOf(kind).filter((x) => listBin ? x.trash : live(x)), states = STATES[kind];
   const on = listSt[kind] || new Set(states.map((s) => s[0]).filter((k) => k !== 'hecha'));
   const scope = listScope === 'here' ? hereId() : listScope;
@@ -801,6 +810,8 @@ addEventListener('click', (e) => {
     return;
   }
   const fx = t.closest('.fr-x'); if (fx) return askDelete(fx.closest('.fr').dataset.id, fx);
+  const fo2 = t.closest('.fr-opt'); if (fo2) { const f = nd(fo2.closest('.fr').dataset.id);
+    return askChoice(fo2, esc(f.title), '', [{ label: f.square ? '◜ Esquinas redondas' : '◻ Esquinas rectas', run: () => { snap(); f.square = f.square ? undefined : true; save(); renderAll(); } }]); }
   const dx = t.closest('.dc-x'); if (dx) return askDelete(dx.closest('.dc').dataset.id, dx);
   const itc = t.closest('.it'); if (itc) return itemClick(itc.dataset.it, itc);
   const pg = t.closest('.dc-tabs span[data-pg]'); if (pg) { const dc2 = pg.closest('.dc'); return openDoc(dc2.dataset.id, pg.dataset.pg, dc2); }   // a tab of a document opens it there
@@ -826,7 +837,8 @@ addEventListener('click', (e) => {
   if (t.closest('[data-lnest]')) { listNested = !listNested; return renderList(); }
   const lrow = t.closest('.lrow'); if (lrow && !t.closest('[data-chk]') && !listBin) return openTask([...S.tasks, ...S.ideas].find((x) => x.id === lrow.dataset.it));
   if (lrow) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === lrow.dataset.it); if (it?.at) return focusTo(nd(it.at).kind === 'ftab' ? parent(it.at).id : it.at); const d = it && docsUsing(it)[0]; if (d) openDoc(d.id); return; }
-  const lb = t.closest('#list nav button[data-l]'); if (lb) { listTab = lb.dataset.l; return renderList(); }
+  const lb = t.closest('#list nav button[data-l]'); if (lb) { listTab = lb.dataset.l; listBin = false; return renderList(); }
+  const gi = t.closest('[data-gal]'); if (gi) return openDrawing((S.drawings || []).find((d) => d.id === gi.dataset.gal));
 });
 const wrapText = (el) => { const s = document.createElement('span'); s.textContent = el.firstChild.textContent; el.firstChild.replaceWith(s); return s; };
 addEventListener('dblclick', (e) => {
@@ -1475,7 +1487,7 @@ function openDrawing(d) {
   box.querySelector('.dw-left').innerHTML = DW_COLORS.left.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
   box.querySelector('.dw-right').innerHTML = DW_COLORS.right.map((c) => `<i data-col="${c}" style="--c:${c}"></i>`).join('');
   box.querySelector('.dw-shapes').innerHTML = DW_SHAPES.map(([t, name]) => `<b data-shape="${t}" title="${name}">${shapeIco(t)}</b>`).join('') + '<span class="dw-sep"></span><b data-fill="1" title="Rellena"><i class="dw-fill"></i></b><b data-fill="0" title="Solo el borde"><i class="dw-hollow"></i></b>';
-  box.querySelector('.dw-where').textContent = nestPath(d.at) || '';
+  box.querySelector('.dw-where').textContent = nd(d.at) ? nestPath(d.at) || '' : 'Sin sitio';
   box.hidden = false; box.querySelector('.dw-center input').checked = d.center !== false; dwPaint(); dwPickColor(dwColor); dwPickShape(dwShape); dwPickFill(dwHollow);
   box.querySelector('.dw-in').animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
 }
