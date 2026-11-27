@@ -781,6 +781,7 @@ addEventListener('click', (e) => {
     const id = ar.dataset.area;   // the second click of a double click lands on the redrawn button: it renames
     if (e.detail >= 2) { const el = $(`.ar[data-area="${id}"] .ar-t`); return el && editInline(el, (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
     arPeek = null;
+    if (ar.classList.contains('pic') && (id === S.area || ar.classList.contains('on') || ar.classList.contains('path')) && drawsAt(id)[0]) return openDrawing(drawsAt(id)[0]);   // already there: the picture is to be edited
     return focusTo(id);
   }
   const addd = t.closest('.ar-adddoc'); if (addd) {
