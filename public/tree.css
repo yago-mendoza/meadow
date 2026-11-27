@@ -1629,3 +1629,7 @@ body.dragging #drawer:not(.open) #dr-list { clip-path: inset(0 0 100% 0 round 14
 .ip-grid button:hover { background: #f4eef5; color: var(--accent); }
 .ip-grid button.on { background: var(--accent); color: #fff; }
 .ip-none { font: 13px "Segoe UI", sans-serif; color: #b3a8b6; margin: 10px 4px; }
+/* a touch darker overall, still pastel */
+#top { background: color-mix(in srgb, var(--page) 88%, transparent) !important; border-bottom-color: #e0d9e5 !important; }
+#home { background: #ecebf2; }
+.fr { box-shadow: 0 1px 3px rgba(60, 40, 70, .08); }

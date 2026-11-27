@@ -442,10 +442,10 @@ function renderStage() {
 let skipFlip = false;
 let arPeek = null, arPids = [], arHtml = '';
 const THEMES = {
-  lavanda: { name: 'Lavanda', bg: '#f6f6fa', cols: ['#d9c9e2', '#e4d6eb', '#efe5f3', '#fdfbfe'] },
-  salvia: { name: 'Salvia', bg: '#f3f6f2', cols: ['#c6dac5', '#d5e5d3', '#e4efe2', '#fbfdfa'] },
-  arena: { name: 'Arena', bg: '#f8f5ef', cols: ['#e3d3bb', '#ebdfcb', '#f3eadc', '#fefcf8'] },
-  cielo: { name: 'Cielo', bg: '#f2f5fa', cols: ['#c7d6ea', '#d5e1f0', '#e3ebf6', '#fbfcfe'] },
+  lavanda: { name: 'Lavanda', bg: '#ecebf2', cols: ['#d2c0dc', '#ddcde6', '#e8dcee', '#f6f2f8'] },
+  salvia: { name: 'Salvia', bg: '#e9eee7', cols: ['#bdd3bb', '#cde0ca', '#dde9da', '#f3f7f1'] },
+  arena: { name: 'Arena', bg: '#f1ece3', cols: ['#dccab0', '#e5d7c1', '#ede2d1', '#f9f5ee'] },
+  cielo: { name: 'Cielo', bg: '#e8edf4', cols: ['#bccde4', '#ccd9eb', '#dbe5f2', '#f3f6fb'] },
   noche: { name: 'Noche', bg: '#f6f6fa', cols: ['#d9c9e2', '#e4d6eb', '#efe5f3', '#fdfbfe'] },
 };
 let COLBG = THEMES.lavanda.cols;
