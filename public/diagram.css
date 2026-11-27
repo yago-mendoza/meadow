@@ -1,54 +1,85 @@
 /* Meadow diagrams: the editor's surface and its few controls. The drawing itself carries its own colours inline,
-   so thumbnails look the same without this file. */
+   so thumbnails look the same without this file. Two themes: calm light (default) and the dark schematic. */
 
 .dg {
+  --dg-bg: #fdfbfe; --dg-dot: #e4dce8; --dg-ink: #3a2f3f; --dg-muted: #8b8492; --dg-accent: #714b67;
+  --dg-panel: #fff; --dg-line: #ece6ee; --dg-btn: #7a6f7f; --dg-hover: #f6f1f5; --dg-on: #f1e9ef; --dg-shadow: rgba(70, 40, 70, .08);
   position: relative; width: 100%; height: 100%; overflow: hidden; outline: none; box-sizing: border-box;
   user-select: none; -webkit-user-select: none; touch-action: none;
-  background-color: #fdfbfe; background-image: radial-gradient(circle at 1px 1px, #e4dce8 1px, transparent 1.5px);
-  font-family: "Segoe UI", sans-serif; color: #3a2f3f;
+  background-color: var(--dg-bg); background-image: radial-gradient(circle at 1px 1px, var(--dg-dot) 1px, transparent 1.5px);
+  font-family: "Segoe UI", sans-serif; color: var(--dg-ink);
+}
+.dg.dg-dark {
+  --dg-bg: #1b1f24; --dg-dot: #2e343c; --dg-ink: #e2e6eb; --dg-muted: #8d98a3; --dg-accent: #c9a3c0;
+  --dg-panel: #232830; --dg-line: #343b45; --dg-btn: #aab4bf; --dg-hover: #2d343d; --dg-on: #353d48; --dg-shadow: rgba(0, 0, 0, .35);
 }
 .dg-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .dg text { pointer-events: none; }
 .dg [data-n] { cursor: move; }
-.dg [data-e] { cursor: pointer; }
+.dg [data-e], .dg [data-f] { cursor: pointer; }
+.dg [data-f] { cursor: ns-resize; }
 .dg-dot { cursor: crosshair; }
-.dg-dot circle + circle { fill: #fff; stroke: #714b67; stroke-width: 1.4; transition: fill .12s; }
-.dg-dot:hover circle + circle { fill: #714b67; }
-.dg-rs { cursor: nwse-resize; fill: #fff; stroke: #714b67; stroke-width: 1.4; }
-.dg-band { fill: rgba(113, 75, 103, .05); stroke: #714b67; stroke-width: 1; stroke-dasharray: 4 3; }
+.dg-dot circle + circle { fill: var(--dg-bg); stroke: var(--dg-accent); stroke-width: 1.4; transition: fill .12s; }
+.dg-dot:hover circle + circle { fill: var(--dg-accent); }
+.dg-rs { cursor: nwse-resize; fill: var(--dg-bg); stroke: var(--dg-accent); stroke-width: 1.4; }
+.dg-band { fill: color-mix(in srgb, var(--dg-accent) 6%, transparent); stroke: var(--dg-accent); stroke-width: 1; stroke-dasharray: 4 3; }
 .dg.dg-grab, .dg.dg-grab * { cursor: grab !important; }
 .dg.dg-panning, .dg.dg-panning * { cursor: grabbing !important; }
 
-.dg-hint { position: absolute; inset: 0; display: grid; place-items: center; color: #b6abba; font-size: 15px; pointer-events: none; }
+.dg-hint { position: absolute; inset: 0; display: grid; place-items: center; color: var(--dg-muted); opacity: .75; font-size: 15px; pointer-events: none; }
 .dg-hint[hidden] { display: none; }
-.dg-title { position: absolute; top: 14px; left: 18px; max-width: 50%; font-size: 13px; color: #8b8492; pointer-events: none;
+.dg-title { position: absolute; top: 14px; left: 18px; max-width: 40%; font-size: 13px; color: var(--dg-muted); pointer-events: none;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* the bar that follows the selection */
-.dg-bar { position: absolute; top: 0; left: 0; z-index: 2; display: flex; align-items: center; gap: 1px; padding: 4px;
-  background: #fff; border: 1px solid #ece6ee; border-radius: 12px; box-shadow: 0 6px 18px rgba(70, 40, 70, .08); }
-.dg-bar[hidden] { display: none; }
-.dg-bar button, .dg-zoom button { box-sizing: border-box; margin: 0; padding: 0; border: 0; background: none; cursor: pointer;
+/* shared look of the floating panels */
+.dg-bar, .dg-zoom, .dg-pal, .dg-reads { background: var(--dg-panel); border: 1px solid var(--dg-line); box-shadow: 0 6px 18px var(--dg-shadow); }
+.dg button { box-sizing: border-box; margin: 0; padding: 0; border: 0; background: none; cursor: pointer; color: var(--dg-btn);
   display: grid; place-items: center; font: 12px "Segoe UI", sans-serif; }
-.dg-bar button { width: 30px; height: 30px; border-radius: 8px; color: #7a6f7f; }
-.dg-bar button:hover { background: #f6f1f5; color: #714b67; }
-.dg-bar button.on { background: #f1e9ef; color: #714b67; }
-.dg-bar .dg-sw, .dg-bar .dg-sw:hover, .dg-bar .dg-sw.on { width: 24px; background: none; }
+.dg button:hover { background: var(--dg-hover); color: var(--dg-accent); }
+.dg button.on { background: var(--dg-on); color: var(--dg-accent); }
+.dg button svg { width: 18px; height: 18px; overflow: visible; }
+.dg-zoom svg, .dg-pal-t svg, .dg-bar > button svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* the bar that follows the selection */
+.dg-bar { position: absolute; top: 0; left: 0; z-index: 2; display: flex; align-items: center; gap: 1px; padding: 4px; border-radius: 12px; }
+.dg-bar[hidden] { display: none; }
+.dg-bar > button { width: 30px; height: 30px; border-radius: 8px; }
+.dg-grid { display: grid; grid-template-columns: repeat(8, 28px); gap: 1px; }
+.dg-grid button { width: 28px; height: 28px; border-radius: 7px; }
+.dg-grid button svg { width: 22px; height: 22px; }
+.dg-cols { display: grid; grid-template-columns: repeat(4, 24px); gap: 1px 0; }
+.dg-bar .dg-sw, .dg-bar .dg-sw:hover, .dg-bar .dg-sw.on { width: 24px; height: 28px; background: none; }
 .dg-sw span { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; box-sizing: border-box; transition: transform .12s; }
 .dg-sw:hover span { transform: scale(1.12); }
-.dg-sw.on span { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #714b67; }
-.dg-sep { width: 1px; height: 20px; background: #ece6ee; margin: 0 4px; }
-.dg svg:not(.dg-svg) { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dg-sw.on span { box-shadow: 0 0 0 2px var(--dg-panel), 0 0 0 3.5px var(--dg-accent); }
+.dg-sep { align-self: stretch; width: 1px; background: var(--dg-line); margin: 4px 5px; }
 
-/* zoom, bottom right */
-.dg-zoom { position: absolute; right: 14px; bottom: 14px; display: flex; align-items: center; gap: 2px; padding: 3px;
-  background: rgba(255, 255, 255, .85); border: 1px solid #ece6ee; border-radius: 10px; }
-.dg-zoom button { height: 26px; min-width: 26px; padding: 0 7px; border-radius: 7px; color: #8b8492; }
-.dg-zoom button:hover { background: #f6f1f5; color: #714b67; }
-.dg-zoom svg:not(.dg-svg) { width: 16px; height: 16px; }
+/* the symbols, left */
+.dg-pal { position: absolute; left: 12px; top: 44px; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 4px; border-radius: 12px; }
+.dg-pal-t { width: 30px; height: 22px; border-radius: 7px; }
+.dg-pal-t svg { width: 16px; height: 16px; transition: transform .16s; }
+.dg-pal-off .dg-pal-t svg { transform: rotate(180deg); }
+.dg-pal-g { display: grid; grid-template-columns: repeat(2, 38px); gap: 2px; margin-top: 2px; }
+.dg-pal-g i { grid-column: 1 / -1; height: 1px; background: var(--dg-line); margin: 3px 4px; }
+.dg-pal-g button { width: 38px; height: 38px; border-radius: 9px; cursor: grab; }
+.dg-pal-g button svg { width: 30px; height: 30px; }
+.dg-ghost { position: absolute; left: 0; top: 0; z-index: 4; width: 40px; height: 40px; pointer-events: none; opacity: .85; }
+.dg-ghost svg { width: 40px; height: 40px; }
 
-/* writing inside a box or on an arrow */
+/* one topology, several readings */
+.dg-reads { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; gap: 2px; padding: 3px; border-radius: 10px; }
+.dg-reads[hidden] { display: none; }
+.dg-reads button { height: 26px; padding: 0 12px; border-radius: 7px; font-size: 12.5px; }
+
+/* zoom and theme, bottom right */
+.dg-zoom { position: absolute; right: 14px; bottom: 14px; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; box-shadow: none; }
+.dg-zoom button { height: 26px; min-width: 26px; padding: 0 7px; border-radius: 7px; color: var(--dg-muted); }
+.dg-zoom svg { width: 16px !important; height: 16px !important; }
+
+/* writing on a piece, an arrow or the frontier */
 .dg-ta { position: absolute; z-index: 1; box-sizing: content-box; margin: 0; padding: 0; border: 0; outline: 0; resize: none; overflow: hidden;
-  background: transparent; color: #3a2f3f; caret-color: #714b67; text-align: center; font-family: "Segoe UI", sans-serif;
+  background: transparent; color: var(--dg-ink); caret-color: var(--dg-accent); text-align: center; font-family: "Segoe UI", sans-serif;
   font-weight: 400; letter-spacing: normal; white-space: pre-wrap; overflow-wrap: break-word; user-select: text; -webkit-user-select: text; }
-.dg-ta-e { background: #fff; color: #5b4f60; box-shadow: 0 0 0 1px #e3d7e1; }
+.dg-ta-up { text-transform: uppercase; letter-spacing: .07em; }
+.dg-ta-left { text-align: left; }
+.dg-ta-e { background: var(--dg-bg); color: var(--dg-muted); box-shadow: 0 0 0 1px var(--dg-line); border-radius: 4px; }

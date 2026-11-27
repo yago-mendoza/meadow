@@ -8,7 +8,7 @@
 <style>
   html, body { margin: 0; height: 100%; }
   #d { position: fixed; inset: 0; }
-  #thumb { position: fixed; left: 14px; bottom: 14px; background: #fff; border: 1px solid #ece6ee; border-radius: 12px; pointer-events: none; line-height: 0; }
+  #thumb { position: fixed; left: 14px; bottom: 14px; background: #fff; border: 1px solid #ece6ee; border-radius: 12px; overflow: hidden; pointer-events: none; line-height: 0; }
 </style>
 </head>
 <body>
@@ -17,35 +17,79 @@
 <script type="module">
 import { createDiagram, diagramThumbSVG } from './diagram.js';
 
-// A sample: one node ("archivo") has no coordinates, to show the automatic layout.
-const data = {
-  v: 1,
-  nodes: [
-    { id: 'idea', x: 40, y: 60, w: 150, h: 70, text: 'Idea', shape: 'ellipse', color: '#ece3f7' },
-    { id: 'notas', x: 260, y: 60, text: 'Notas sueltas y lecturas', shape: 'note', color: '#f9eedb' },
-    { id: 'borrador', x: 260, y: 230, text: 'Borrador', color: '#e3edf9' },
-    { id: 'listo', x: 500, y: 215, text: '¿Se entiende?', shape: 'diamond', color: '#f7e4ec' },
-    { id: 'revisar', x: 500, y: 400, text: 'Revisar con calma', color: '#e5f3e4' },
-    { id: 'publicar', x: 760, y: 230, text: 'Publicar', color: '#dff2f0' },
-    { id: 'archivo', text: 'Guardar en el archivo', color: '#f6f2f7' },
-  ],
-  edges: [
-    { id: 'e1', from: 'idea', to: 'notas' },
-    { id: 'e2', from: 'idea', to: 'borrador' },
-    { id: 'e3', from: 'notas', to: 'borrador', dashed: true },
-    { id: 'e4', from: 'borrador', to: 'listo' },
-    { id: 'e5', from: 'listo', to: 'publicar', text: 'sí' },
-    { id: 'e6', from: 'listo', to: 'revisar', text: 'no' },
-    { id: 'e7', from: 'revisar', to: 'borrador' },
-    { id: 'e8', from: 'publicar', to: 'archivo' },
-  ],
+// ?d=chain (default): one real chain in the inherited language, close to the GGUF.OS sketch 110.
+// ?d=classic: the original boxes, one without coordinates. ?d=agent: what an agent writes, no coordinates at all.
+// &theme=dark switches the sample's theme.
+const SAMPLES = {
+  chain: {
+    v: 1,
+    readings: ['Datos', 'Autoridad', 'Actividad'],
+    notes: {
+      Autoridad: { 'edge:e6': { text: 'la puerta lo exige', tone: 'ok' }, 'edge:e3': 'solo lo apunta', interp: 'responde LAZO' },
+      Actividad: { puente: { text: '412 pasadas · hace 20 s', tone: 'ok' }, interp: { text: '38 pasadas · 2 con fallo', tone: 'warn' } },
+    },
+    nodes: [
+      { id: 'wa', shape: 'event', text: 'WhatsApp', outside: true, x: 197, y: 40 },
+      { id: 'modelo', shape: 'resource', text: 'Modelo remoto', outside: true, x: 632, y: 26 },
+      { id: 'g', shape: 'group', text: 'Entorno local', x: 40, y: 190, w: 820, h: 640 },
+      { id: 'puente', shape: 'operation', text: 'Puente', sub: 'TARS · Ingesta', status: 'ok', clock: { kind: 'clock', words: '20 s' }, x: 125, y: 290 },
+      { id: 'orig', shape: 'store', text: 'Originales', x: 187, y: 455 },
+      { id: 'interp', shape: 'operation', text: 'Interpretación', sub: 'LAZO · Social', status: 'idle', x: 420, y: 430, w: 250, h: 112 },
+      { id: 'libro', shape: 'book', text: 'Libro Social', x: 254, y: 690 },
+      { id: 'inter', shape: 'user', text: 'Interacciones', x: 690, y: 690 },
+    ],
+    edges: [
+      { id: 'e1', from: 'wa', to: 'puente', verb: 'entra' },
+      { id: 'e2', from: 'puente', to: 'orig', verb: 'añade' },
+      { id: 'e3', from: 'orig', to: 'interp', verb: 'lee' },
+      { id: 'e4', from: 'interp', to: 'libro', text: 'append' },
+      { id: 'e5', from: 'interp', to: 'inter', text: 'write' },
+      { id: 'e6', from: 'interp', to: 'modelo', verb: 'usa', dash: 'dashdot' },
+    ],
+  },
+  classic: {
+    v: 1,
+    nodes: [
+      { id: 'idea', x: 40, y: 60, w: 150, h: 70, text: 'Idea', shape: 'ellipse', color: '#ece3f7' },
+      { id: 'notas', x: 260, y: 60, text: 'Notas sueltas y lecturas', shape: 'note', color: '#f9eedb' },
+      { id: 'borrador', x: 260, y: 230, text: 'Borrador', color: '#e3edf9' },
+      { id: 'listo', x: 500, y: 215, text: '¿Se entiende?', shape: 'diamond', color: '#f7e4ec' },
+      { id: 'revisar', x: 500, y: 400, text: 'Revisar con calma', color: '#e5f3e4' },
+      { id: 'publicar', x: 760, y: 230, text: 'Publicar', color: '#dff2f0' },
+      { id: 'archivo', text: 'Guardar en el archivo', color: '#f6f2f7' },
+    ],
+    edges: [
+      { id: 'e1', from: 'idea', to: 'notas' }, { id: 'e2', from: 'idea', to: 'borrador' }, { id: 'e3', from: 'notas', to: 'borrador', dashed: true },
+      { id: 'e4', from: 'borrador', to: 'listo' }, { id: 'e5', from: 'listo', to: 'publicar', text: 'sí' }, { id: 'e6', from: 'listo', to: 'revisar', text: 'no' },
+      { id: 'e7', from: 'revisar', to: 'borrador' }, { id: 'e8', from: 'publicar', to: 'archivo' },
+    ],
+  },
+  agent: {
+    v: 1, theme: 'dark',
+    frontier: { label: 'Este ordenador' },
+    nodes: [
+      { id: 'wa', shape: 'event', text: 'WhatsApp', outside: true },
+      { id: 'a', shape: 'operation', text: 'Puente\nTARS · Ingesta', clock: { kind: 'clock', words: '20 s' } },
+      { id: 's', shape: 'store', text: 'Originales' },
+      { id: 'i', shape: 'operation', text: 'Interpretación', sub: 'LAZO · Social' },
+      { id: 'b', shape: 'book', text: 'Libro Social' },
+      { id: 'm', shape: 'resource', text: 'Modelo remoto', outside: true },
+      { id: 'g', shape: 'group', text: 'Entorno local', kids: ['a', 's', 'i', 'b'] },
+    ],
+    edges: [
+      { from: 'wa', to: 'a', verb: 'entra' }, { from: 'a', to: 's', text: 'APPEND', dash: 'solid' }, { from: 's', to: 'i', verb: 'lee' },
+      { from: 'i', to: 'b', verb: 'añade' }, { from: 'i', to: 'm', verb: 'usa', dash: 'dashdot' },
+    ],
+  },
 };
+const q = new URLSearchParams(location.search), data = structuredClone(SAMPLES[q.get('d')] || SAMPLES.chain);
+if (q.get('theme')) data.theme = q.get('theme');
 
 const thumb = document.getElementById('thumb');
 thumb.innerHTML = diagramThumbSVG(data);
 window.dg = createDiagram(document.getElementById('d'), {
   data,
-  title: 'Cómo nace un artículo',
+  title: 'Cómo llega un mensaje al libro',
   onChange: (d) => { console.log('onChange ' + JSON.stringify(d)); thumb.innerHTML = diagramThumbSVG(d); },
 });
 </script>
