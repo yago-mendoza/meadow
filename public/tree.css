@@ -1646,3 +1646,11 @@ body.dragging #drawer:not(.open) #dr-list { clip-path: inset(0 0 100% 0 round 14
 /* a list's card */
 .dc.lstc { display: flex; flex-direction: column; }
 .dc-ls { flex: 1; margin-top: 6px; overflow: hidden; }
+/* a card's options and delete: bottom right, sized with the card (only on hover); a drawing steps aside */
+.dc { --bt: 22px; }
+.dc.sz-s { --bt: 20px; } .dc.sz-m { --bt: 24px; } .dc.sz-l { --bt: 28px; } .dc.sz-xl { --bt: 32px; }
+.dc-opt, .dc > .dc-x { top: auto !important; bottom: 8px !important; width: var(--bt) !important; height: var(--bt) !important; font-size: calc(var(--bt) * .55) !important; border-radius: calc(var(--bt) * .32) !important; display: grid !important; place-items: center; background: rgba(255, 255, 255, .92) !important; box-shadow: 0 0 0 1px #ece4ee; }
+.dc > .dc-x { right: 8px !important; }
+.dc-opt { right: calc(8px + var(--bt) + 4px) !important; }
+.dc .dw-th { right: calc(8px + 2 * var(--bt) + 12px) !important; }
+.dc .dw-th + .dw-th { right: calc(8px + 2 * var(--bt) + 12px + 78px) !important; }
