@@ -791,7 +791,7 @@ body.selmode .ar-x, body.selmode .fr-x, body.selmode .ft-x, body.selmode .dc-x, 
 .ar-tab { flex-direction: column; gap: 6px; }
 .ar-tab .nb { margin: 0; min-width: 18px; height: 18px; font-size: 10px; flex: none; }
 /* where a dragged idea, task or drawing will land: a dashed circle in its place */
-.it-slot { display: inline-block; flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 10%, #fff); animation: slot-in .18s ease-out; }
+.it-slot { display: inline-block; flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 10%, #fff); animation: slot-in .1s ease-out; }
 .it-slot.draw { width: 36px; height: 24px; border-radius: 5px; }
 @keyframes slot-in { from { transform: scale(.5); opacity: 0; } }
 body.drag-hang .drop-on, body.drag-draw .drop-on { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent) !important; outline-offset: 2px; }
@@ -829,7 +829,7 @@ body.drag-hang .drop-on, body.drag-draw .drop-on { outline: 2px solid color-mix(
 .dw-sheet { position: relative; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px #e8e0ea, 0 4px 16px rgba(60, 40, 70, .12); }
 .dw-sheet::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .5;
   background-image: linear-gradient(to right, rgba(120, 100, 130, .07) 1px, transparent 1px), linear-gradient(to bottom, rgba(120, 100, 130, .07) 1px, transparent 1px);
-  background-size: 5px 5px; }
+  background-size: 3px 3px; }
 #dw-c { display: block; width: 720px; height: 480px; border-radius: 0; box-shadow: none; }
 .dw-cur { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: #f6f2f7 !important; box-shadow: inset 0 0 0 1px #ece4ee; }
 .dw-cur svg { fill: currentColor; stroke: currentColor; width: 20px; height: 20px; }
@@ -1040,3 +1040,10 @@ body.no-pics .fr.has-pic { margin-top: 0; } body.no-pics .fr.has-pic::before { d
 #areas .ar.pic:hover .ar-opt { opacity: 1; }
 .ar-opt:hover { background: rgba(110, 95, 115, .6); }
 body.mk-dibujo #areas .ar:not(.ar-doc) { animation: can-go 1.4s ease-in-out infinite; outline: 1.5px dashed color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+/* the handle of a chosen figure */
+.dw-hnd { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 3px; background: #fff; box-shadow: 0 0 0 1.5px #2f2735, 0 1px 3px rgba(0, 0, 0, .25); pointer-events: none; }
+#dw-c.picking { cursor: default; }
+/* the fold handles: a little more room around the chevron */
+.ar-fold, .ar-unfold { width: 20px; height: 48px; margin-top: -24px; }
+.ar-fold::before { transform: translateX(2px) rotate(135deg); }
+.ar-unfold::before { transform: translateX(-2px) rotate(-45deg); }

@@ -630,10 +630,13 @@ function indexInFlow(body, x, y) {
   for (const c of kids) { const r = c.getBoundingClientRect(); if (y > r.bottom || (y >= r.top && x > r.left + r.width / 2)) i++; }
   return i;
 }
+let slotEl = null;
 function paintTarget(t) {
   for (const el of document.querySelectorAll('.drop-on, .drop-bad')) el.classList.remove('drop-on', 'drop-bad');
-  document.querySelector('.it-slot')?.remove();
-  if (t?.slot && t.el) {   // where the circle will go: a dashed one, right there
+  const old = document.querySelector('.it-slot');
+  if (old && !(t?.slot && t.el === slotEl)) { old.remove(); slotEl = null; }   // the slot stays while over the same thing (no flicker, no delay)
+  if (t?.slot && t.el && !(old && t.el === slotEl)) {   // where the circle will go: a dashed one, right there
+    slotEl = t.el;
     const slot = document.createElement('i'); slot.className = 'it-slot' + (drag?.src?.make === 'dibujo' ? ' draw' : '');
     const fr = t.el.matches('.fr') ? t.el : t.el.matches('.ft') ? t.el.closest('.fr') : null;
     if (fr) fr.querySelector(':scope > .fr-head .grow')?.before(slot);
@@ -1307,7 +1310,7 @@ addEventListener('click', (e) => {
 // ---- drawings: quick sketches hung on a frame or a document ------------------------------------------------------------
 // Figures only (rectangle, circle, triangle, diamond, line), chosen by passing over them and put on the sheet by dragging.
 // Stored as figures, never pixels; painted pixel by pixel on a small sheet (96 × 64), so they look like pixel art.
-const DW_W = 144, DW_H = 96;
+const DW_W = 240, DW_H = 160;
 const DW_COLORS = {
   top: ['#f6c9d6', '#f9d8b8', '#f8eaa6', '#cfeccd', '#c4e3f3', '#cfd3f5', '#e3cdf1', '#f2f0ee'],
   left: ['#2f2735', '#3d5a80', '#7a2e3a', '#2e6b4a', '#8a5a2b', '#6b6670'],
@@ -1334,7 +1337,7 @@ function paintShapes(ctx, shapes, base = DW_W) {
     if (s.t === 'line' || s.t === 'path') {
       const segs = s.t === 'line' ? [[s.x1, s.y1, s.x2, s.y2]] : s.pts.slice(1).map((p, i) => [s.pts[i][0] * k, s.pts[i][1] * k, p[0] * k, p[1] * k]);
       ctx.fillStyle = s.c;
-      for (const [ax, ay, bx, by] of segs) for (let y = Math.floor(Math.min(ay, by) - 1); y <= Math.max(ay, by) + 1; y++) for (let x = Math.floor(Math.min(ax, bx) - 1); x <= Math.max(ax, bx) + 1; x++) if (segDist(x + 0.5, y + 0.5, ax, ay, bx, by) <= 0.62) ctx.fillRect(x, y, 1, 1);
+      for (const [ax, ay, bx, by] of segs) for (let y = Math.floor(Math.min(ay, by) - 1); y <= Math.max(ay, by) + 1; y++) for (let x = Math.floor(Math.min(ax, bx) - 1); x <= Math.max(ax, bx) + 1; x++) if (segDist(x + 0.5, y + 0.5, ax, ay, bx, by) <= 1) ctx.fillRect(x, y, 1, 1);
       continue;
     }
     const x0 = Math.floor(s.x), y0 = Math.floor(s.y), x1 = Math.ceil(s.x + s.w), y1 = Math.ceil(s.y + s.h), edge = darker(s.c);
@@ -1414,13 +1417,10 @@ function dwCenter(d) {
 }
 $('#draw').addEventListener('change', (e) => { if (!e.target.closest('.dw-center')) return; const d = dwNow(); if (!d) return; d.center = e.target.checked; if (d.center) dwEdit(() => {}); else save(); });
 function dwUndo() { const d = dwNow(); if (!d || !dwHist.length) return; d.shapes = JSON.parse(dwHist.pop()); dwSel.clear(); d.v = (d.v || 0) + 1; save(); dwPaint(); }
-// colours, figures, filled/outline and the pointer are taken by passing over them, no click
-let dwHoverT = null;
-$('#draw').addEventListener('pointerover', (e) => {
-  const sw = e.target.closest('[data-col]'), sh = e.target.closest('[data-shape]'); clearTimeout(dwHoverT);
-  if (sw) dwHoverT = setTimeout(() => dwPickColor(sw.dataset.col), 90);
-  if (sh) dwHoverT = setTimeout(() => dwPickShape(sh.dataset.shape), 90);
-  const fl = e.target.closest('[data-fill]'); if (fl) dwHoverT = setTimeout(() => dwPickFill(fl.dataset.fill === '0'), 90);
+// colours, figures, filled/outline and the tools are taken with a click
+$('#draw').addEventListener('click', (e) => {
+  const sw = e.target.closest('[data-col]'), sh = e.target.closest('[data-shape]'), fl = e.target.closest('[data-fill]');
+  if (sw) dwPickColor(sw.dataset.col); if (sh) dwPickShape(sh.dataset.shape); if (fl) dwPickFill(fl.dataset.fill === '0');
 });
 
 // ---- choosing figures on the sheet: click one, drag a box around several, then move, copy, paste, delete ----
@@ -1453,11 +1453,17 @@ function eraseHit(d, x, y, k) {
   }
   return -1;
 }
+function dwHandles(d, k) {   // where the handles of the one chosen figure are (in the drawing's units)
+  if (dwSel.size !== 1) return []; const i = [...dwSel][0], s = d.shapes[i]; if (!s || s.t === 'path') return [];
+  return s.t === 'line' ? [{ i, end: 1, x: s.x1, y: s.y1 }, { i, end: 2, x: s.x2, y: s.y2 }] : [{ i, end: 0, x: s.x + s.w, y: s.y + s.h }];
+}
+const dwHandleAt = (d, x, y, k) => dwHandles(d, k).find((h) => Math.abs(h.x - x) <= 3 * k && Math.abs(h.y - y) <= 3 * k);
 function dwPaintSel(box) {   // dashed boxes over what is chosen (and the box being dragged), drawn above the pixels
   const d = dwNow(), host = $('#draw .dw-sels'); if (!d || !host) return;
   const r = $('#dw-c').getBoundingClientRect(), cw = r.width / DW_W, k = (d.base || 192) / DW_W;
   const div = (b, cls) => `<i class="${cls}" style="left:${b.x / k * cw - 3}px;top:${b.y / k * cw - 3}px;width:${b.w / k * cw + 6}px;height:${b.h / k * cw + 6}px"></i>`;
-  host.innerHTML = [...dwSel].filter((i) => d.shapes[i]).map((i) => div(sBox(d.shapes[i]), 'dw-selb')).join('') + (box ? div(box, 'dw-marq') : '');
+  host.innerHTML = [...dwSel].filter((i) => d.shapes[i]).map((i) => div(sBox(d.shapes[i]), 'dw-selb')).join('') + (box ? div(box, 'dw-marq') : '')
+    + dwHandles(d, k).map((h) => `<b class="dw-hnd" style="left:${h.x / k * cw}px;top:${h.y / k * cw}px"></b>`).join('');
 }
 $('#dw-c').addEventListener('pointermove', (e) => {
   const r = e.currentTarget.getBoundingClientRect(), px = $('#draw .dw-px'), cw = r.width / DW_W;
@@ -1485,8 +1491,15 @@ $('#dw-c').addEventListener('pointerdown', (e) => {
     rub(e); mv = rub;
     up = () => { if (!gone) return; const after = d.shapes; d.shapes = JSON.parse(before); dwEdit(() => { d.shapes = after; }); };
   } else if (dwShape === 'select') {
-    const i = hitShape(d, p0[0] * k, p0[1] * k, k), add = e.shiftKey || e.ctrlKey || e.metaKey;
-    if (i >= 0) {                                       // on a figure: choose it and drag what is chosen
+    const hnd = dwHandleAt(d, p0[0] * k, p0[1] * k, k), i = hitShape(d, p0[0] * k, p0[1] * k, k), add = e.shiftKey || e.ctrlKey || e.metaKey;
+    if (hnd) {                                          // on a handle: resize
+      const j = hnd.i, o = JSON.stringify(d.shapes[j]), before = JSON.stringify(d.shapes); let moved = false;
+      mv = (ev) => { const p = at(ev), x = p[0] * k, y = p[1] * k, s0 = JSON.parse(o); moved = true;
+        if (s0.t === 'line') { if (hnd.end === 1) { s0.x1 = x; s0.y1 = y; } else { s0.x2 = x; s0.y2 = y; } }
+        else { let w = Math.max(k, x - s0.x), h = Math.max(k, y - s0.y); if (ev.shiftKey) w = h = Math.max(w, h); s0.w = w; s0.h = h; }
+        d.shapes[j] = s0; dwPaint(); };
+      up = () => { if (moved) { const after = d.shapes; d.shapes = JSON.parse(before); dwEdit(() => { d.shapes = after; }); } };
+    } else if (i >= 0) {                                       // on a figure: choose it and drag what is chosen
       if (!dwSel.has(i)) { if (!add) dwSel.clear(); dwSel.add(i); } else if (add) { dwSel.delete(i); return dwPaint(); }
       const orig = new Map([...dwSel].map((j) => [j, JSON.stringify(d.shapes[j])])), before = JSON.stringify(d.shapes);
       let moved = false;
@@ -1502,13 +1515,17 @@ $('#dw-c').addEventListener('pointerdown', (e) => {
     }
   } else {
     // a figure is put on the sheet by dragging its box (a line: from where you press to where you let go)
+    let shift = e.shiftKey;
     const fig = (p1) => {
+      if (shift) { const dx = p1[0] - p0[0], dy = p1[1] - p0[1];
+        if (dwShape === 'line') { const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * Math.PI / 4, L = Math.hypot(dx, dy); p1 = [Math.round(p0[0] + Math.cos(a) * L), Math.round(p0[1] + Math.sin(a) * L)]; }
+        else { const m = Math.max(Math.abs(dx), Math.abs(dy)); p1 = [p0[0] + Math.sign(dx || 1) * m, p0[1] + Math.sign(dy || 1) * m]; } }
       if (dwShape === 'line') return { t: 'line', x1: p0[0] * k, y1: p0[1] * k, x2: p1[0] * k, y2: p1[1] * k, c: dwColor };
       const x = Math.min(p0[0], p1[0]), y = Math.min(p0[1], p1[1]);
       return { t: dwShape, hollow: dwHollow || undefined, x: x * k, y: y * k, w: Math.abs(p1[0] - p0[0]) * k, h: Math.abs(p1[1] - p0[1]) * k, c: dwColor };
     };
     let last = p0;
-    mv = (ev) => { last = at(ev); dwPaint(fig(last)); };
+    mv = (ev) => { last = at(ev); shift = ev.shiftKey; dwPaint(fig(last)); };
     up = () => {
       const s = fig(last), big = s.t === 'line' ? Math.hypot(s.x2 - s.x1, s.y2 - s.y1) >= k : s.w >= k && s.h >= k;
       if (!big) return dwPaint();
