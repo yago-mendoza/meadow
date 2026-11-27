@@ -1536,3 +1536,41 @@ html[data-dense="airy"] #areas .ar { margin-bottom: 4px; }
 .dia-where { font: 12px "Segoe UI", sans-serif; color: #b3a8b6; }
 .dia-ok { margin-left: auto; padding: 7px 16px; border-radius: 10px; background: var(--accent); color: #fff; font: 600 13px "Segoe UI", sans-serif; }
 .dia-c { flex: 1; position: relative; min-height: 0; }
+
+/* the components bar: a thin rule between the frame (what holds) and what goes inside */
+.tool-sep { width: 1px; height: 22px; margin: 0 6px; background: #ddd3e0; align-self: center; }
+
+/* the corner: one quiet button that opens the drawer, the map and the post-its; the shortcuts beside it */
+#map { display: block !important; } #map.mini { display: none !important; }
+#drawer { display: block !important; left: 12px !important; bottom: 62px !important; }
+#drawer .dr-pull { display: none; }
+#drawer:hover #dr-list, #drawer.near #dr-list { clip-path: inset(0 0 100% 0 round 14px); opacity: 0; pointer-events: none; }
+#drawer.open #dr-list { clip-path: inset(0 0 0 0 round 14px) !important; opacity: 1 !important; pointer-events: auto !important; }
+#dr-list { bottom: 0 !important; }
+body.dragging #drawer #dr-list { clip-path: inset(0 0 0 0 round 14px); opacity: 1; pointer-events: auto; }
+#corner { position: fixed; left: 12px; bottom: 12px; z-index: 41; }
+#corner-btn { position: relative; width: 40px; height: 40px; border-radius: 13px; background: #fff; color: #8a7d8e; display: grid; place-items: center; box-shadow: 0 1px 3px rgba(60, 40, 70, .12), 0 0 0 1px #ece4ee; }
+#corner-btn:hover, #corner.open #corner-btn { color: var(--accent); box-shadow: 0 3px 10px rgba(60, 40, 70, .16), 0 0 0 1px #ddd2e2; }
+#corner-btn #dr-n { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #e3dce7; color: #6a5f6d; font: 700 10px/16px "Segoe UI", sans-serif; font-style: normal; }
+#corner-btn #dr-n:empty { display: none; }
+#corner-menu { position: absolute; left: 0; bottom: calc(100% + 8px); width: 220px; padding: 6px; border-radius: 14px; background: #fff; box-shadow: var(--shadow-up); display: flex; flex-direction: column; gap: 2px;
+  opacity: 0; transform: translateY(6px); pointer-events: none; transition: opacity .15s, transform .2s cubic-bezier(.22, 1, .36, 1); }
+#corner.open #corner-menu { opacity: 1; transform: none; pointer-events: auto; }
+#corner-menu button { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; font: 600 13px "Segoe UI", sans-serif; color: #4a3f4d; text-align: left; }
+#corner-menu button:hover { background: #f6f1f7; color: var(--accent); }
+#corner-menu .ico { color: #a397a5; }
+#corner-menu button:hover .ico { color: var(--accent); }
+#corner-menu i { margin-left: auto; font: 700 11px "Segoe UI", sans-serif; font-style: normal; color: #a397a5; }
+.cm-sep { height: 1px; margin: 4px 6px; background: #f0eaf2; }
+#pins { left: 60px; }
+/* the drawer's ideas and tasks */
+.dr-sub { margin: 8px 8px 4px; font: 700 11px "Segoe UI", sans-serif; letter-spacing: .05em; text-transform: uppercase; color: #a397a5; }
+.dr-it { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 9px; }
+.dr-it:hover { background: #f6f1f7; }
+.dr-it .it { width: 18px; height: 18px; font-size: 9px; flex: none; }
+.dr-it span { flex: 1; min-width: 0; font: 13px "Segoe UI", sans-serif; color: #4a3f4d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dr-it button { width: 22px; height: 22px; border-radius: 7px; color: #a397a5; opacity: 0; }
+.dr-it:hover button { opacity: 1; }
+.dr-it button:hover { background: #fff; color: var(--accent); }
+.dr-it .dr-kill:hover { color: #c0566a; }
+.ar-dis { margin-top: 2px !important; opacity: .7; } .ar-col:hover > .ar-dis { opacity: 1; }

@@ -476,10 +476,10 @@ function crMenu(btn) {
 function crHide() { $('#crmenu')?.classList.remove('on'); }
 $('#crumbs').addEventListener('pointerover', (e) => { const b = e.target.closest('.cr.alt'); if (!b) return; clearTimeout(crT); crMenu(b); });
 $('#crumbs').addEventListener('pointerout', (e) => { if (e.target.closest('.cr.alt')) { clearTimeout(crT); crT = setTimeout(crHide, 160); } });
-const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo'], ['diagrama', '◇', 'Diagrama'], ['postit', '🗒️', 'Post-it']];
+const TOOLS = [['frame', '⬚', 'Marco'], ['doc', '📄', 'Documento'], ['idea', '💡', 'Idea'], ['tarea', '☑️', 'Tarea'], ['dibujo', '🖍', 'Dibujo'], ['diagrama', '◇', 'Diagrama']];
 $('#tools').addEventListener('pointerover', () => document.body.classList.add('tool-hover'));
 $('#tools').addEventListener('pointerleave', () => document.body.classList.remove('tool-hover'));
-$('#tools').innerHTML = TOOLS.map(([k, ico, name]) => `<button class="tool t-${k}" data-drag="new:${k}" title="${k === 'tarea' || k === 'idea' ? DEF[k].replace(/'/g, '') + ' ' : ''}Clic: crear aquí · arrastra: crear donde lo sueltes"><span class="ico">${ico}</span>${name}</button>`).join('');
+$('#tools').innerHTML = TOOLS.map(([k, ico, name]) => (k === 'doc' ? '<span class="tool-sep"></span>' : '') + `<button class="tool t-${k}" data-drag="new:${k}" title="${k === 'tarea' || k === 'idea' ? DEF[k].replace(/'/g, '') + ' ' : ''}Clic: crear aquí · arrastra: crear donde lo sueltes"><span class="ico">${ico}</span>${name}</button>`).join('');
 
 // the map: every node as a rectangle inside its parent; a frame's (or page's) only tab adds no level
 function vtree(id) {
@@ -522,8 +522,11 @@ function renderDrawer() {
   const KIND = { area: 'Apartado', frame: 'Marco', ftab: 'Pestaña', doc: 'Documento', dtab: 'Página', project: 'Marco' };
   const rows = S.drawer.map((id) => { const n = nd(id); if (!n) return ''; const c = countIn(id);
     return `<div class="dr-chip" data-drag="${id}" data-id="${id}"><span class="dr-ico k-${n.kind}">${icon[n.kind]}</span><span class="dr-t"><b>${esc(n.title)}</b><small>${KIND[n.kind]}${c ? ' · ' + c + ' dentro' : ''}</small></span><button class="dr-x" title="Borrar para siempre">×</button></div>`; }).join('');
+  const its = [...S.ideas, ...S.tasks].filter((x) => x.trash).sort((a, b) => b.trash - a.trash);
+  const irows = its.map((it) => `<div class="dr-it" data-it="${it.id}"><i class="it ${it.kind} st-${stOf(it)}">${it.kind === 'idea' ? '💡' : ''}</i><span>${esc(it.text) || '…'}</span><button data-unbin="${it.id}" title="Sacarla del cajón">↩</button><button class="dr-kill" data-kill="${it.id}" title="Borrar para siempre">×</button></div>`).join('');
   $('#dr-list').innerHTML = `<div class="dr-h"><b>Cajón</b>${S.drawer.length ? '<button class="dr-empty">Vaciar</button>' : ''}</div>`
-    + (rows ? `<div class="dr-rows">${rows}</div>` : '<div class="dr-none"><span class="dr-big">🗄</span>Arrastra aquí lo que quieras apartar; vuelve a sacarlo cuando quieras.</div>');
+    + (rows || irows ? `<div class="dr-rows">${rows}${irows ? `<div class="dr-sub">Ideas y tareas apartadas</div>${irows}` : ''}</div>` : '<div class="dr-none"><span class="dr-big">🗄</span>Arrastra aquí lo que quieras apartar; vuelve a sacarlo cuando quieras.</div>');
+  $('#dr-n').textContent = (S.drawer.length + its.length) || '';
 }
 function nestPath(id) { return id ? pathOf(id).filter((n) => n.kind !== 'project' && !(n.kind === 'ftab' && parent(n.id)?.kids.length === 1) && !(n.kind === 'dtab' && parent(n.id)?.kids.length === 1)).map((n) => n.title).join(' › ') : ''; }
 // ---- the list of tasks or ideas: search, where (everything, here, one container or page), state, for whom; flat or nested
@@ -581,7 +584,7 @@ function renderList() {
   $('#fd-scope').innerHTML = scope && nd(scope) ? `<span class="fd-in-chip">${icon(KIND_ICO[nd(scope).kind] || 'area')}${esc(nd(scope).title)}<button data-lscope="" title="En todo el proyecto">×</button></span>` : '';
   const binN = [...S.tasks, ...S.ideas].filter((x) => x.trash).length;
   $('#fd-kinds').innerHTML = FD_KINDS.map(([v, l]) => `<button data-l="${v}" class="${k === v ? 'on' : ''}">${l}</button>`).join('')
-    + `<span class="lf-gap"></span>${scope ? '' : `<button class="fd-here" data-lscope="here" title="Solo lo que estás viendo">Aquí</button>`}<button class="fd-bin${k === 'bin' ? ' on' : ''}" data-l="bin" title="Papelera: lo descartado">${icon('bin')}${binN ? `<i>${binN}</i>` : ''}</button>`;
+    + `<span class="lf-gap"></span>${scope ? '' : `<button class="fd-here" data-lscope="here" title="Solo lo que estás viendo">Aquí</button>`}<button class="fd-bin${k === 'bin' ? ' on' : ''}" data-l="bin" title="En el cajón">${icon('drawer')}${binN ? `<i>${binN}</i>` : ''}</button>`;
   const place = (p) => `<button class="fd-row" ${p.kind === 'head' ? `data-go-head="${p.id}"` : `data-go-node="${p.id}"`}>${icon(KIND_ICO[p.kind])}<span><b>${esc(p.title || '…')}</b><small>${esc(relPath(p.at, scope))}</small></span></button>`;
   const row = (it) => `<div class="lrow st-${stOf(it)}${it.done ? ' done' : ''}" data-it="${it.id}">${it.kind === 'idea' ? '<span class="lic">💡</span>' : `<button class="lchk${it.done ? ' on' : ''}" data-chk="${it.id}" title="${it.done ? 'Reabrir' : 'Hecha'}"></button>`}<div class="lmain">${barHTML(it)}<div class="ltx">${esc(it.text) || '…'}</div><div class="lsub">${whoOf(it.who) === 'Agente' ? '<b class="lwho">Agente</b>' : ''}${stLabel(it) ? `<b class="lst s-${stOf(it)}">${stLabel(it)}</b>` : ''}${esc(relPath(placeOf(it), scope))}</div>${it.trash ? `<div class="lbin-acts"><button data-unbin="${it.id}">Recuperar</button><button data-kill="${it.id}">Borrar para siempre</button></div>` : ''}</div></div>`;
   const draws = () => (S.drawings || []).filter((d) => (nd(d.at) ? !scope || d.at === scope || isIn(d.at, scope) : !scope) && (!q || relPath(d.at).toLowerCase().includes(q))).sort((a, b) => (b.created || 0) - (a.created || 0));
@@ -602,7 +605,7 @@ function renderList() {
     const on = listSt.tarea || new Set(STEPS.map((s) => s[0]).filter((x) => x !== 'hecha')), l = fdItems('tarea', q, scope);
     html = who + `<div class="lf-row">${STEPS.map(([v, lab]) => chip(`data-lst="${v}"`, lab, on.has(v))).join('')}${chip('data-lstop', 'Paradas', listStop, ' class="stop" title="Solo las que esperan a otras o están en pausa"')}</div>` + (l.map(row).join('') || none('Ninguna tarea con estos filtros.'));
   } else if (k === 'dibujos') { const l = draws(); html = l.length ? gal(l) : none('Ningún dibujo.'); }
-  else if (k === 'bin') { const l = [...fdItems('idea', q, scope, true), ...fdItems('tarea', q, scope, true)].sort((a, b) => b.trash - a.trash); html = `<div class="lbin-h">${icon('bin')}<b>Papelera</b><small>lo descartado</small></div>` + (l.map(row).join('') || none('La papelera está vacía.')); }
+  else if (k === 'bin') { const l = [...fdItems('idea', q, scope, true), ...fdItems('tarea', q, scope, true)].sort((a, b) => b.trash - a.trash); html = `<div class="lbin-h">${icon('drawer')}<b>En el cajón</b></div>` + (l.map(row).join('') || none('El cajón está vacío.')); }
   box.innerHTML = html;
 }
 function openFinder(scope, text) {
@@ -990,7 +993,7 @@ addEventListener('click', (e) => {
   const mr = t.closest('.mr'); if (mr && !mr.classList.contains('k-project')) mapOpen(false);
   if (mr) { if (mr.dataset.head) { const [tab, line] = mr.dataset.head.split(':'); const d = parent(tab); openDoc(d.id, tab); setTimeout(() => ed?.gotoLine(+line), 60); } else focusTo(mr.dataset.id); return; }
   if (t.closest('.dr-pull')) return $('#drawer').classList.toggle('open');
-  if (!t.closest('#drawer')) $('#drawer').classList.remove('open');
+  if (!t.closest('#drawer, #corner')) $('#drawer').classList.remove('open');
   const dre = t.closest('.dr-empty'); if (dre) return askChoice(dre, '¿Vaciar el cajón?', `Se borra lo que hay dentro (${S.drawer.length}). Se puede deshacer.`, [{ label: 'Vaciar', danger: true, run: () => { snap(); for (const id of [...S.drawer]) { detach(id); removeTree(id); } S.drawer = []; tidy(); save(); renderAll(); toast('Cajón vacío', [['Deshacer', doUndo]]); } }]);
   const drx = t.closest('.dr-x'); if (drx) { const id = drx.closest('.dr-chip').dataset.id; return askChoice(drx, `¿Borrar «${esc(nd(id).title)}» para siempre?`, 'Sale del cajón y no vuelve (salvo con Deshacer).', [{ label: 'Borrar', danger: true, run: () => { snap(); detach(id); removeTree(id); save(); renderAll(); } }]); }
   const drc = t.closest('.dr-chip'); if (drc) { const n = nd(drc.dataset.id); if (n.kind === 'doc') openDoc(n.id); return; }
@@ -1159,7 +1162,7 @@ function showPeek(el, focus) {
   const r = el.getBoundingClientRect();
   peekBox.dataset.id = it.id;
   peekBox.className = 'k-' + it.kind + (it.done ? ' done' : '') + ' st-' + stOf(it);
-  peekBox.innerHTML = `${barHTML(it)}<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea · ' + stLabel(it) : 'Tarea · ' + stLabel(it) + (whoOf(it.who) === 'Agente' ? ' · para el agente' : '')}</span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="A la papelera"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Descartar</span></button></div>${true ? `<div class="ip-t ip-open" title="Abrir">${esc(it.text || '…')}${it.body ? `<small>${esc(it.body.slice(0, 160))}${it.body.length > 160 ? '…' : ''}</small>` : '<small class="ip-nodesc">Sin descripción</small>'}</div>` : `<div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`}`;
+  peekBox.innerHTML = `${barHTML(it)}<div class="ip-h"><span class="ip-k">${it.kind === 'idea' ? '💡 Idea · ' + stLabel(it) : 'Tarea · ' + stLabel(it) + (whoOf(it.who) === 'Agente' ? ' · para el agente' : '')}</span>${it.kind === 'tarea' ? `<button class="ip-done" data-ip="done">${it.done ? '✓ Hecha' : 'Marcar hecha'}</button>` : ''}<button class="ip-rm" data-ip="rm" title="Al cajón"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.7 8.6a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-8.6"/></svg><span>Al cajón</span></button></div>${true ? `<div class="ip-t ip-open" title="Abrir">${esc(it.text || '…')}${it.body ? `<small>${esc(it.body.slice(0, 160))}${it.body.length > 160 ? '…' : ''}</small>` : '<small class="ip-nodesc">Sin descripción</small>'}</div>` : `<div class="ip-t" contenteditable="true" spellcheck="false" data-ph="Escribe…">${esc(it.text || '')}</div>`}`;
   const left = Math.min(innerWidth - 300, Math.max(8, r.left + r.width / 2 - 145));
   Object.assign(peekBox.style, { left: left + 'px', top: r.bottom + 10 + 'px' }); peekBox.style.setProperty('--ax', (r.left + r.width / 2 - left) + 'px');
   peekBox.classList.add('on');
@@ -1192,7 +1195,7 @@ peekBox.addEventListener('click', (e) => {
   if (bt.dataset.ip === 'done') { toggleTask(it); const el = $(`.it[data-it="${it.id}"]`); return el ? showPeek(el) : hidePeek(); }
   peekBox.classList.remove('on');
   snap(); toBin(it);
-  save(); renderAll(); ed?.refresh?.(); toast('A la papelera', [['Deshacer', doUndo]]);
+  save(); renderAll(); ed?.refresh?.(); toast('Al cajón', [['Deshacer', doUndo]]);
 });
 
 // ---- a task is a small document: its plan (with versions), what to keep in mind, its state, who it is for, comments -
@@ -1359,7 +1362,7 @@ function paintTask() {
       ${idea && ideaTasks(it).length ? `<div class="tk-sec">Sus tareas</div><div class="tk-kids">${ideaTasks(it).map((t) => `<button data-open="${t.id}">${barHTML(t)}<span>${esc(t.text || '…')}</span><small>${stLabel(t)}</small></button>`).join('')}</div>` : ''}
       ${!idea && dependents(it).length ? `<div class="tk-sec">Al terminarla siguen</div><div class="tk-frees">${dependents(it).map((d) => `<button data-open="${d.id}">🔓 ${esc(d.text || '…')}</button>`).join('')}</div>` : ''}
     </div>
-    <footer>${idea ? '' : `<button class="tk-del">${icon('trash')}Borrar</button>`}<button class="tk-rm">${icon('bin')}${idea ? 'Descartar la idea' : 'Descartar'}</button></footer>`;
+    <footer>${idea ? '' : `<button class="tk-del">${icon('trash')}Borrar</button>`}<button class="tk-rm">${icon('drawer')}Al cajón</button></footer>`;
 }
 $('#task').addEventListener('input', (e) => {
   const it = taskNow(); if (!it) return;
@@ -1423,7 +1426,7 @@ $('#task').addEventListener('click', (e) => {
   if (t.closest('.tk-rm')) {
     taskOpen = null; $('#task').hidden = true;
     snap(); toBin(it);
-    save(); renderAll(); ed?.refresh?.(); return toast(it.kind === 'idea' ? 'Idea a la papelera' : 'Tarea a la papelera', [['Deshacer', doUndo]]);
+    save(); renderAll(); ed?.refresh?.(); return toast('Al cajón', [['Deshacer', doUndo]]);
   }
 });
 
@@ -1977,6 +1980,19 @@ $('#ed-name').addEventListener('input', (e) => { const d = nd(cur); if (d && e.t
 $('#ed-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ed.focus(); } });
 $('#ed-close').onclick = closeDoc;
 let mins = JSON.parse(localStorage.getItem('meadow.mins') || '[]');
+function cornerPaint() {
+  const n = S.drawer.length + [...S.ideas, ...S.tasks].filter((x) => x.trash).length;
+  $('#corner-menu').innerHTML = `<button data-cm="drawer">${icon('drawer')}<span>Cajón</span>${n ? `<i>${n}</i>` : ''}</button><button data-cm="map">${icon('mapgrid')}<span>Mapa</span></button><span class="cm-sep"></span><button data-cm="postit">${icon('note')}<span>Nuevo post-it</span></button><button data-cm="postits">${icon(SET.postits === false ? 'eye' : 'eyeOff')}<span>${SET.postits === false ? 'Mostrar los post-its' : 'Ocultar los post-its'}</span></button>`;
+}
+$('#corner-btn').onclick = (e) => { e.stopPropagation(); const open = !$('#corner').classList.contains('open'); $('#corner').classList.toggle('open', open); if (open) cornerPaint(); $('#drawer').classList.remove('open'); };
+$('#corner-menu').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cm]'); if (!b) return; $('#corner').classList.remove('open');
+  if (b.dataset.cm === 'drawer') { renderDrawer(); return $('#drawer').classList.add('open'); }
+  if (b.dataset.cm === 'map') return mapOpen(true);
+  if (b.dataset.cm === 'postit') return makeAt('postit', null);
+  if (b.dataset.cm === 'postits') { SET.postits = SET.postits === false; localStorage.setItem('meadow.set', JSON.stringify(SET)); applySet(); }
+});
+addEventListener('pointerdown', (e) => { if (!e.target.closest('#corner')) $('#corner').classList.remove('open'); if (!e.target.closest('#drawer, #corner, #pick')) $('#drawer').classList.remove('open'); }, true);
 function togglePin(id, on) { S.pins = (S.pins || []).filter((x) => x !== id); if (on) S.pins.push(id); }
 function renderPins() {
   const l = (S.pins || []).filter((id) => nd(id) && PAR.has(id)), ico = { area: 'area', frame: 'frame', doc: 'doc' };
@@ -2267,6 +2283,8 @@ const ICO = {
   head: '<path d="M6 4v16M14 4v16M6 12h8M18 8l2-1v13"/>',
   image: '<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  mapgrid: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M3.5 11h17M11 4.5v15"/>',
+  note: '<path d="M5 4h14v10l-5 6H5z"/><path d="M14 20v-6h5"/>',
   bin: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M12 10.5a2.4 2.4 0 0 0-1.4 4.3c.3.2.4.5.4.9h2c0-.4.1-.7.4-.9a2.4 2.4 0 0 0-1.4-4.3zM11.2 17.6h1.6"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
 };
@@ -2294,7 +2312,7 @@ function frameOptions(anchor, id) {
     { label: 'Esquinas', now: f.square ? 'sq' : 'round', set: (v) => { f.square = v === 'sq' || undefined; }, tiles: [['round', 'Redondas', '<i class="fo-shape round"></i>'], ['sq', 'Rectas', '<i class="fo-shape square"></i>']] },
     { label: 'Fondo', now: f.paper || 'plain', set: (v) => { f.paper = v === 'plain' ? undefined : v; }, tiles: [['plain', 'Liso', tileBox('bg-plain')], ['paper', 'Papel', tileBox('bg-paper')], ['dots', 'Puntos', tileBox('bg-dots')], ['grid', 'Cuadrícula', tileBox('bg-grid')]] },
     { label: 'Borde', now: f.edge || 'line', set: (v) => { f.edge = v === 'line' ? undefined : v; }, tiles: [['line', 'Línea', tileBox('bd-line')], ['dash', 'Discontinuo', tileBox('bd-dash')], ['none', 'Sin borde', tileBox('bd-none')]] },
-    { label: 'Atajo abajo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] },
+    { label: 'Acceso directo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] },
     { label: 'Cabecera', now: f.headStyle || 'band', set: (v) => { f.headStyle = v === 'band' ? undefined : v; }, tiles: [['band', 'Franja', tileBox('hd-band')], ['plain', 'Solo título', tileBox('hd-plain')]] },
   ], 330);
 }
@@ -2303,7 +2321,7 @@ function docOptions(anchor, id) {
   const d = nd(id);
   optsPop(anchor, () => [
     { label: 'Tamaño', now: d.size || 'm', set: (v) => { d.size = v === 'm' ? undefined : v; }, tiles: [['s', 'Pequeña', tileBox('sz-s')], ['m', 'Mediana', tileBox('sz-m')], ['l', 'Grande', tileBox('sz-l')]] },
-    { label: 'Atajo abajo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] },
+    { label: 'Acceso directo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] },
     { label: 'Papel', now: d.paper || 'plain', set: (v) => { d.paper = v === 'plain' ? undefined : v; }, tiles: [['plain', 'Liso', tileBox('pp-plain')], ['ruled', 'Rayado', tileBox('pp-ruled')], ['grid', 'Cuadriculado', tileBox('pp-grid')]] },
   ], 300);
 }
@@ -2311,7 +2329,7 @@ function docOptions(anchor, id) {
 const AREA_ICONS = ['🌱', '📚', '💼', '🎯', '🧪', '🏠', '🎨', '💡', '🛠️', '📈', '🧭', '❤️', '🎵', '✈️', '🧩', '⭐'];
 function areaOptions(anchor, id) {
   const a = nd(id);
-  optsPop(anchor, () => [{ label: 'Atajo abajo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] }, { label: 'Icono', small: true, now: a.icon || '', set: (v) => { a.icon = v || undefined; }, tiles: [['', 'Ninguno', '<i class="fo-none"></i>'], ...AREA_ICONS.map((e) => [e, e, `<i class="fo-emo">${e}</i>`])] }], 300);
+  optsPop(anchor, () => [{ label: 'Acceso directo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] }, { label: 'Icono', small: true, now: a.icon || '', set: (v) => { a.icon = v || undefined; }, tiles: [['', 'Ninguno', '<i class="fo-none"></i>'], ...AREA_ICONS.map((e) => [e, e, `<i class="fo-emo">${e}</i>`])] }], 300);
 }
 function askChoice(anchor, title, note, options) {
   $('#pick').classList.remove('fo-pop'); $('#pick').style.width = '';
