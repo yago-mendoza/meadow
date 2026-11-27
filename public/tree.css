@@ -1607,3 +1607,25 @@ body.dragging #drawer:not(.open) #dr-list { clip-path: inset(0 0 100% 0 round 14
 #area-its .lc-row:hover { background: #fff !important; }
 #areas .ar.cr-hl { box-shadow: 0 0 0 2px var(--accent), 0 4px 14px rgba(113, 75, 103, .22) !important; transform: translateX(2px); transition: transform .15s, box-shadow .15s; }
 #areas .ar-sq.cr-hl { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--accent) !important; transform: scale(1.2); }
+
+/* a place's icon (from the set) */
+.nic { display: inline-flex; align-items: center; color: inherit; opacity: .85; margin-right: 6px; }
+.nic svg { display: block; }
+.fr-title .nic, .dc-title .nic { margin-right: 7px; vertical-align: -3px; display: inline-flex; }
+.ar-sq span svg { display: block; margin: 0 auto; }
+.ar-sq:has(span) { color: #6a5f6d; }
+.fo-ico { width: 40px; height: 28px; display: grid; place-items: center; color: #6a5f6d; font-style: normal; font-size: 18px; }
+/* the icon chooser */
+.ipk { display: flex; flex-direction: column; max-height: 440px; }
+.ip-top { display: flex; gap: 6px; margin-bottom: 8px; }
+.ip-q { flex: 1; padding: 8px 11px; border-radius: 10px; border: 1.5px solid #ece4ee; outline: none; font: 13.5px "Segoe UI", sans-serif; }
+.ip-q:focus { border-color: var(--accent); }
+.ip-no { padding: 0 10px; border-radius: 10px; font: 600 12px "Segoe UI", sans-serif; color: #8a7d8e; background: #f6f2f7; }
+.ip-no:hover { color: var(--accent); }
+.ip-list { overflow: auto; padding-right: 2px; }
+.ip-set { margin: 8px 2px 4px; font: 700 10.5px "Segoe UI", sans-serif; letter-spacing: .07em; text-transform: uppercase; color: #a397a5; }
+.ip-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; }
+.ip-grid button { height: 34px; display: grid; place-items: center; border-radius: 8px; color: #5a4f5d; }
+.ip-grid button:hover { background: #f4eef5; color: var(--accent); }
+.ip-grid button.on { background: var(--accent); color: #fff; }
+.ip-none { font: 13px "Segoe UI", sans-serif; color: #b3a8b6; margin: 10px 4px; }

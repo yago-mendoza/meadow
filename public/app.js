@@ -8,6 +8,7 @@ import { createEditor, LINK_RE, TAG_RE, TOKEN_RE } from './editor.bundle.js';
 import { flip, measure, EASE } from './motion.js';
 import { createPostits } from './postits.js';
 import { createDiagram, diagramThumbSVG } from './diagram.js';
+import { ICON_SETS, ICONS, iconSVG } from './icons.js';
 
 const PASTEL = ['#fff1b8', '#ffd9c2', '#f9d0e3', '#e3d9f7', '#cfe5fb', '#cdeedd', '#e4ebd3', '#eceef2'];
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -299,7 +300,7 @@ function frameHTML(id, depth) {
   const kids = kidsHTML(t.kids, (k) => (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)));
   return `<section class="fr d${depth}${drawsAt(id).length ? ' has-pic' : ''}${f.square ? ' sq' : ''}${f.paper ? ' fb-' + f.paper : ''}" data-id="${id}" style="--bg:${f.color || PASTEL[4]}">${drawsAt(id).length ? `<div class="fr-pic">${thumbs(id)}</div>` : ''}
     <div class="fr-head">
-      <span class="fr-title${tabs.length > 1 && at === tabs[0].id ? ' on' : ''}" data-drag="${id}" data-tab0="${tabs[0].id}" title="${tabs.length > 1 ? 'Clic: su primera pestaña · ' : ''}Arrastra para moverlo · doble clic: renombrar">${esc(f.title)}</span>${nb(id)}${tabs.length > 1 && at === tabs[0].id ? `<button class="fr-tx" data-tab0="${tabs[0].id}" title="Borrar esta pestaña (la siguiente pasa a ser la primera)">×</button>` : ''}
+      <span class="fr-title${tabs.length > 1 && at === tabs[0].id ? ' on' : ''}" data-drag="${id}" data-tab0="${tabs[0].id}" title="${tabs.length > 1 ? 'Clic: su primera pestaña · ' : ''}Arrastra para moverlo · doble clic: renombrar">${nodeIcon(f, 16)}${esc(f.title)}</span>${nb(id)}${tabs.length > 1 && at === tabs[0].id ? `<button class="fr-tx" data-tab0="${tabs[0].id}" title="Borrar esta pestaña (la siguiente pasa a ser la primera)">×</button>` : ''}
       <span class="fr-tabs" data-drop="tabs" data-id="${id}">${tabs.length > 1 ? tabs.slice(1).map((x) => `<span class="ft${x.id === at ? ' on' : ''}" data-tab="${x.id}" data-drag="${x.id}" data-id="${x.id}">${esc(x.title)}${nb(x.id)}${x.id === at ? '<button class="ft-x" title="Borrar esta pestaña">×</button>' : ''}</span>`).join('') : ''}<button class="ft-add" title="Nueva pestaña">＋</button></span>
       ${circles(id)}${tabs.length > 1 ? circles(at) : ''}
       <span class="grow"></span>
@@ -340,13 +341,14 @@ function kidsHTML(ids, one) {
   for (const k of ids) { if (nd(k)?.kind === 'doc') run.push(k); else { flush(); out.push(one(k)); } }
   flush(); return out.join('');
 }
+const nodeIcon = (n, size = 15) => (!n?.icon ? '' : ICONS[n.icon] ? `<span class="ar-ic nic">${iconSVG(n.icon, size)}</span>` : `<span class="ar-ic">${n.icon}</span>`);
 function docHTML(id) {
   const d = nd(id), at = activeTab(d), text = nd(at).text || '';
   const prev = readable(text).split('\n').filter((l, i, a) => l.trim() || (i && a[i - 1].trim())).slice(0, { s: 10, m: 12, l: 20, xl: 28 }[docSize(id)]).join('\n');
   const many = d.kids.length > 1;          // with tabs: its name, and its tabs right under it (what each holds stays inside)
   if (d.dia) return `<article class="dc dia sz-${docSize(id) === 's' ? 'm' : docSize(id)}" data-id="${id}" data-drag="${id}" data-drop="doc"><h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}</h3><div class="dc-dg">${(d.dg?.nodes || []).length ? diagramThumbSVG(d.dg, 240, 160) : '<span class="dc-dg-empty">Diagrama vacío</span>'}</div>${circles(id)}<button class="dc-opt" title="Opciones del documento">⋯</button><button class="dc-x" title="Borrar">×</button></article>`;
   return `<article class="dc${many ? ' many' : ''} sz-${docSize(id)}" data-id="${id}" data-drag="${id}" data-drop="doc">
-    <h3 class="dc-title" title="Doble clic: renombrar">${d.icon ? `<span class="ar-ic">${d.icon}</span> ` : ''}${esc(d.title)}${nb(id)}</h3>
+    <h3 class="dc-title" title="Doble clic: renombrar">${nodeIcon(d, 16)}${esc(d.title)}${nb(id)}</h3>
     ${many ? `<div class="dc-tabs">${d.kids.map((k) => `<span data-pg="${k}" class="${k === at ? 'on' : ''}">${esc(nd(k).title)}${nb(k)}</span>`).join('')}</div><div class="dc-lines"></div>`
       : prev ? `<div class="dc-prev">${esc(prev).replace(/^(#{1,6})\s+(.*)$/gm, '<b class="h$1">$2</b>')}</div>` : '<div class="dc-lines" title="Página en blanco"></div>'}
     ${thumbs(id)}${circles(id)}<button class="dc-opt" title="Opciones del documento">⋯</button><button class="dc-x" title="Borrar o guardar en el cajón">×</button>
@@ -463,9 +465,9 @@ function renderAreas(peek) {
   }
   const btn = (k, i) => { const a = nd(k), g = isGroup(a); if (a.kind === 'doc') return `<div role="button" tabindex="0" class="ar ar-doc sheet" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Clic: abrirlo · doble clic: renombrar"><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el documento o guardarlo en el cajón">×</b></div>`; const pk = k === PICK && k !== S.area ? ' picked' : '', pic = SET.pics && drawsAt(k)[0];
     if (pic) return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar pic${pk}${k === S.area ? ' on' : real.includes(k) ? ' path' : ''}${a.picTitle === false ? ' notitle' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="${esc(a.title)}"><img class="ar-img" src="${drawThumb(pic)}" alt="">${isGroup(a) ? `<span class="ar-its">${circles(k, 3, false)}</span>` : ''}<button class="ar-opt" data-opt="${k}" title="Opciones"></button>${a.picTitle === false ? `<span class="ar-nbc">${nb(k)}</span>` : `<span class="ar-cap"><span class="ar-t">${esc(a.title)}</span>${nb(k)}</span>`}</div>`;
-    return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${pk}${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i>${a.icon ? `<span class="ar-ic">${a.icon}</span>` : ''}<span class="ar-t">${esc(a.title)}</span>${g ? circles(k, 3, false) : ''}${nb(k)}<b class="ar-o" title="Icono">⋯</b><b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
+    return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${pk}${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i>${nodeIcon(a)}<span class="ar-t">${esc(a.title)}</span>${g ? circles(k, 3, false) : ''}${nb(k)}<b class="ar-o" title="Icono">⋯</b><b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
-  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${FOLD.has(c.pid) ? ' fold' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}" data-pid="${c.pid}"><div class="ar-strip"><button class="ar-unfold" data-fold="${c.pid}" title="Desplegar la columna"></button>${c.ids.map((k, i) => `<button class="ar-sq${real.includes(k) ? ' on' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" data-sq="${k}" style="--sc:${SCALES[i % SCALES.length]}" title="${esc(nd(k).title)}">${nd(k).icon ? `<span>${nd(k).icon}</span>` : ''}</button>`).join('')}</div><button class="ar-fold" data-fold="${c.pid}" title="Plegar la columna"></button>${lv === 0 ? wrap : ''}${c.ids.filter((k) => nd(k).kind !== 'doc').map(btn).join('')}${c.ids.some((k) => nd(k).kind === 'doc') ? `<div class="ar-docs">${c.ids.filter((k) => nd(k).kind === 'doc').map(btn).join('')}</div>` : ''}${S.ideas.filter((x) => live(x) && x.at === c.pid && c.pid === S.root).map((x) => `<div class="ar-idea st-${stOf(x)}" data-it="${x.id}" data-drag="item:${x.id}" title="Idea · clic para abrirla"><span>💡</span><span class="ar-t">${esc(x.text || '…')}</span></div>`).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
+  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${FOLD.has(c.pid) ? ' fold' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}" data-pid="${c.pid}"><div class="ar-strip"><button class="ar-unfold" data-fold="${c.pid}" title="Desplegar la columna"></button>${c.ids.map((k, i) => `<button class="ar-sq${real.includes(k) ? ' on' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" data-sq="${k}" style="--sc:${SCALES[i % SCALES.length]}" title="${esc(nd(k).title)}">${nd(k).icon ? `<span>${ICONS[nd(k).icon] ? iconSVG(nd(k).icon, 13) : nd(k).icon}</span>` : ''}</button>`).join('')}</div><button class="ar-fold" data-fold="${c.pid}" title="Plegar la columna"></button>${lv === 0 ? wrap : ''}${c.ids.filter((k) => nd(k).kind !== 'doc').map(btn).join('')}${c.ids.some((k) => nd(k).kind === 'doc') ? `<div class="ar-docs">${c.ids.filter((k) => nd(k).kind === 'doc').map(btn).join('')}</div>` : ''}${S.ideas.filter((x) => live(x) && x.at === c.pid && c.pid === S.root).map((x) => `<div class="ar-idea st-${stOf(x)}" data-it="${x.id}" data-drag="item:${x.id}" title="Idea · clic para abrirla"><span>💡</span><span class="ar-t">${esc(x.text || '…')}</span></div>`).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; }   // unchanged: leave it (keeps double clicks)
   arPids = cols.map((c) => c.pid);
   if (!peek) document.documentElement.style.setProperty('--areas-w', cols.reduce((w, c) => w + (FOLD.has(c.pid) ? 40 : 172), 0) + 'px');
@@ -2016,7 +2018,7 @@ addEventListener('pointerdown', (e) => { if (!e.target.closest('#corner')) $('#c
 function togglePin(id, on) { S.pins = (S.pins || []).filter((x) => x !== id); if (on) S.pins.push(id); }
 function renderPins() {
   const l = (S.pins || []).filter((id) => nd(id) && PAR.has(id)), ico = { area: 'area', frame: 'frame', doc: 'doc' };
-  $('#pins').innerHTML = l.map((id) => `<button class="pin" data-pin="${id}" title="Ir a «${esc(nd(id).title)}»">${nd(id).icon ? `<span class="ar-ic">${nd(id).icon}</span>` : icon(ico[nd(id).kind] || 'area')}<span>${esc(nd(id).title)}</span><b class="pin-x" title="Quitar el atajo">×</b></button>`).join('');
+  $('#pins').innerHTML = l.map((id) => `<button class="pin" data-pin="${id}" title="Ir a «${esc(nd(id).title)}»">${nd(id).icon ? nodeIcon(nd(id)) : icon(ico[nd(id).kind] || 'area')}<span>${esc(nd(id).title)}</span><b class="pin-x" title="Quitar el atajo">×</b></button>`).join('');
 }
 $('#pins').addEventListener('click', (e) => {
   const x = e.target.closest('.pin-x'); if (x) { e.stopPropagation(); snap(); togglePin(x.closest('.pin').dataset.pin, false); save(); return renderAll(); }
@@ -2304,6 +2306,7 @@ const ICO = {
   image: '<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
   pin: '<path d="M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6"/>',
+  sparkles2: '<path d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6z"/>',
   mapgrid: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M3.5 11h17M11 4.5v15"/>',
   note: '<path d="M5 4h14v10l-5 6H5z"/><path d="M14 20v-6h5"/>',
   bin: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M12 10.5a2.4 2.4 0 0 0-1.4 4.3c.3.2.4.5.4.9h2c0-.4.1-.7.4-.9a2.4 2.4 0 0 0-1.4-4.3zM11.2 17.6h1.6"/>',
@@ -2341,11 +2344,13 @@ function frameOptions(anchor, id) {
   const f = nd(id);
   optsPop(anchor, () => [
     { label: 'Esquinas', now: f.square ? 'sq' : 'round', set: (v) => { f.square = v === 'sq' || undefined; }, tiles: [['round', 'Redondas', '<i class="fo-shape round"></i>'], ['sq', 'Rectas', '<i class="fo-shape square"></i>']] },
+    { label: 'Icono', now: '', set: () => setTimeout(() => iconPicker(anchor, id), 0), tiles: [['pick', f.icon ? (ICONS[f.icon]?.label || 'Cambiar') : 'Elegir icono', f.icon ? `<i class="fo-ico">${ICONS[f.icon] ? iconSVG(f.icon, 22) : f.icon}</i>` : '<i class="fo-ico">' + icon('sparkles2') + '</i>']] },
     { label: 'Fondo', now: f.paper || 'plain', set: (v) => { f.paper = v === 'plain' ? undefined : v; }, tiles: [['plain', 'Liso', tileBox('bg-plain')], ['paper', 'Papel', tileBox('bg-paper')], ['dots', 'Puntos', tileBox('bg-dots')], ['grid', 'Cuadrícula', tileBox('bg-grid')]] },
   ], 300);
 }
 // a document: card size, paper (also in the editor)
 function docOptions(anchor, id) {
+  return iconPicker(anchor, id);
   const d = nd(id);
   optsPop(anchor, () => [{ label: 'Icono', small: true, now: d.icon || '', set: (v) => { d.icon = v || undefined; }, tiles: [['', 'Ninguno', '<i class="fo-none"></i>'], ...AREA_ICONS.map((e) => [e, e, `<i class="fo-emo">${e}</i>`])] }], 300);
   return;
@@ -2356,7 +2361,26 @@ function docOptions(anchor, id) {
 }
 // an area: a little icon before its name
 const AREA_ICONS = ['🌱', '📚', '💼', '🎯', '🧪', '🏠', '🎨', '💡', '🛠️', '📈', '🧭', '❤️', '🎵', '✈️', '🧩', '⭐'];
-function areaOptions(anchor, id) {
+function iconPicker(anchor, id) {
+  const n = nd(id), pop = $('#pick'), host = anchor.closest('.fr, .dc, .ar') || anchor, width = 360; let q = '';
+  const grid = () => {
+    const ql = q.trim().toLowerCase(), hit = (k) => !ql || k.includes(ql) || ICONS[k].label.toLowerCase().includes(ql) || ICONS[k].k.includes(ql);
+    const sets = ICON_SETS.map((st) => ({ name: st.name, icons: st.icons.filter(hit) })).filter((st) => st.icons.length);
+    return (sets.length ? sets.map((st) => `<div class="ip-set">${st.name}</div><div class="ip-grid">${st.icons.map((k) => `<button data-ico="${k}" class="${n.icon === k ? 'on' : ''}" title="${ICONS[k].label}">${iconSVG(k, 20)}</button>`).join('')}</div>`).join('') : '<p class="ip-none">Ningún icono con ese nombre.</p>');
+  };
+  pop.innerHTML = `<div class="ipk"><div class="ip-top"><input class="ip-q" placeholder="Buscar un icono…" spellcheck="false"><button class="ip-no" data-ico="" title="Sin icono">Ninguno</button></div><div class="ip-list">${grid()}</div></div>`;
+  pop.classList.add('fo-pop'); pop.style.width = width + 'px';
+  const hr = host.getBoundingClientRect(), ph = 440;
+  const left = hr.right + 14 + width < innerWidth ? hr.right + 14 : hr.left - width - 14 >= 8 ? hr.left - width - 14 : Math.max(8, innerWidth - width - 10);
+  Object.assign(pop.style, { left: left + 'px', top: Math.max(66, Math.min(hr.top, innerHeight - ph - 12)) + 'px' });
+  pop.classList.add('on');
+  const inp = pop.querySelector('.ip-q'); inp.focus();
+  inp.oninput = () => { q = inp.value; pop.querySelector('.ip-list').innerHTML = grid(); };
+  inp.onkeydown = (e) => { if (e.key === 'Escape') pop.classList.remove('on'); if (e.key === 'Enter') pop.querySelector('.ip-list [data-ico]')?.click(); e.stopPropagation(); };
+  pop.onclick = (e) => { const b = e.target.closest('[data-ico]'); if (!b) return; snap(); n.icon = b.dataset.ico || undefined; save(); renderAll(); for (const x of pop.querySelectorAll('[data-ico]')) x.classList.toggle('on', x.dataset.ico === b.dataset.ico && !!b.dataset.ico); };
+}
+function areaOptions(anchor, id) { return iconPicker(anchor, id); }
+function areaOptionsOld(anchor, id) {
   const a = nd(id);
   optsPop(anchor, () => [{ label: 'Icono', small: true, now: a.icon || '', set: (v) => { a.icon = v || undefined; }, tiles: [['', 'Ninguno', '<i class="fo-none"></i>'], ...AREA_ICONS.map((e) => [e, e, `<i class="fo-emo">${e}</i>`])] }], 300);
 }
