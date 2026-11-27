@@ -344,7 +344,9 @@ function renderAreas(peek) {
     cols.push({ pid, ids: nd(pid).kids.filter((k) => nd(k)?.kind === 'area' || (nd(k)?.kind === 'doc' && (pid === S.root || isGroup(nd(pid)) || !nd(pid).kids.some((x) => nd(x)?.kind === 'frame')))) });
     const nx = chain[lv]; if (!nx || lv + 1 >= depth) break; pid = nx;   // always as many columns as levels: an area with none inside shows an empty one
   }
-  const btn = (k, i) => { const a = nd(k), g = isGroup(a); if (a.kind === 'doc') return `<div role="button" tabindex="0" class="ar ar-doc sheet" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Clic: abrirlo · doble clic: renombrar"><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el documento o guardarlo en el cajón">×</b></div>`; return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
+  const btn = (k, i) => { const a = nd(k), g = isGroup(a); if (a.kind === 'doc') return `<div role="button" tabindex="0" class="ar ar-doc sheet" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Clic: abrirlo · doble clic: renombrar"><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el documento o guardarlo en el cajón">×</b></div>`; const pic = SET.pics && drawsAt(k)[0];
+    if (pic) return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar pic${k === S.area ? ' on' : real.includes(k) ? ' path' : ''}${a.picTitle === false ? ' notitle' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="${esc(a.title)}"><img class="ar-img" src="${drawThumb(pic)}" alt=""><button class="ar-opt" data-opt="${k}" title="Opciones"></button>${a.picTitle === false ? `<span class="ar-nbc">${nb(k)}</span>` : `<span class="ar-cap"><span class="ar-t">${esc(a.title)}</span>${nb(k)}</span>`}</div>`;
+    return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
   const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${FOLD.has(c.pid) ? ' fold' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}" data-pid="${c.pid}"><div class="ar-strip"><button class="ar-unfold" data-fold="${c.pid}" title="Desplegar la columna"></button>${c.ids.map((k, i) => `<button class="ar-sq${real.includes(k) ? ' on' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" data-sq="${k}" style="--sc:${SCALES[i % SCALES.length]}" title="${esc(nd(k).title)}"></button>`).join('')}</div><button class="ar-fold" data-fold="${c.pid}" title="Plegar la columna"></button>${lv === 0 ? wrap : ''}${c.ids.filter((k) => nd(k).kind !== 'doc').map(btn).join('')}${c.ids.some((k) => nd(k).kind === 'doc') ? `<div class="ar-docs">${c.ids.filter((k) => nd(k).kind === 'doc').map(btn).join('')}</div>` : ''}${S.ideas.filter((x) => x.at === c.pid).map((x) => `<div class="ar-idea st-${stOf(x)}" data-it="${x.id}" data-drag="item:${x.id}" title="Idea · clic para abrirla"><span>💡</span><span class="ar-t">${esc(x.text || '…')}</span></div>`).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; }   // unchanged: leave it (keeps double clicks)
@@ -556,8 +558,8 @@ function targetAt(x, y) {
   if (el.closest('#areas')) {
     const itemKind = src.item ? [...S.tasks, ...S.ideas].find((x) => x.id === src.item)?.kind : (src.make === 'idea' || src.make === 'tarea') ? src.make : null;
     const isDoc = src.make === 'doc' || (src.node && nd(src.node)?.kind === 'doc');
-    if (itemKind || isDoc || src.make === 'dibujo') {
-      if (src.make === 'dibujo') return null;
+    if (src.make === 'dibujo') { const arEl = el.closest('.ar[data-area]:not(.ar-doc)'); return arEl ? { kind: 'place', pid: arEl.dataset.area, el: arEl, ok: true } : null; }
+    if (itemKind || isDoc) {
       const col = el.closest('.ar-col'), arEl = el.closest('.ar[data-area]'), cpid = col?.dataset.pid;
       const kindOf = (o) => (src.item ? { kind: 'hang', pid: o.pid, el: o.el, ok: true, side: o.side } : { kind: 'place', pid: o.pid, idx: o.idx, forced: isDoc ? 'doc' : undefined, el: o.el, ok: true, side: o.side });
       if (arEl) {
@@ -720,6 +722,12 @@ addEventListener('click', (e) => {
   const tool = t.closest('#tools .tool'); if (tool) { snap(); return makeAt(tool.dataset.drag.slice(4), null); }
   const go = t.closest('[data-go]'); if (go) return focusTo(go.dataset.go);
   if (t.closest('.new-frame')) { snap(); return makeAt('frame', { kind: 'place', pid: S.area || S.root }); }
+  const opt = t.closest('.ar-opt'); if (opt) { const k = opt.dataset.opt, a = nd(k);
+    return askChoice(opt, esc(a.title), '', [
+      { label: a.picTitle === false ? 'Mostrar el título' : 'Ocultar el título', run: () => { snap(); a.picTitle = a.picTitle === false ? undefined : false; save(); renderAll(); } },
+      { label: 'Editar el dibujo', run: () => openDrawing(drawsAt(k)[0]) },
+      { label: 'Borrar el apartado…', danger: true, run: () => askDelete(k, opt) },
+    ]); }
   const fo = t.closest('[data-fold]'); if (fo) return toggleFold(fo.dataset.fold);
   const sq = t.closest('.ar-sq'); if (sq) return focusTo(sq.dataset.sq);
   const ari = t.closest('.ar-idea'); if (ari) return openTask(S.ideas.find((x) => x.id === ari.dataset.it));
@@ -1544,7 +1552,8 @@ let dwClipK = 1;
 // a new drawing, on the container it was dropped on (only frames and documents)
 function newDrawing(at) {
   let n = nd(at); if (n?.kind === 'ftab') n = parent(at); if (n?.kind === 'dtab') n = parent(at);
-  if (!n || (n.kind !== 'frame' && n.kind !== 'doc')) return toast('Un dibujo va en un marco o en un documento: arrástralo encima de uno');
+  if (n?.kind === 'area' && drawsAt(n.id)[0]) return openDrawing(drawsAt(n.id)[0]);   // an area has one drawing
+  if (!n || !['frame', 'doc', 'area'].includes(n.kind)) return toast('Un dibujo va en un marco, un documento o un apartado: arrástralo encima de uno');
   snap(); S.drawings ||= []; S.seq.dibujo = (S.seq.dibujo || 0) + 1;
   const d = { id: 'd' + S.seq.dibujo + '-' + uid().slice(0, 3), n: S.seq.dibujo, at: n.id, shapes: [], base: DW_W, created: Date.now(), fresh: true };
   S.drawings.push(d); save(); renderAll(); openDrawing(d);
