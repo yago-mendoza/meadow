@@ -346,24 +346,14 @@ function renderAreas(peek) {
   }
   const btn = (k, i) => { const a = nd(k), g = isGroup(a); if (a.kind === 'doc') return `<div role="button" tabindex="0" class="ar ar-doc sheet" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Clic: abrirlo · doble clic: renombrar"><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el documento o guardarlo en el cajón">×</b></div>`; return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
-  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${lv === cols.length - 1 ? ' last' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}" data-pid="${c.pid}">${lv < cols.length - 1 ? `<div class="ar-strip">${lv === 0 && wrap ? '<i class="ar-tab-add"></i>' : ''}${c.ids.map((k, i) => `<span class="ar-tab${real.includes(k) ? ' on' : chain.includes(k) ? ' peek' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" style="--sc:${SCALES[i % SCALES.length]}"><b>${esc(nd(k).title)}</b>${nb(k)}</span>`).join('')}</div>` : ''}${lv === 0 ? wrap : ''}${c.ids.filter((k) => nd(k).kind !== 'doc').map(btn).join('')}${c.ids.some((k) => nd(k).kind === 'doc') ? `<div class="ar-docs">${c.ids.filter((k) => nd(k).kind === 'doc').map(btn).join('')}</div>` : ''}${S.ideas.filter((x) => x.at === c.pid).map((x) => `<div class="ar-idea st-${stOf(x)}" data-it="${x.id}" data-drag="item:${x.id}" title="Idea · clic para abrirla"><span>💡</span><span class="ar-t">${esc(x.text || '…')}</span></div>`).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
-  if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; paintHov(); }   // unchanged: leave it (keeps hover, double clicks)
+  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${FOLD.has(c.pid) ? ' fold' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}" data-pid="${c.pid}"><div class="ar-strip"><button class="ar-unfold" data-fold="${c.pid}" title="Desplegar la columna"></button>${c.ids.map((k, i) => `<button class="ar-sq${real.includes(k) ? ' on' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" data-sq="${k}" style="--sc:${SCALES[i % SCALES.length]}" title="${esc(nd(k).title)}"></button>`).join('')}</div><button class="ar-fold" data-fold="${c.pid}" title="Plegar la columna"></button>${lv === 0 ? wrap : ''}${c.ids.filter((k) => nd(k).kind !== 'doc').map(btn).join('')}${c.ids.some((k) => nd(k).kind === 'doc') ? `<div class="ar-docs">${c.ids.filter((k) => nd(k).kind === 'doc').map(btn).join('')}</div>` : ''}${S.ideas.filter((x) => x.at === c.pid).map((x) => `<div class="ar-idea st-${stOf(x)}" data-it="${x.id}" data-drag="item:${x.id}" title="Idea · clic para abrirla"><span>💡</span><span class="ar-t">${esc(x.text || '…')}</span></div>`).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
+  if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; }   // unchanged: leave it (keeps double clicks)
   arPids = cols.map((c) => c.pid);
-  if (!peek) document.documentElement.style.setProperty('--areas-w', (cols.length - 1) * 48 + 172 + 'px');   // folded strips + the open column, whatever is hovered
+  if (!peek) document.documentElement.style.setProperty('--areas-w', cols.reduce((w, c) => w + (FOLD.has(c.pid) ? 40 : 172), 0) + 'px');
 }
-// hovering a folded column opens it to read; only a click chooses. The hover is kept by hand so a redraw (after a
-// click) does not fold and reopen it
-let arHov = -1;
-const paintHov = () => document.querySelectorAll('#areas .ar-col').forEach((c, i) => c.classList.toggle('hov', i === arHov));
-let arShut = -1;   // a column folded by a click stays folded until the pointer goes to another one
-$('#areas').addEventListener('pointermove', (e) => {
-  const c = e.target.closest('.ar-col'); if (!c) return;
-  const i = c.classList.contains('last') ? -1 : [...c.parentNode.children].indexOf(c);
-  if (arShut !== -1 && i === arShut) return;   // the column just folded by a click stays folded while the pointer is still on it…
-  arShut = -1;                                  // …and any other column, the open one included, frees it
-  if (i !== arHov) { arHov = i; paintHov(); }
-});
-$('#areas').addEventListener('pointerleave', () => { arHov = -1; arShut = -1; paintHov(); });
+// a column is folded or unfolded by hand (kept per project)
+const FOLD = new Set(JSON.parse(localStorage.getItem('meadow.fold.' + P) || '[]'));
+function toggleFold(pid) { FOLD.has(pid) ? FOLD.delete(pid) : FOLD.add(pid); localStorage.setItem('meadow.fold.' + P, JSON.stringify([...FOLD])); renderAreas(); }
 function renderTop() {
   const p = pathOf(S.focus);
   $('#crumbs').innerHTML = p.map((n, i) => {
@@ -730,13 +720,14 @@ addEventListener('click', (e) => {
   const tool = t.closest('#tools .tool'); if (tool) { snap(); return makeAt(tool.dataset.drag.slice(4), null); }
   const go = t.closest('[data-go]'); if (go) return focusTo(go.dataset.go);
   if (t.closest('.new-frame')) { snap(); return makeAt('frame', { kind: 'place', pid: S.area || S.root }); }
+  const fo = t.closest('[data-fold]'); if (fo) return toggleFold(fo.dataset.fold);
+  const sq = t.closest('.ar-sq'); if (sq) return focusTo(sq.dataset.sq);
   const ari = t.closest('.ar-idea'); if (ari) return openTask(S.ideas.find((x) => x.id === ari.dataset.it));
   const arx = t.closest('.ar-x'); if (arx) return askDelete(arx.closest('.ar').dataset.area, arx);
   const ar = t.closest('.ar'); if (ar) {
     const id = ar.dataset.area;   // the second click of a double click lands on the redrawn button: it renames
     if (e.detail >= 2) { const el = $(`.ar[data-area="${id}"] .ar-t`); return el && editInline(el, (v) => { if (v && v !== nd(id).title) { snap(); nd(id).title = v; save(); } renderAll(); }); }
     arPeek = null;
-    const col = ar.closest('.ar-col'); if (col && !col.classList.contains('last')) { arShut = [...col.parentNode.children].indexOf(col); arHov = -1; }   // chosen: fold it, show the next column
     return focusTo(id);
   }
   const addd = t.closest('.ar-adddoc'); if (addd) {

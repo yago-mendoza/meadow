@@ -354,14 +354,14 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
    in front, whole. Areas centred in their column, no rounded corner. */
 .ar-col { width: 172px; padding: 14px 12px 70px; border-radius: 0; box-shadow: none; transition: box-shadow .18s; }
 .ar-col + .ar-col { margin-left: -124px; padding-left: 12px; box-shadow: -9px 0 14px -9px rgba(70, 45, 80, .4); }
-.ar-col:not(.last).hov { z-index: 50 !important; box-shadow: 9px 0 18px -8px rgba(70, 45, 80, .4); }
-.ar-col:not(.last).hov + .ar-col { box-shadow: none; }
+.ar-col.fold.hov { z-index: 50 !important; box-shadow: 9px 0 18px -8px rgba(70, 45, 80, .4); }
+.ar-col.fold.hov + .ar-col { box-shadow: none; }
 
 /* outer columns read like the index of a filing cabinet: a strip of vertical tabs; hovering opens the column whole */
 .ar-strip { position: absolute; left: 0; top: 0; bottom: 0; width: 48px; padding: 14px 7px 70px; display: flex; flex-direction: column; gap: 5px; z-index: 2;
   background: var(--cb); transition: opacity .15s; pointer-events: none; }
 .ar-col.hov > .ar-strip { opacity: 0; }
-.ar-col:not(.last):not(.hov) > :not(.ar-strip) { visibility: hidden; }
+.ar-col.fold:not(.hov) > :not(.ar-strip) { visibility: hidden; }
 .ar-tab { flex: 0 1 auto; min-height: 34px; max-height: 150px; border-radius: 9px; background: var(--sc); border: 1px solid rgba(120, 90, 130, .14);
   box-shadow: 0 1px 2px rgba(70, 45, 80, .1); display: flex; align-items: center; justify-content: center; padding: 9px 0; overflow: hidden; }
 .ar-tab b { writing-mode: vertical-rl; transform: rotate(180deg); font: 700 11.5px "Segoe UI", sans-serif; letter-spacing: .03em; color: #5d4f62;
@@ -431,7 +431,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 #ed-body .cm-content { padding-top: 10px; padding-bottom: 55vh; }   /* the last titles can also reach the top */
 /* while you rename an area in a folded column, it stays open */
 .ar-col:has([contenteditable="true"]) { z-index: 50 !important; }
-.ar-col:not(.last):has([contenteditable="true"]) > :not(.ar-strip) { visibility: visible; }
+.ar-col.fold:has([contenteditable="true"]) > :not(.ar-strip) { visibility: visible; }
 .ar-col:has([contenteditable="true"]) > .ar-strip { opacity: 0; }
 
 /* ---- a task: a small document ---- */
@@ -502,14 +502,14 @@ body.drag-hang #stage .ft { outline-offset: 1px; }
 #task ~ .pop, .pop { z-index: 340; }
 
 /* folded columns open smoothly: the column is always whole underneath, a clip shows only its strip and grows on hover */
-.ar-col:not(.last) { clip-path: inset(0 calc(100% - 48px) 0 0); box-shadow: 9px 0 18px -8px rgba(70, 45, 80, .4);
+.ar-col.fold { clip-path: inset(0 calc(100% - 48px) 0 0); box-shadow: 9px 0 18px -8px rgba(70, 45, 80, .4);
   transition: clip-path .32s cubic-bezier(.22, 1, .36, 1), z-index 0s linear .32s; }
-.ar-col:not(.last).hov, .ar-col:not(.last):has([contenteditable="true"]) { clip-path: inset(0 -40px 0 0); transition: clip-path .32s cubic-bezier(.22, 1, .36, 1), z-index 0s; }
-.ar-col:not(.last).hov + .ar-col { box-shadow: -9px 0 14px -9px rgba(70, 45, 80, .4); }
-#areas .ar-col:not(.last):not(.hov) > :not(.ar-strip) { visibility: visible; opacity: 0; }
-#areas .ar-col:not(.last) > :not(.ar-strip) { transition: opacity .2s .06s; }
-#areas .ar-col:not(.last).hov > .ar-strip { opacity: 0; transition: opacity .16s; }
-#areas .ar-col:not(.last) > .ar-strip { transition: opacity .2s .1s; }
+.ar-col.fold.hov, .ar-col.fold:has([contenteditable="true"]) { clip-path: inset(0 -40px 0 0); transition: clip-path .32s cubic-bezier(.22, 1, .36, 1), z-index 0s; }
+.ar-col.fold.hov + .ar-col { box-shadow: -9px 0 14px -9px rgba(70, 45, 80, .4); }
+#areas .ar-col.fold:not(.hov) > :not(.ar-strip) { visibility: visible; opacity: 0; }
+#areas .ar-col.fold > :not(.ar-strip) { transition: opacity .2s .06s; }
+#areas .ar-col.fold.hov > .ar-strip { opacity: 0; transition: opacity .16s; }
+#areas .ar-col.fold > .ar-strip { transition: opacity .2s .1s; }
 
 /* removing a column */
 .ar-dis { margin-top: auto; padding: 6px 10px; border-radius: 9px; text-align: left; font: 600 11.5px "Segoe UI", sans-serif; color: #b3a5b8; }
@@ -657,12 +657,12 @@ body.drag-hang #stage .ft { outline-offset: 1px; }
 /* columns as an accordion (v3): folded ones are strips side by side, always reachable; the hovered one widens and
    pushes the ones on its right over the stage, so no strip is ever covered */
 #areas .ar-col { margin-left: 0; clip-path: none; transition: width .3s cubic-bezier(.22, 1, .36, 1), box-shadow .2s; overflow: hidden; }
-#areas .ar-col:not(.last) { width: 48px; padding: 14px 12px 70px; box-shadow: inset -1px 0 0 #e2d6e7; }
-#areas .ar-col:not(.last).hov, #areas .ar-col:not(.last):has([contenteditable="true"]) { width: 172px; box-shadow: 8px 0 18px -8px rgba(70, 45, 80, .35); }
-#areas .ar-col:not(.last) > :not(.ar-strip) { min-width: 148px; }
-#areas .ar-col.last { width: 172px; box-shadow: none; }
+#areas .ar-col.fold { width: 48px; padding: 14px 12px 70px; box-shadow: inset -1px 0 0 #e2d6e7; }
+#areas .ar-col.fold.hov, #areas .ar-col.fold:has([contenteditable="true"]) { width: 172px; box-shadow: 8px 0 18px -8px rgba(70, 45, 80, .35); }
+#areas .ar-col.fold > :not(.ar-strip) { min-width: 148px; }
+#areas .ar-col:not(.fold) { width: 172px; box-shadow: none; }
 #areas .ar-col + .ar-col { box-shadow: inset -1px 0 0 #e2d6e7; }
-#areas .ar-col:not(.last).hov + .ar-col, #areas .ar-col.last { box-shadow: none; }
+#areas .ar-col.fold.hov + .ar-col, #areas .ar-col:not(.fold) { box-shadow: none; }
 
 /* ideas in soft gold, so they read at a glance (Yago, 26.11: «más doradito, si no apenas se ve») */
 .it.idea { background: radial-gradient(circle at 35% 30%, #fff8dc, #f4d98a 75%); box-shadow: 0 0 0 1px #e8c96a, 0 1px 4px rgba(150, 110, 20, .25); }
@@ -990,3 +990,34 @@ body.no-pics .fr.has-pic { margin-top: 0; } body.no-pics .fr.has-pic::before { d
 /* the eraser: its own pointer, and the figure it would take marked in soft red */
 #dw-c.erasing { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 20 20'%3E%3Cpath d='M11.5 3.5 L17 9 L10 16 L5.5 16 L3 13.5 Z' fill='%23f3b6c4' stroke='%238a6070' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M7 8 L12.5 13.5' stroke='%238a6070' stroke-width='1.2'/%3E%3C/svg%3E") 4 20, crosshair; }
 .dw-erab { position: absolute; border: 1.5px dashed #c0566a; border-radius: 3px; background: rgba(192, 86, 106, .08); box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .8); }
+
+/* columns v4: open with their names, or folded by hand into a thin strip of coloured squares (no hover tricks) */
+#areas .ar-col { transition: width .28s cubic-bezier(.22, 1, .36, 1); overflow: hidden; }
+#areas .ar-col:not(.fold) { width: 172px; padding: 14px 12px 70px; }
+#areas .ar-col.fold { width: 40px; padding: 0; box-shadow: inset -1px 0 0 #e2d6e7; }
+#areas .ar-col:not(.fold) + .ar-col { box-shadow: inset 1px 0 0 #e8dfec; }
+#areas .ar-col:not(.fold) > .ar-strip { display: none; }
+#areas .ar-col.fold > :not(.ar-strip) { visibility: hidden !important; pointer-events: none; }
+#areas .ar-col.fold > .ar-strip { opacity: 1 !important; }
+.ar-strip { position: absolute; inset: 0; width: 40px; padding: 12px 0 70px; display: flex; flex-direction: column; align-items: center; gap: 7px; z-index: 2; background: none; pointer-events: auto; }
+.ar-sq { width: 16px; height: 16px; flex: none; border-radius: 5px; background: var(--sc); box-shadow: inset 0 0 0 1px rgba(120, 90, 130, .16); transition: transform .15s; }
+.ar-sq:hover { transform: scale(1.18); }
+.ar-sq.on { width: 20px; height: 20px; border-radius: 6px; box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--accent); }
+.ar-sq.doc { background: #fff; border-radius: 2px 5px 2px 2px; box-shadow: inset 0 0 0 1px #d9cede; }
+.ar-unfold, .ar-fold { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; color: #9a8da0; flex: none; }
+.ar-unfold { margin-bottom: 4px; }
+.ar-unfold:hover, .ar-fold:hover { background: rgba(255, 255, 255, .7); color: var(--accent); }
+.ar-unfold::before, .ar-fold::before { content: ''; width: 6px; height: 6px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; }
+.ar-unfold::before { transform: translateX(-1px) rotate(-45deg); }
+.ar-fold::before { transform: translateX(1px) rotate(135deg); }
+.ar-fold { position: absolute; right: 4px; bottom: 14px; opacity: .55; z-index: 3; }
+#areas .ar-col:hover > .ar-fold { opacity: 1; }
+/* the fold handle: a slim tab on the column's right edge, halfway down */
+.ar-fold, .ar-unfold { position: absolute; right: 0; top: 50%; bottom: auto; width: 14px; height: 44px; margin: -22px 0 0; border-radius: 8px 0 0 8px; opacity: 1;
+  background: rgba(255, 255, 255, .55); box-shadow: inset 0 0 0 1px #e6dcea; z-index: 4; }
+.ar-unfold { border-radius: 8px 0 0 8px; }
+.ar-fold::before, .ar-unfold::before { width: 5px; height: 5px; }
+#areas .ar-col > .ar-fold { opacity: .6; }
+#areas .ar-col:hover > .ar-fold, .ar-unfold:hover, .ar-fold:hover { opacity: 1; background: #fff; }
+.ar-sq.on { background: var(--accent); box-shadow: 0 0 0 2px #fff, 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+.ar-sq { box-shadow: inset 0 0 0 1px rgba(120, 90, 130, .28); }
