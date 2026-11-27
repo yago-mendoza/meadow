@@ -1343,6 +1343,7 @@ function closeTask() {
   if (it) delete it.fresh;
   taskOpen = null; $('#task').hidden = true; renderAll(); ed?.refresh?.();
   if (navBack) { const n = navBack; navBack = null; if (nd(n.id)) openNav(n.id, n); }
+  if (diaOpen && !listOpen) diaEd?.refreshItems?.();
 }
 function paintTask() {
   const it = taskNow(); if (!it) return closeTask();
@@ -2035,7 +2036,13 @@ function openDia(id) {
   const d = nd(id); if (!d) return; diaOpen = id;
   const box = $('#dia'); box.hidden = false;
   box.innerHTML = `<header class="dia-h"><span class="dia-k">◇ Diagrama</span><input class="dia-name" value="${esc(d.title)}" spellcheck="false"><span class="dia-where">${esc(nestPath(PAR.get(id)) || '')}</span><button class="dia-ok">Listo</button></header><div class="dia-c"></div>`;
-  diaEd = createDiagram(box.querySelector('.dia-c'), { data: d.dg || { v: 1, nodes: [], edges: [] }, panOnDrag: true, onChange: (x) => { const n = nd(id); if (n) { n.dg = x; save(); } } });
+  const items = {
+    list: (nodeId) => [...S.ideas, ...S.tasks].filter((it) => live(it) && it.at === id && it.dn === nodeId).map((it) => ({ id: it.id, kind: it.kind, text: it.text || '', state: stOf(it) })),
+    onDrop: (kind, nodeId) => { snap(); const it = newItem(kind, '', id); it.dn = nodeId; it.fresh = true; save(); diaEd?.refreshItems?.(); openTask(it); },
+    onOpen: (itId) => openTask([...S.ideas, ...S.tasks].find((x) => x.id === itId)),
+    onMove: (itId, nodeId) => { const it = [...S.ideas, ...S.tasks].find((x) => x.id === itId); if (it) { snap(); it.dn = nodeId; save(); diaEd?.refreshItems?.(); } },
+  };
+  diaEd = createDiagram(box.querySelector('.dia-c'), { data: d.dg || { v: 1, nodes: [], edges: [] }, panOnDrag: true, items, onChange: (x) => { const n = nd(id); if (n) { n.dg = x; save(); } } });
   box.querySelector('.dia-name').addEventListener('input', (e) => { if (e.target.value.trim()) { d.title = e.target.value.trim(); save(); } });
   box.querySelector('.dia-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); e.stopPropagation(); });
   box.querySelector('.dia-ok').onclick = closeDia;
@@ -2058,7 +2065,7 @@ function closeDia() {
   try { const x = diaEd?.getData?.(); if (x && nd(id)) nd(id).dg = x; diaEd?.destroy(); } catch {}
   diaEd = null; const box = $('#dia'); box.classList.remove('in'); box.hidden = true; box.innerHTML = ''; save(); renderAll();
 }
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && diaOpen && !e.defaultPrevented && !e.target.closest?.('input, textarea, [contenteditable="true"]')) { e.preventDefault(); e.stopPropagation(); closeDia(); } });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && diaOpen && !taskOpen && !e.defaultPrevented && !e.target.closest?.('input, textarea, [contenteditable="true"]')) { e.preventDefault(); e.stopPropagation(); closeDia(); } });
 function renderDock() {
   renderPins();
   mins = mins.filter((m) => nd(m.id)); localStorage.setItem('meadow.mins', JSON.stringify(mins));
@@ -2414,7 +2421,7 @@ addEventListener('pointerdown', (e) => { if (!e.target.closest('#pick')) $('#pic
 
 // ---- keys -------------------------------------------------------------------------------------------------------------
 addEventListener('keydown', (e) => {
-  if (diaOpen) return;   // the diagram has its own keys
+  if (diaOpen && !taskOpen) return;   // the diagram has its own keys (a card opened over it still takes Esc)
   const typing = e.target.closest?.('input, textarea, [contenteditable="true"], .cm-editor');
   if (e.key === 'Escape') {
     if (taskOpen) { e.preventDefault(); return closeTask(); }
