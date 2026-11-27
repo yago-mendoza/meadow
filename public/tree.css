@@ -1207,3 +1207,46 @@ body:has(#draw:not([hidden])) #pick { z-index: 320; }
 .pk-opt.danger .ico { color: #c0566a; }
 #crmenu button .ico { color: #b0a3b5; }
 #crmenu button.on .ico { color: var(--accent); }
+
+/* an idea without its title: the title asks for it */
+.tk-title.need { animation: need 0.5s ease; box-shadow: inset 0 -2px 0 #e0a84a; }
+.tk-title.need:empty::before { color: #c0862a; }
+@keyframes need { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+
+/* the bin: a quiet icon at the end of the tabs, with its count; opened, a header to go back */
+#list nav .lbin-tab { flex: none; width: 38px; position: relative; display: grid; place-items: center; color: #b0a3b5; }
+#list nav .lbin-tab:hover { color: var(--accent); }
+#list nav .lbin-tab.on { color: #fff; background: #5a4f5d; }
+#list nav .lbin-tab i { position: absolute; top: 3px; right: 3px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box; border-radius: 8px; background: #e3dce7; color: #6a5f6d; font: 700 9.5px/15px "Segoe UI", sans-serif; font-style: normal; text-align: center; }
+#list nav .lbin-tab.on i { background: rgba(255, 255, 255, .25); color: #fff; }
+.lbin-h { display: flex; align-items: center; gap: 8px; margin: 10px 6px 6px; padding: 8px 10px; border-radius: 12px; background: #f6f2f7; color: #5a4f5d; text-transform: none; letter-spacing: 0; }
+.lbin-h button { width: 24px; height: 24px; border-radius: 7px; font: 600 16px "Segoe UI", sans-serif; color: #8a7d8e; }
+.lbin-h button:hover { background: #fff; color: var(--accent); }
+.lbin-h b { font: 700 13.5px "Segoe UI", sans-serif; }
+.lbin-h small { font: 12px "Segoe UI", sans-serif; color: #a397a5; }
+
+/* frames: much rounder corners and a border that reads (square ones stay square) */
+.fr:not(.sq) { border-radius: 30px !important; }
+.fr:not(.sq) > .fr-head { border-radius: 29px 29px 0 0 !important; padding-left: 20px; }
+.fr:not(.sq) > .fr-body { border-radius: 0 0 29px 29px !important; padding: 16px 18px 18px; }
+.fr.d1:not(.sq) { border-radius: 24px !important; } .fr.d1:not(.sq) > .fr-head { border-radius: 23px 23px 0 0 !important; } .fr.d1:not(.sq) > .fr-body { border-radius: 0 0 23px 23px !important; }
+.fr.d2:not(.sq) { border-radius: 20px !important; } .fr.d2:not(.sq) > .fr-head { border-radius: 19px 19px 0 0 !important; } .fr.d2:not(.sq) > .fr-body { border-radius: 0 0 19px 19px !important; }
+.fr { border: 1.5px solid color-mix(in srgb, var(--bg) 55%, #5a4060 30%) !important; }
+.fr > .fr-head { border-bottom: 1px solid color-mix(in srgb, var(--bg) 60%, #5a4060 18%); }
+
+/* a document card's free space: soft lines of different lengths, as if there were text */
+.dc { display: flex; flex-direction: column; }
+.dc-lines { flex: 1; min-height: 60px; margin: 10px 2px 4px; pointer-events: none;
+  background:
+    linear-gradient(#ece6ef, #ece6ef) 0 0 / 92% 5px no-repeat,
+    linear-gradient(#ece6ef, #ece6ef) 0 16px / 78% 5px no-repeat,
+    linear-gradient(#ece6ef, #ece6ef) 0 32px / 86% 5px no-repeat,
+    linear-gradient(#ece6ef, #ece6ef) 0 48px / 54% 5px no-repeat,
+    linear-gradient(#f1ecf3, #f1ecf3) 0 72px / 88% 5px no-repeat,
+    linear-gradient(#f1ecf3, #f1ecf3) 0 88px / 70% 5px no-repeat,
+    linear-gradient(#f1ecf3, #f1ecf3) 0 104px / 82% 5px no-repeat,
+    linear-gradient(#f4f0f5, #f4f0f5) 0 120px / 40% 5px no-repeat;
+  border-radius: 3px; -webkit-mask: linear-gradient(#000 70%, transparent); mask: linear-gradient(#000 70%, transparent); }
+
+.nv-col h4 { display: flex; align-items: center; gap: 7px; text-transform: none; letter-spacing: 0; font-size: 12.5px; color: #6a5f6d; }
+.nv-col h4 .ico { width: 15px; height: 15px; color: #a397a5; }

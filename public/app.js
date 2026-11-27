@@ -322,8 +322,8 @@ function docHTML(id) {
   const many = d.kids.length > 1;          // with tabs: its name, and its tabs right under it (what each holds stays inside)
   return `<article class="dc${many ? ' many' : ''}" data-id="${id}" data-drag="${id}" data-drop="doc">
     <h3 class="dc-title" title="Doble clic: renombrar">${esc(d.title)}${nb(id)}</h3>
-    ${many ? `<div class="dc-tabs">${d.kids.map((k) => `<span data-pg="${k}" class="${k === at ? 'on' : ''}">${esc(nd(k).title)}${nb(k)}</span>`).join('')}</div>`
-      : `<div class="dc-prev">${prev ? esc(prev).replace(/^(#{1,6})\s+(.*)$/gm, '<b class="h$1">$2</b>') : '<span class="dc-empty">Página en blanco</span>'}</div>`}
+    ${many ? `<div class="dc-tabs">${d.kids.map((k) => `<span data-pg="${k}" class="${k === at ? 'on' : ''}">${esc(nd(k).title)}${nb(k)}</span>`).join('')}</div><div class="dc-lines"></div>`
+      : prev ? `<div class="dc-prev">${esc(prev).replace(/^(#{1,6})\s+(.*)$/gm, '<b class="h$1">$2</b>')}</div>` : '<div class="dc-lines" title="Página en blanco"></div>'}
     ${thumbs(id)}${circles(id)}<button class="dc-x" title="Borrar o guardar en el cajón">×</button>
   </article>`;
 }
@@ -447,7 +447,7 @@ const scopeName = (id) => { const n = nd(id); if (!n) return ''; return n.kind =
 function renderGallery() {
   const scope = listScope === 'here' ? hereId() : listScope;
   const l = (S.drawings || []).filter((d) => (nd(d.at) ? !scope || d.at === scope || isIn(d.at, scope) : !scope)).sort((a, b) => (b.created || 0) - (a.created || 0));
-  $('#list-who').innerHTML = '';
+  $('#list-who').innerHTML = ''; $('#list nav .lbin-tab').hidden = true;
   $('#list-body').innerHTML = `<div class="lfil"><div class="lw">${listScope ? `<span class="lw-on">${PLACE_ICO[nd(scope)?.kind] || ''} ${esc(scopeName(scope))}<button data-lscope="" title="En todas partes">×</button></span>` : `<input class="lwq" placeholder="Dónde: un apartado, marco, documento…" value="${esc(listWQ)}">`}${listScope === 'here' ? '' : '<button class="lw-here" data-lscope="here" title="Lo que estás viendo">Aquí</button>'}<div class="lw-sug">${listScope ? '' : whereSug()}</div></div></div>
     ${l.length ? `<div class="gal">${l.map((d) => `<button class="gal-it" data-gal="${d.id}"><img src="${drawThumb(d)}" alt=""><small>${nd(d.at) ? esc(nestPath(d.at) || nd(d.at).title) : '<i>Sin sitio</i>'}</small></button>`).join('')}</div>` : '<p class="none">Todavía no hay dibujos aquí.</p>'}`;
   for (const b of document.querySelectorAll('#list nav button')) b.classList.toggle('on', b.dataset.l === listTab);
@@ -461,7 +461,7 @@ function renderList() {
   const l = all.filter((it) => (listBin || kind === 'idea' || (on.has(stepOf(it)) && (!listStop || stopOf(it)))) && (listWho === 'Todas' || whoOf(it.who) === listWho) && (!scope || inScope(it, scope))
     && (!q || [it.text, it.body, it.notes].some((x) => (x || '').toLowerCase().includes(q))))
     .sort((a, b) => listBin ? b.trash - a.trash : kind === 'idea' ? 0 : (!!stopOf(b) - !!stopOf(a)) || STEPS.findIndex((s) => s[0] === stepOf(a)) - STEPS.findIndex((s) => s[0] === stepOf(b)));
-  const row = (it, d = 0) => `<div class="lrow st-${stOf(it)}${it.done ? ' done' : ''}" style="--d:${d}" data-it="${it.id}">${kind === 'idea' ? '<span class="lic">💡</span>' : `<button class="lchk${it.done ? ' on' : ''}" data-chk="${it.id}" title="${it.done ? 'Reabrir' : 'Hecha'}"></button>`}<div class="lmain">${barHTML(it)}<div class="ltx">${esc(it.text) || '…'}</div><div class="lsub">${whoOf(it.who) === 'Agente' ? '<b class="lwho">Agente</b>' : ''}<b class="lst s-${stOf(it)}">${stLabel(it)}</b>${listNested ? '' : esc(nestPath(placeOf(it)) || 'sin sitio')}</div>${listBin ? `<div class="lbin-acts"><button data-unbin="${it.id}">Recuperar</button><button data-kill="${it.id}">Borrar para siempre</button></div>` : ''}</div></div>`;
+  const row = (it, d = 0) => `<div class="lrow st-${stOf(it)}${it.done ? ' done' : ''}" style="--d:${d}" data-it="${it.id}">${kind === 'idea' ? '<span class="lic">💡</span>' : `<button class="lchk${it.done ? ' on' : ''}" data-chk="${it.id}" title="${it.done ? 'Reabrir' : 'Hecha'}"></button>`}<div class="lmain">${barHTML(it)}<div class="ltx">${esc(it.text) || '…'}</div><div class="lsub">${whoOf(it.who) === 'Agente' ? '<b class="lwho">Agente</b>' : ''}${stLabel(it) ? `<b class="lst s-${stOf(it)}">${stLabel(it)}</b>` : ''}${listNested ? '' : esc(nestPath(placeOf(it)) || 'sin sitio')}</div>${listBin ? `<div class="lbin-acts"><button data-unbin="${it.id}">Recuperar</button><button data-kill="${it.id}">Borrar para siempre</button></div>` : ''}</div></div>`;
   let body = '';
   if (!listNested) body = l.map((it) => row(it)).join('');
   else {   // nested: under the containers they hang on, as in the tree
@@ -487,8 +487,8 @@ function renderList() {
       <input class="lq" placeholder="Buscar en el texto de las ${kind === 'idea' ? 'ideas' : 'tareas'}…" value="${esc(listQ)}">
       ${kind === 'tarea' && !listBin ? `<div class="lf-row"><span>Estado</span>${states.map(([k, lab]) => chip(`data-lst="${k}"`, lab, on.has(k))).join('')}${chip('data-lstop', 'Paradas', listStop, ' class="stop" title="Solo las que esperan a otras o están en pausa"')}</div>` : ''}
       <div class="lf-row"><span class="lf-gap"></span>${chip('data-lnest', '⌥ Anidadas', listNested, ' title="Agruparlas bajo donde están"')}</div>
-    </div>${listBin ? '<div class="lbin-h">🗑 Papelera</div>' : ''}${body || `<p class="none">${listBin ? 'La papelera está vacía.' : all.length ? 'Nada con estos filtros.' : kind === 'tarea' ? 'Sin tareas todavía.' : 'Sin ideas todavía.'}</p>`}
-    <div class="lfoot"><button class="lbin${listBin ? ' on' : ''}" data-lbin title="${listBin ? 'Volver' : 'Lo descartado'}">🗑 ${listBin ? 'Volver' : 'Papelera'}${!listBin && bin.length ? ` <i>${bin.length}</i>` : ''}</button></div>`;
+    </div>${listBin ? `<div class="lbin-h"><button data-lbin title="Volver">‹</button>${icon('trash')}<b>Papelera</b><small>${kind === 'idea' ? 'ideas' : 'tareas'} descartadas</small></div>` : ''}${body || `<p class="none">${listBin ? 'La papelera está vacía.' : all.length ? 'Nada con estos filtros.' : kind === 'tarea' ? 'Sin tareas todavía.' : 'Sin ideas todavía.'}</p>`}`;
+  const nb2 = $('#list nav .lbin-tab'); nb2.innerHTML = icon('trash') + (bin.length ? `<i>${bin.length}</i>` : ''); nb2.classList.toggle('on', listBin); nb2.hidden = false;
   $('#list-who').innerHTML = WHO.map((w) => `<button data-lw="${w}" class="w-${w === 'Yo' ? 'yo' : 'ag'}${listWho === w ? ' on' : ''}">${w}</button>`).join('');
   for (const b of document.querySelectorAll('#list nav button')) b.classList.toggle('on', b.dataset.l === listTab);
 }
@@ -1056,13 +1056,14 @@ const ideaTasks = (it) => S.tasks.filter((t) => t.from === it.id && !t.trash);
 // what a thing looks like now (its colour): a task's stop or step; an idea, done when all its tasks are
 const stOf = (it) => (it.kind === 'idea' ? (ideaTasks(it).length && ideaTasks(it).every((t) => t.done) ? 'cumplida' : 'viva') : stopOf(it) || stepOf(it));
 const stLabel = (it) => {
-  if (it.kind === 'idea') { const l = ideaTasks(it); return l.length ? `${l.filter((t) => t.done).length} de ${l.length} tareas hechas` : 'Sin tareas'; }
+  if (it.kind === 'idea') { const l = ideaTasks(it), d = l.filter((t) => t.done).length; return l.length ? `${l.length} ${l.length === 1 ? 'tarea' : 'tareas'} · ${d} ${d === 1 ? 'hecha' : 'hechas'}` : ''; }
   const st = stopOf(it); return st === 'espera' ? 'Espera a otras' : st === 'pausa' ? 'En pausa' : STEPS.find((x) => x[0] === stepOf(it))[1];
 };
 const live = (it) => !it.trash;
 // the bar with its little ticks: a task's four steps; an idea's tasks, one tick each
 function barHTML(it) {
-  if (it.kind === 'idea') { const l = ideaTasks(it); return `<span class="pbar idea">${l.length ? l.map((t) => `<i class="on s-${stOf(t)}" title="${esc(t.text || '…')}: ${stLabel(t)}"></i>`).join('') : '<i></i>'}</span>`; }
+  if (it.kind === 'idea') return '';
+  if (false) { const l = ideaTasks(it); return `<span class="pbar idea">${l.length ? l.map((t) => `<i class="on s-${stOf(t)}" title="${esc(t.text || '…')}: ${stLabel(t)}"></i>`).join('') : '<i></i>'}</span>`; }
   const n = STEPS.findIndex((x) => x[0] === stepOf(it)), st = stopOf(it);
   return `<span class="pbar${st ? ' stop-' + st : ''}${it.done ? ' done' : ''}">${STEPS.slice(1).map((x, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span>`;
 }
@@ -1122,12 +1123,13 @@ function openNav(id, keep) {
 function paintNav() {
   const box = $('#itnav'), id = navState.id, q = navState.q.trim().toLowerCase();
   const hit = (it) => !q || [it.text, it.body, it.notes].some((x) => (x || '').toLowerCase().includes(q));
-  const row = (it, sub) => `<button class="nv-row ${it.kind} st-${stOf(it)}${it.done ? ' done' : ''}" data-open="${it.id}"><i class="it ${it.kind} st-${stOf(it)}${it.done ? ' done' : ''}">${it.kind === 'idea' ? '💡' : ''}</i><span><b>${esc(it.text) || '…'}</b>${sub ? `<small>${esc(nestPath(placeOf(it)))}</small>` : ''}</span></button>`;
+  const rel = (p) => { const ps = pathOf(p).filter((n) => n.kind !== 'project' && !(n.kind === 'ftab' && parent(n.id)?.kids.length === 1) && !(n.kind === 'dtab' && parent(n.id)?.kids.length === 1)); const i = ps.findIndex((n) => n.id === id); return (i >= 0 ? ['…', ...ps.slice(i + 1)] : ps).map((n) => n.title || n).join(' › '); };
+  const row = (it, sub) => `<button class="nv-row ${it.kind} st-${stOf(it)}${it.done ? ' done' : ''}" data-open="${it.id}"><i class="it ${it.kind} st-${stOf(it)}${it.done ? ' done' : ''}">${it.kind === 'idea' ? '💡' : ''}</i><span><b>${esc(it.text) || '…'}</b>${sub ? `<small>${esc(rel(placeOf(it)))}</small>` : ''}</span></button>`;
   const here = itemsAt(id).filter(hit), deep = nestedItems(id).filter(hit);
   const keepQ = box.querySelector('.nv-q'), had = keepQ && document.activeElement === keepQ, pos = had ? keepQ.selectionStart : null;
   box.innerHTML = `<div class="nv-card"><div class="nv-head"><b>${esc(scopeName(id) || nd(id)?.title || '')}</b><input class="nv-q" placeholder="Buscar…" value="${esc(navState.q)}"><button class="nv-x" title="Cerrar">×</button></div>
-    <div class="nv-cols"><div class="nv-col"><h4>Aquí</h4>${here.map((it) => row(it)).join('') || '<p class="nv-none">Nada</p>'}</div>
-    <div class="nv-col"><h4>Dentro</h4>${deep.map((it) => row(it, true)).join('') || '<p class="nv-none">Nada</p>'}</div></div></div>`;
+    <div class="nv-cols"><div class="nv-col"><h4>${icon('layers')}Colgadas de «${esc(nd(id)?.title || '')}»</h4>${here.map((it) => row(it)).join('') || '<p class="nv-none">Nada</p>'}</div>
+    <div class="nv-col"><h4>${icon('list')}${nd(id)?.kind === 'doc' ? 'En sus páginas' : 'En lo que tiene dentro'}</h4>${deep.map((it) => row(it, true)).join('') || '<p class="nv-none">Nada</p>'}</div></div></div>`;
   if (had) { const n = box.querySelector('.nv-q'); n.focus(); n.setSelectionRange(pos, pos); }
 }
 function navClick(e) {
@@ -1146,7 +1148,11 @@ function closeTask() {
   if (document.activeElement?.closest?.('#task')) document.activeElement.blur();
   const it = taskNow();                                     // left empty: it was never made
   const written = it && (it.text || it.body || it.notes || (it.plans || []).some((p) => p.text) || (it.log || []).some((e) => !e.auto));
-  if (it?.fresh && !written) listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);
+  if (it?.kind === 'idea' && !(it.text || '').trim()) {
+    if (written) { const t = $('#task .tk-title'); t?.classList.remove('need'); void t?.offsetWidth; t?.classList.add('need'); t?.focus(); return toast('Una idea necesita título'); }
+    if (!it.fresh) { dropItem(it); it.fresh = true; }
+  }
+  if (it?.fresh && !written) { const L = listOf(it.kind), i = L.indexOf(it); if (i >= 0) L.splice(i, 1); }
   if (it) delete it.fresh;
   taskOpen = null; $('#task').hidden = true; renderAll(); ed?.refresh?.();
   if (navBack) { const n = navBack; navBack = null; if (nd(n.id)) openNav(n.id, n); }
@@ -1159,7 +1165,7 @@ function paintTask() {
   $('#task .tk-in').innerHTML = `
     <header class="tk-h st-${st}">
       <span class="tk-k" title="${DEF[it.kind]}">${idea ? '💡 Idea' : 'Tarea'}</span>
-      ${idea ? `<span class="tk-prog">${barHTML(it)}<small>${stLabel(it)}</small></span><button class="tk-mk" title="Crear una tarea a partir de esta idea (quedan enlazadas)">→ Tarea</button>`
+      ${idea ? `${stLabel(it) ? `<span class="tk-prog"><small>${stLabel(it)}</small></span>` : ''}<button class="tk-mk" title="Crear una tarea a partir de esta idea (quedan enlazadas)">→ Tarea</button>`
         : `<span class="tk-steps${waits(it) && activeBlockers(it).length ? ' locked' : ''}${stopOf(it) ? ' stop-' + stopOf(it) : ''}">${STEPS.map(([k, l], i) => `<button data-st="${k}" class="${i <= STEPS.findIndex((x) => x[0] === stepOf(it)) && i ? 'on' : ''}${k === stepOf(it) ? ' cur' : ''}">${l}</button>`).join('')}</span>
         <span class="tk-stops"><button data-stop="espera" class="${it.stop === 'espera' ? 'on' : ''}" title="Espera a que otras tareas estén hechas">Espera a…</button><button data-stop="pausa" class="${it.stop === 'pausa' ? 'on' : ''}" title="Parada a mano">En pausa</button></span>`}
       <button class="tk-x" title="Cerrar (Esc)">×</button>
