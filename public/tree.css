@@ -1051,3 +1051,46 @@ body.mk-dibujo #areas .ar:not(.ar-doc) { animation: can-go 1.4s ease-in-out infi
 /* while dragging nothing hovers: only the real targets light up (.drop-on) */
 body.dragging:not(.hit) * { pointer-events: none !important; }
 body.dragging:not(.hit) { cursor: grabbing; }
+
+/* tasks: a livelier blue */
+.it.tarea { background: linear-gradient(135deg, #e6f0ff, #c4dbfb); box-shadow: 0 0 0 1px #a9c6ef, 0 1px 3px rgba(60, 40, 70, .15); }
+.it.tarea::before { border-color: #4a7fc8; }
+/* «…» / «+N»: the rest of a place's ideas and tasks */
+.it-more { height: 20px; min-width: 22px; padding: 0 6px; border-radius: 10px; background: #f1ecf2; color: #8a7d8e; font: 700 10.5px "Segoe UI", sans-serif; box-shadow: inset 0 0 0 1px #e2d9e6; align-self: center; }
+.it-more:hover { background: #fff; color: var(--accent); }
+/* a group's circles on its button in the column */
+#areas .ar .its { display: inline-flex; gap: 3px; margin-left: auto; }
+#areas .ar .its .it { width: 15px; height: 15px; font-size: 8px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .7); }
+#areas .ar .its .it.tarea::before { width: 6px; height: 6px; border-width: 1.3px; border-radius: 2px; }
+#areas .ar .its .it-more { height: 15px; min-width: 15px; padding: 0 4px; font-size: 9px; }
+#areas .ar .its + .nb { margin-left: 4px; }
+#areas .ar.pic .ar-its { position: absolute; left: 5px; top: 5px; }
+/* dropping on an area's canvas: a quiet strip on top, with the slot */
+.loose-its.lz-on { padding: 8px 10px; border-radius: 14px; border: 1.5px dashed color-mix(in srgb, var(--accent) 35%, transparent); background: color-mix(in srgb, var(--accent) 5%, transparent); align-items: center; min-height: 30px; box-sizing: border-box; }
+/* the navigator */
+#itnav { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; background: rgba(60, 40, 70, .18); }
+#itnav[hidden] { display: none; }
+.nv-card { width: min(760px, 92vw); max-height: 76vh; display: flex; flex-direction: column; border-radius: 20px; background: #fff; box-shadow: 0 20px 60px rgba(60, 40, 70, .25); overflow: hidden; animation: nv-in .2s cubic-bezier(.22, 1, .36, 1); }
+@keyframes nv-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+.nv-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #f0eaf2; }
+.nv-head b { font: 700 15px "Segoe UI", sans-serif; color: #2f2735; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
+.nv-q { flex: 1; padding: 8px 12px; border-radius: 10px; border: 1.5px solid #ece4ee; outline: none; font: 14px "Segoe UI", sans-serif; }
+.nv-q:focus { border-color: var(--accent); }
+.nv-x { width: 28px; height: 28px; border-radius: 8px; color: #9a8da0; font-size: 18px; }
+.nv-x:hover { background: #f4eef5; color: var(--accent); }
+.nv-cols { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; flex: 1; }
+.nv-col { overflow: auto; padding: 10px 12px 14px; min-height: 160px; }
+.nv-col + .nv-col { border-left: 1px solid #f0eaf2; background: #fcfafd; }
+.nv-col h4 { margin: 2px 4px 8px; font: 700 11px "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #a397a5; }
+.nv-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px; border-radius: 10px; text-align: left; }
+.nv-row:hover { background: #f6f1f7; }
+.nv-row .it { flex: none; margin-top: 1px; }
+.nv-row span { display: flex; flex-direction: column; min-width: 0; }
+.nv-row b { font: 600 13.5px/1.35 "Segoe UI", sans-serif; color: #3a2f3f; }
+.nv-row small { font: 11.5px "Segoe UI", sans-serif; color: #a397a5; margin-top: 2px; }
+.nv-row.done b, .nv-row.st-descartada b { color: #b3a8b6; text-decoration: line-through; }
+.nv-none { margin: 6px 6px; font: 13px "Segoe UI", sans-serif; color: #b3a8b6; }
+/* an area's own strip of ideas and tasks: hidden when empty, there (faint) as soon as one is being dragged */
+.loose-its.lz-empty { display: none; }
+body.drag-hang .grid > .loose-its.lz-empty { display: flex; min-height: 34px; border-radius: 14px; border: 1.5px dashed color-mix(in srgb, var(--accent) 18%, transparent); box-sizing: border-box; padding: 4px 10px; align-items: center; }
+#areas .ar .ar-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

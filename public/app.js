@@ -284,7 +284,8 @@ function tidy() {
 
 // ---- drawing ---------------------------------------------------------------------------------------------------------
 const itemsAt = (id) => [...S.tasks, ...S.ideas].filter((t) => t.at === id);
-const circles = (id) => { const l = itemsAt(id); return l.length ? `<span class="its">${l.map((it) => `<i class="it ${it.kind}${it.done ? ' done' : ''}${' st-' + stOf(it) + (whoOf(it.who) === 'Agente' ? ' agent' : '') + (it.kind === 'tarea' && stOf(it) === 'bloqueada' && activeBlockers(it).length ? ' dep' : '')}" data-it="${it.id}" data-drag="item:${it.id}">${it.kind === 'idea' ? '💡' : ''}</i>`).join('')}</span>` : ''; };
+const nestedItems = (id) => [...S.tasks, ...S.ideas].filter((it) => it.at !== id && inScope(it, id));
+const circles = (id, max = 4, deep = true) => { const all = itemsAt(id), l = all.slice(0, max), more = all.length > max || (deep && nestedItems(id).length); return l.length || more ? `<span class="its">${l.map((it) => `<i class="it ${it.kind}${it.done ? ' done' : ''}${' st-' + stOf(it) + (whoOf(it.who) === 'Agente' ? ' agent' : '') + (it.kind === 'tarea' && stOf(it) === 'bloqueada' && activeBlockers(it).length ? ' dep' : '')}" data-it="${it.id}" data-drag="item:${it.id}">${it.kind === 'idea' ? '💡' : ''}</i>`).join('')}${more ? `<button class="it-more" data-nav="${id}" title="Ver todas las de aquí y las de dentro">${all.length > max ? '+' + (all.length - max) : '…'}</button>` : ''}</span>` : ''; };
 function frameHTML(id, depth) {
   const f = nd(id), at = activeTab(f), t = nd(at), tabs = f.kids.map(nd);
   const kids = t.kids.map((k) => (nd(k).kind === 'frame' ? (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)) : docHTML(k))).join('');
@@ -328,7 +329,7 @@ function renderStage() {
   const f = nd(S.focus);
   const before = measure(stage, '.fr[data-id], .dc[data-id]');
   stage.innerHTML = f.kind === 'project' || f.kind === 'area'
-    ? `<div class="grid" data-drop="into" data-id="${f.id}">${itemsAt(f.id).length ? `<div class="loose-its" data-id="${f.id}">${circles(f.id)}</div>` : ''}${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}<div class="fr-new" data-drop="into" data-id="${f.id}"><button class="new-frame">＋ Marco</button></div></div>`
+    ? `<div class="grid" data-drop="into" data-id="${f.id}">${((lc) => `<div class="loose-its${lc ? '' : ' lz-empty'}" data-id="${f.id}">${lc}</div>`)(circles(f.id, 12, false))}${f.kids.map((k) => (nd(k).kind === 'doc' ? docHTML(k) : frameHTML(k, 0))).join('')}<div class="fr-new" data-drop="into" data-id="${f.id}"><button class="new-frame">＋ Marco</button></div></div>`
     : `<div class="solo">${frameHTML(f.id, 0)}</div>`;
   if (!skipFlip) flip(stage, before, () => 1, { sel: '.dc[data-id]', appear: false });
 }
@@ -345,10 +346,10 @@ function renderAreas(peek) {
     const nx = chain[lv]; if (!nx || lv + 1 >= depth) break; pid = nx;   // always as many columns as levels: an area with none inside shows an empty one
   }
   const btn = (k, i) => { const a = nd(k), g = isGroup(a); if (a.kind === 'doc') return `<div role="button" tabindex="0" class="ar ar-doc sheet" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Clic: abrirlo · doble clic: renombrar"><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el documento o guardarlo en el cajón">×</b></div>`; const pic = SET.pics && drawsAt(k)[0];
-    if (pic) return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar pic${k === S.area ? ' on' : real.includes(k) ? ' path' : ''}${a.picTitle === false ? ' notitle' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="${esc(a.title)}"><img class="ar-img" src="${drawThumb(pic)}" alt=""><button class="ar-opt" data-opt="${k}" title="Opciones"></button>${a.picTitle === false ? `<span class="ar-nbc">${nb(k)}</span>` : `<span class="ar-cap"><span class="ar-t">${esc(a.title)}</span>${nb(k)}</span>`}</div>`;
-    return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
+    if (pic) return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar pic${k === S.area ? ' on' : real.includes(k) ? ' path' : ''}${a.picTitle === false ? ' notitle' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="${esc(a.title)}"><img class="ar-img" src="${drawThumb(pic)}" alt="">${isGroup(a) ? `<span class="ar-its">${circles(k, 3, false)}</span>` : ''}<button class="ar-opt" data-opt="${k}" title="Opciones"></button>${a.picTitle === false ? `<span class="ar-nbc">${nb(k)}</span>` : `<span class="ar-cap"><span class="ar-t">${esc(a.title)}</span>${nb(k)}</span>`}</div>`;
+    return `<div role="button" tabindex="0" style="--sc:${SCALES[i % SCALES.length]};z-index:${40 - i}" class="ar${k === S.area ? ' on' : real.includes(k) ? ' path' : chain.includes(k) ? ' peek' : ''}${g ? ' grp' : ''}" data-area="${k}" data-id="${k}" data-drag="${k}" data-drop="area" title="Doble clic: renombrar · arrastra para ordenarlo"><i class="ar-sel" title="Elegir para el contexto"></i><span class="ar-t">${esc(a.title)}</span>${g ? circles(k, 3, false) : ''}${nb(k)}<b class="ar-x" title="Borrar el apartado (lo de dentro puede quedarse)">×</b></div>`; };
   const wrap = colsDepth() < MAXCOLS ? '<button class="ar-wrap" title="Columna encima: mete estos apartados dentro de uno nuevo (hasta 4 columnas)"></button>' : '';
-  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${FOLD.has(c.pid) ? ' fold' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}" data-pid="${c.pid}"><div class="ar-strip"><button class="ar-unfold" data-fold="${c.pid}" title="Desplegar la columna"></button>${c.ids.map((k, i) => `<button class="ar-sq${real.includes(k) ? ' on' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" data-sq="${k}" style="--sc:${SCALES[i % SCALES.length]}" title="${esc(nd(k).title)}"></button>`).join('')}</div><button class="ar-fold" data-fold="${c.pid}" title="Plegar la columna"></button>${lv === 0 ? wrap : ''}${c.ids.filter((k) => nd(k).kind !== 'doc').map(btn).join('')}${c.ids.some((k) => nd(k).kind === 'doc') ? `<div class="ar-docs">${c.ids.filter((k) => nd(k).kind === 'doc').map(btn).join('')}</div>` : ''}${S.ideas.filter((x) => x.at === c.pid).map((x) => `<div class="ar-idea st-${stOf(x)}" data-it="${x.id}" data-drag="item:${x.id}" title="Idea · clic para abrirla"><span>💡</span><span class="ar-t">${esc(x.text || '…')}</span></div>`).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
+  const html = cols.map((c, lv) => `<div style="z-index:${lv + 1};--cb:${COLBG[Math.max(0, COLBG.length - cols.length + lv)]}" class="ar-col${FOLD.has(c.pid) ? ' fold' : ''}${arPids[lv] && arPids[lv] !== c.pid ? ' in' : ''}" data-pid="${c.pid}"><div class="ar-strip"><button class="ar-unfold" data-fold="${c.pid}" title="Desplegar la columna"></button>${c.ids.map((k, i) => `<button class="ar-sq${real.includes(k) ? ' on' : ''}${nd(k).kind === 'doc' ? ' doc' : ''}" data-sq="${k}" style="--sc:${SCALES[i % SCALES.length]}" title="${esc(nd(k).title)}"></button>`).join('')}</div><button class="ar-fold" data-fold="${c.pid}" title="Plegar la columna"></button>${lv === 0 ? wrap : ''}${c.ids.filter((k) => nd(k).kind !== 'doc').map(btn).join('')}${c.ids.some((k) => nd(k).kind === 'doc') ? `<div class="ar-docs">${c.ids.filter((k) => nd(k).kind === 'doc').map(btn).join('')}</div>` : ''}${S.ideas.filter((x) => x.at === c.pid && c.pid === S.root).map((x) => `<div class="ar-idea st-${stOf(x)}" data-it="${x.id}" data-drag="item:${x.id}" title="Idea · clic para abrirla"><span>💡</span><span class="ar-t">${esc(x.text || '…')}</span></div>`).join('')}<button class="ar-add" data-pid="${c.pid}" title="Nuevo apartado en esta columna">＋ Apartado</button>${lv < cols.length - 1 ? `<button class="ar-dis" data-lv="${lv}" title="Sus apartados desaparecen y lo que tienen dentro se junta aquí">Quitar esta columna</button>` : ''}</div>`).join('');
   if (arHtml !== html) { arHtml = html; $('#areas').innerHTML = html; }   // unchanged: leave it (keeps double clicks)
   arPids = cols.map((c) => c.pid);
   if (!peek) document.documentElement.style.setProperty('--areas-w', cols.reduce((w, c) => w + (FOLD.has(c.pid) ? 40 : 172), 0) + 'px');
@@ -640,18 +641,18 @@ function hitThrough(x, y) {
 function paintTarget(t) {
   for (const el of document.querySelectorAll('.drop-on, .drop-bad')) el.classList.remove('drop-on', 'drop-bad');
   const old = document.querySelector('.it-slot');
-  if (old && !(t?.slot && t.el === slotEl)) { old.remove(); slotEl = null; }   // the slot stays while over the same thing (no flicker, no delay)
+  if (old && !(t?.slot && t.el === slotEl)) { old.remove(); slotEl = null; for (const z of document.querySelectorAll('.lz-on')) { z.classList.remove('lz-on'); if (z.dataset.tmp) z.remove(); } }   // the slot stays while over the same thing (no flicker, no delay)
   if (t?.slot && t.el && !(old && t.el === slotEl)) {   // where the circle will go: a dashed one, right there
     slotEl = t.el;
     const slot = document.createElement('i'); slot.className = 'it-slot' + (drag?.src?.make === 'dibujo' ? ' draw' : '');
     const fr = t.el.matches('.fr') ? t.el : t.el.matches('.ft') ? t.el.closest('.fr') : null;
     if (fr) fr.querySelector(':scope > .fr-head .grow')?.before(slot);
     else if (t.el.matches('.dc')) { let its = t.el.querySelector(':scope > .its'); if (!its) { its = document.createElement('span'); its.className = 'its'; t.el.append(its); } its.append(slot); }
-    else if (t.el.matches('.grid')) { let l = t.el.querySelector(':scope > .loose-its'); if (!l) { l = document.createElement('div'); l.className = 'loose-its'; t.el.prepend(l); } l.append(slot); }
+    else if (t.el.matches('.grid')) { let l = t.el.querySelector(':scope > .loose-its'); if (!l) { l = document.createElement('div'); l.className = 'loose-its'; l.dataset.tmp = '1'; t.el.prepend(l); } (l.querySelector('.its') || l).append(slot); l.classList.add('lz-on'); }
   }
   bar.classList.remove('on');
   if (!t?.el) return;
-  t.el.classList.add(t.ok ? 'drop-on' : 'drop-bad');
+  if (!(t.slot && t.el.matches('.grid'))) t.el.classList.add(t.ok ? 'drop-on' : 'drop-bad');
   if (!t.ok) return;
   // where exactly: a bar between things
   if (t.side === 't' || t.side === 'b') { const r = t.el.getBoundingClientRect(); Object.assign(bar.style, { left: r.left + 'px', top: (t.side === 't' ? r.top - 3 : r.bottom + 1) + 'px', width: r.width + 'px', height: '3px' }); bar.classList.add('on'); }
@@ -735,6 +736,7 @@ addEventListener('click', (e) => {
     return askChoice(opt, esc(a.title), '', [
       { label: a.picTitle === false ? 'Mostrar el título' : 'Ocultar el título', run: () => { snap(); a.picTitle = a.picTitle === false ? undefined : false; save(); renderAll(); } },
       { label: 'Editar el dibujo', run: () => openDrawing(drawsAt(k)[0]) },
+      { label: 'Quitar el dibujo', run: () => { snap(); S.drawings.splice(S.drawings.indexOf(drawsAt(k)[0]), 1); save(); renderAll(); toast('Dibujo quitado', [['Deshacer', doUndo]]); } },
       { label: 'Borrar el apartado…', danger: true, run: () => askDelete(k, opt) },
     ]); }
   const fo = t.closest('[data-fold]'); if (fo) return toggleFold(fo.dataset.fold);
@@ -1048,6 +1050,37 @@ function openTask(it) {
   box.querySelector('.tk-in').animate([{ opacity: 0, transform: 'translateY(10px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
   if (!it.text) box.querySelector('.tk-title').focus();
 }
+// ---- the navigator of a place: its ideas and tasks on the left, those further inside on the right; a search on top.
+// Opening one closes it; closing that one brings the navigator back as it was
+let navState = null, navBack = null;
+function openNav(id, keep) {
+  navState = { id, q: keep?.q || '', scroll: keep?.scroll || [0, 0] };
+  let box = $('#itnav'); if (!box) { box = document.createElement('div'); box.id = 'itnav'; document.body.append(box); box.addEventListener('input', (e) => { if (e.target.matches('.nv-q')) { navState.q = e.target.value; paintNav(); } }); box.addEventListener('click', navClick); }
+  box.hidden = false; paintNav(); box.querySelector('.nv-q').focus();
+  box.querySelectorAll('.nv-col').forEach((c, i) => { c.scrollTop = navState.scroll[i] || 0; });
+}
+function paintNav() {
+  const box = $('#itnav'), id = navState.id, q = navState.q.trim().toLowerCase();
+  const hit = (it) => !q || [it.text, it.body, it.notes].some((x) => (x || '').toLowerCase().includes(q));
+  const row = (it, sub) => `<button class="nv-row ${it.kind} st-${stOf(it)}${it.done ? ' done' : ''}" data-open="${it.id}"><i class="it ${it.kind} st-${stOf(it)}${it.done ? ' done' : ''}">${it.kind === 'idea' ? '💡' : ''}</i><span><b>${esc(it.text) || '…'}</b>${sub ? `<small>${esc(nestPath(placeOf(it)))}</small>` : ''}</span></button>`;
+  const here = itemsAt(id).filter(hit), deep = nestedItems(id).filter(hit);
+  const keepQ = box.querySelector('.nv-q'), had = keepQ && document.activeElement === keepQ, pos = had ? keepQ.selectionStart : null;
+  box.innerHTML = `<div class="nv-card"><div class="nv-head"><b>${esc(scopeName(id) || nd(id)?.title || '')}</b><input class="nv-q" placeholder="Buscar…" value="${esc(navState.q)}"><button class="nv-x" title="Cerrar">×</button></div>
+    <div class="nv-cols"><div class="nv-col"><h4>Aquí</h4>${here.map((it) => row(it)).join('') || '<p class="nv-none">Nada</p>'}</div>
+    <div class="nv-col"><h4>Dentro</h4>${deep.map((it) => row(it, true)).join('') || '<p class="nv-none">Nada</p>'}</div></div></div>`;
+  if (had) { const n = box.querySelector('.nv-q'); n.focus(); n.setSelectionRange(pos, pos); }
+}
+function navClick(e) {
+  const box = $('#itnav');
+  if (e.target === box || e.target.closest('.nv-x')) return closeNav();
+  const o = e.target.closest('[data-open]'); if (!o) return;
+  navState.scroll = [...box.querySelectorAll('.nv-col')].map((c) => c.scrollTop);
+  navBack = navState; box.hidden = true;
+  openTask([...S.tasks, ...S.ideas].find((x) => x.id === o.dataset.open));
+}
+function closeNav() { const b = $('#itnav'); if (b) b.hidden = true; navState = null; }
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && navState && !$('#itnav').hidden && !taskOpen) { e.stopPropagation(); closeNav(); } }, true);
+addEventListener('click', (e) => { const m = e.target.closest('.it-more'); if (!m || justDragged) return; e.preventDefault(); e.stopPropagation(); openNav(m.dataset.nav); }, true);
 function closeTask() {
   if (!taskOpen) return;
   if (document.activeElement?.closest?.('#task')) document.activeElement.blur();
@@ -1056,6 +1089,7 @@ function closeTask() {
   if (it?.fresh && !written) listOf(it.kind).splice(listOf(it.kind).indexOf(it), 1);
   if (it) delete it.fresh;
   taskOpen = null; $('#task').hidden = true; renderAll(); ed?.refresh?.();
+  if (navBack) { const n = navBack; navBack = null; if (nd(n.id)) openNav(n.id, n); }
 }
 function paintTask() {
   const it = taskNow(); if (!it) return closeTask();
