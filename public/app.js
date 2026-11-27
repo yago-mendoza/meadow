@@ -553,7 +553,7 @@ addEventListener('pointerup', () => {
 });
 // Where a drop would land: { kind, pid, idx, forced, el, ok }
 function targetAt(x, y) {
-  const el = document.elementFromPoint(x, y); if (!el) return null;
+  const el = hitThrough(x, y); if (!el) return null;
   const src = drag.src;
   if (el.closest('#areas')) {
     const itemKind = src.item ? [...S.tasks, ...S.ideas].find((x) => x.id === src.item)?.kind : (src.make === 'idea' || src.make === 'tarea') ? src.make : null;
@@ -631,6 +631,12 @@ function indexInFlow(body, x, y) {
   return i;
 }
 let slotEl = null;
+// while dragging nothing reacts to the pointer (no hover where it cannot go); only real targets light up.
+// The page is made untouchable by CSS, and lifted for the instant of asking what is under the pointer
+function hitThrough(x, y) {
+  const b = document.body, on = b.classList.contains('dragging'); if (on) b.classList.add('hit');
+  const el = document.elementFromPoint(x, y); if (on) b.classList.remove('hit'); return el;
+}
 function paintTarget(t) {
   for (const el of document.querySelectorAll('.drop-on, .drop-bad')) el.classList.remove('drop-on', 'drop-bad');
   const old = document.querySelector('.it-slot');

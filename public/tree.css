@@ -1047,3 +1047,7 @@ body.mk-dibujo #areas .ar:not(.ar-doc) { animation: can-go 1.4s ease-in-out infi
 .ar-fold, .ar-unfold { width: 20px; height: 48px; margin-top: -24px; }
 .ar-fold::before { transform: translateX(2px) rotate(135deg); }
 .ar-unfold::before { transform: translateX(-2px) rotate(-45deg); }
+
+/* while dragging nothing hovers: only the real targets light up (.drop-on) */
+body.dragging:not(.hit) * { pointer-events: none !important; }
+body.dragging:not(.hit) { cursor: grabbing; }
