@@ -529,7 +529,7 @@ const ghost = $('#ghost'), bar = $('#drop-bar');
 addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   const src = e.target.closest('[data-drag]'); if (!src) return;
-  if (e.target.closest('button:not([data-drag]), input, [contenteditable="true"], .fr-pal')) return;
+  if (e.target.closest('button:not([data-drag]), input, [contenteditable="true"], .fr-pal') && !src.matches('.cm-chip')) return;
   drag = { key: src.dataset.drag, el: src, sx: e.clientX, sy: e.clientY, on: false };
 }, true);
 function srcOf(key) {
@@ -570,6 +570,12 @@ addEventListener('pointerup', () => {
 function targetAt(x, y) {
   const el = hitThrough(x, y); if (!el) return null;
   const src = drag.src;
+  if ((src.item || src.make === 'idea' || src.make === 'tarea') && ed && cur && el.closest('#ed-body .cm-content, #ed-body .cm-scroller')) {
+    const v = ed.view, pos = v.posAtCoords({ x, y }, false); if (pos == null) return null;
+    const line = v.state.doc.lineAt(pos), top = v.coordsAtPos(line.from), bot = v.coordsAtPos(line.to, -1) || top; if (!top) return null;
+    const after = y > (top.top + (bot?.bottom ?? top.bottom)) / 2, r = v.contentDOM.getBoundingClientRect();
+    return { kind: 'text', line: line.number, after, el: v.contentDOM, ok: true, y: after ? (bot?.bottom ?? top.bottom) : top.top, x0: r.left, w: r.width };
+  }
   if (el.closest('#areas')) {
     const itemKind = src.item ? [...S.tasks, ...S.ideas].find((x) => x.id === src.item)?.kind : (src.make === 'idea' || src.make === 'tarea') ? src.make : null;
     const isDoc = src.make === 'doc' || (src.node && nd(src.node)?.kind === 'doc');
@@ -666,6 +672,7 @@ function paintTarget(t) {
   }
   bar.classList.remove('on');
   if (!t?.el) return;
+  if (t.kind === 'text') { Object.assign(bar.style, { left: t.x0 + 'px', top: t.y - 1 + 'px', width: t.w + 'px', height: '3px' }); bar.classList.add('on'); return; }
   if (!(t.slot && t.el.matches('.grid'))) t.el.classList.add(t.ok ? 'drop-on' : 'drop-bad');
   if (!t.ok) return;
   // where exactly: a bar between things
@@ -679,8 +686,21 @@ function paintTarget(t) {
     if (k) { const r = k.getBoundingClientRect(), after = !chips[t.idx]; Object.assign(bar.style, { left: (after ? r.right + 2 : r.left - 4) + 'px', top: r.top + 'px', width: '3px', height: r.height + 'px' }); bar.classList.add('on'); }
   }
 }
+function dropInText(it, t) {   // the idea or task becomes its own line there (moved, if it was already in this page)
+  const tab = nd(curTab); if (!tab || !it) return;
+  const tok = token(it); let ls = (tab.text || '').split('\n'), at = t.after ? t.line : t.line - 1;
+  for (let i = ls.length - 1; i >= 0; i--) if (ls[i].includes(tok)) {
+    if (ls[i].replace(/^\s*(?:[-*]\s+)?/, '').trim() === tok) { ls.splice(i, 1); if (i < at) at--; } else ls[i] = ls[i].split(tok).join('').replace(/[ \t]{2,}/g, ' ').replace(/\s+$/, '');
+  }
+  ls.splice(Math.max(0, Math.min(ls.length, at)), 0, tok);
+  it.at = null; tab.text = ls.join('\n'); ed.replaceText(tab.text); save(); renderAll(); ed.refresh?.();
+}
 function drop(src, t) {
   snap();
+  if (t.kind === 'text') {
+    if (src.item) return dropInText([...S.ideas, ...S.tasks].find((x) => x.id === src.item), t);
+    const it = newItem(src.make, '', null); it.fresh = true; dropInText(it, t); return openTask(it);
+  }
   if (src.item) { const it = [...S.ideas, ...S.tasks].find((x) => x.id === src.item); if (it) it.at = t.pid; save(); renderAll(); return; }
   if (src.make) return makeAt(src.make, t);
   const before = src.node ? nd(src.node)?.kind : 'h';
@@ -1842,7 +1862,7 @@ const edApi = {
   createItem(kind, text) { const it = newItem(kind, text, null); save(); renderList(); return it.n; },
   toggleTask(n) { toggleTask(S.tasks.find((x) => x.n === n)); },
   openItem(kind, n) { openTask(listOf(kind).find((x) => x.n === n)); },
-  editItem(kind, n, el) { const it = listOf(kind).find((x) => x.n === n); if (it) openTask(it); },
+  editItem(kind, n, el) { if (justDragged) return; const it = listOf(kind).find((x) => x.n === n); if (it) openTask(it); },
   createDoc(name, text = '', o = {}) {
     const p = PAR.get(cur), d = mk('doc', name); d.kids.push(mk('dtab', 'Página 1', { text }).id);
     if (p) { const P = nd(p); P.kids.splice(P.kids.indexOf(cur) + 1, 0, d.id); } else S.drawer.push(d.id);

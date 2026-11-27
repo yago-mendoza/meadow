@@ -58,12 +58,13 @@ const POSTIT_ICO = Decoration.replace({ widget: new PostitWidget() });
 class ChipWidget extends WidgetType {
   constructor(kind, n, item, api) {
     super(); this.kind = kind; this.n = n; this.api = api;
-    this.text = item ? item.text : 'ya no existe'; this.done = !!item?.done; this.missing = !item; this.st = item?.state || '';
+    this.text = item ? item.text : 'ya no existe'; this.done = !!item?.done; this.missing = !item; this.st = item?.state || ''; this.id = item?.id || '';
   }
   eq(o) { return o.kind === this.kind && o.n === this.n && o.text === this.text && o.done === this.done && o.missing === this.missing && o.st === this.st; }
   toDOM() {
     const s = document.createElement('span');
     s.className = `cm-chip cm-chip-${this.kind}${this.done ? ' done' : ''}${this.missing ? ' missing' : ''}${this.st ? ' st-' + this.st : ''}`;
+    if (this.id) s.dataset.drag = 'item:' + this.id;
     const ico = document.createElement('span'); ico.className = 'cm-chip-ico';
     ico.textContent = this.kind === 'idea' ? '💡' : '';
     if (this.kind === 'tarea' && !this.missing) {
@@ -73,7 +74,8 @@ class ChipWidget extends WidgetType {
     const t = document.createElement('span'); t.className = 'cm-chip-text' + (this.text ? '' : ' empty'); t.textContent = this.text || '…';
     if (!this.missing) {
       t.title = this.kind === 'tarea' ? 'Abrir la tarea' : 'Clic para cambiar el texto';
-      t.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); this.api.editItem?.(this.kind, this.n, s); });
+      t.addEventListener('mousedown', (e) => { e.preventDefault(); });
+      t.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); this.api.editItem?.(this.kind, this.n, s); });
     }
     s.append(ico, t); return s;
   }
@@ -100,9 +102,21 @@ function chipsPlugin(api) {
   }, { decorations: (v) => v.decorations, provide: (pl) => EditorView.atomicRanges.of((v) => v.plugin(pl)?.decorations ?? Decoration.none) });
 }
 
+const SOLO_RE = /^\s*(?:[-*]\s+)?\{(idea|tarea) \d+\}\s*$/;
+const LI_RE = /^(\s*)([-*])\s+(?!\{(?:idea|tarea) \d+\}\s*$)/;
+class BulletWidget extends WidgetType { toDOM() { const s = document.createElement('span'); s.className = 'cm-bullet'; return s; } eq() { return true; } ignoreEvent() { return false; } }
+const BULLET = Decoration.replace({ widget: new BulletWidget() });
 function decorateLine(line, out) {
   const t = line.text, base = line.from;
   if (RULE_RE.test(t)) { out.push(RULE_LINE.range(base)); return; }
+  const so = t.match(SOLO_RE);
+  if (so) { out.push(Decoration.line({ class: 'cm-solo cm-solo-' + so[1] }).range(base)); return; }
+  const li = t.match(LI_RE);
+  if (li) {
+    const lv = Math.min(4, Math.floor(li[1].replace(/\t/g, '  ').length / 2));
+    out.push(Decoration.line({ class: 'cm-li', attributes: { style: '--lv:' + lv } }).range(base));
+    out.push(BULLET.range(base, base + li[0].length));
+  }
   let skip = 0;
   const tm = t.match(TAG_RE), hm = t.match(HEAD_RE);
   if (hm) {

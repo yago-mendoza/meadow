@@ -338,3 +338,16 @@ body.dragging .shp-tools, body.dragging .shape .tb { visibility: hidden; }
 /* «|»: its gap to the words is always there, typed space or not */
 .cm-intro-bar { padding-right: .7em; }
 .cm-intro-sp { display: inline-block; width: 0; overflow: hidden; vertical-align: top; }
+
+/* an idea or a task alone on its line: a long quiet band, like an addendum to the text */
+.cm-line.cm-solo { margin: 3px 0; padding: 3px 10px !important; border-radius: 9px; }
+.cm-line.cm-solo-idea { background: linear-gradient(90deg, #fbf3dc, rgba(251, 243, 220, .25)); box-shadow: inset 3px 0 0 #e6c776; }
+.cm-line.cm-solo-tarea { background: linear-gradient(90deg, #e9f1fc, rgba(233, 241, 252, .25)); box-shadow: inset 3px 0 0 #9dbde8; }
+.cm-solo .cm-chip { background: none !important; border: 0 !important; padding: 0; margin: 0; font-size: 14.5px; color: #4a3f4d; }
+.cm-solo .cm-chip-text { font-weight: 500; }
+.cm-chip[data-drag] { cursor: grab; }
+.cm-chip-text { cursor: pointer; }
+/* lists: a dot and a hanging indent */
+.cm-line.cm-li { padding-left: calc(22px + var(--lv, 0) * 20px) !important; text-indent: -14px; }
+.cm-bullet { display: inline-block; width: 14px; text-indent: 0; }
+.cm-bullet::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #9a8aa2; vertical-align: middle; margin: 0 5px 2px 1px; }
