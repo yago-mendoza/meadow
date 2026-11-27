@@ -1369,9 +1369,10 @@ function inside(s, x, y) {
 }
 const segDist = (px, py, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy; const t = L ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L)) : 0; return Math.hypot(px - ax - t * dx, py - ay - t * dy); };
 // paint the figures pixel by pixel on a sheet-sized context (older drawings were on a 192 × 128 sheet)
-function paintShapes(ctx, shapes, base = DW_W) {
+function paintShapes(ctx, shapes, base = DW_W, bg = null) {
   const k = DW_W / base;
   ctx.fillStyle = '#fffdf8'; ctx.fillRect(0, 0, DW_W, DW_H);
+  if (bg) { ctx.imageSmoothingEnabled = false; ctx.drawImage(bg, 0, 0, DW_W, DW_H); }
   for (const s0 of shapes) {
     const s = { ...s0 }; for (const p of ['x', 'y', 'w', 'h', 'x1', 'y1', 'x2', 'y2']) if (s[p] != null) s[p] *= k;
     if (s.t === 'line' || s.t === 'path') {
@@ -1391,9 +1392,36 @@ function paintShapes(ctx, shapes, base = DW_W) {
   }
 }
 const thumbCache = new Map();
+// a drawing's picture (kept as a small PNG in the drawing's own palette); decoded once, then drawn under the figures
+const bgCache = new Map();
+function bgOf(d) {
+  if (!d.bg) return null;
+  let im = bgCache.get(d.bg); if (im) return im.complete && im.naturalWidth ? im : null;
+  im = new Image(); bgCache.set(d.bg, im);
+  im.onload = () => { if (dwOpen === d.id) dwPaint(); renderAll(); };
+  im.src = d.bg; return null;
+}
+// a picture brought in (loaded, dropped or pasted): fitted whole into the sheet and redrawn with the sheet's colours
+async function dwImport(file) {
+  const d = dwNow(); if (!d || !file || !file.type.startsWith('image/')) return;
+  let src; try { src = await createImageBitmap(file); } catch { return toast('No pude leer esa imagen'); }
+  const c = document.createElement('canvas'); c.width = DW_W; c.height = DW_H; const x = c.getContext('2d');
+  const sc = Math.min(DW_W / src.width, DW_H / src.height), w = Math.round(src.width * sc), h = Math.round(src.height * sc);
+  x.imageSmoothingQuality = 'high'; x.drawImage(src, Math.round((DW_W - w) / 2), Math.round((DW_H - h) / 2), w, h);
+  const img = x.getImageData(0, 0, DW_W, DW_H), px = img.data;
+  const pal = [...new Set([...DW_COLORS.top, ...DW_COLORS.left, ...DW_COLORS.right, '#fffdf8', '#ffffff', '#1f1a24'])].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] < 128) { px[i + 3] = 0; continue; }
+    const [r, g, b] = [px[i], px[i + 1], px[i + 2]]; let best = pal[0], bd = Infinity;
+    for (const p of pal) { const rm = (r + p[0]) / 2, dr = r - p[0], dg = g - p[1], db = b - p[2], dd = (2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db; if (dd < bd) { bd = dd; best = p; } }
+    px[i] = best[0]; px[i + 1] = best[1]; px[i + 2] = best[2]; px[i + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  dwEdit(() => { d.bg = c.toDataURL('image/png'); });
+}
 function drawThumb(d) {
-  const key = d.id + ':' + (d.v || 0) + ':' + d.shapes.length;
-  if (!thumbCache.has(key)) { const c = document.createElement('canvas'); c.width = DW_W; c.height = DW_H; paintShapes(c.getContext('2d'), d.shapes, d.base || 192); thumbCache.set(key, c.toDataURL()); }
+  const bg = bgOf(d), key = d.id + ':' + (d.v || 0) + ':' + d.shapes.length + ':' + (d.bg ? (bg ? d.bg.length : 'wait') : '');
+  if (!thumbCache.has(key)) { const c = document.createElement('canvas'); c.width = DW_W; c.height = DW_H; paintShapes(c.getContext('2d'), d.shapes, d.base || 192, bg); thumbCache.set(key, c.toDataURL()); }
   return thumbCache.get(key);
 }
 const thumbs = (id) => drawsAt(id).map((d) => `<img class="dw-th" data-draw="${d.id}" src="${drawThumb(d)}" alt="" title="Dibujo · clic para abrirlo">`).join('');
@@ -1423,7 +1451,8 @@ function closeDrawing() {
 }
 function dwPaint(preview) {
   const d = dwNow(); if (!d) return;
-  paintShapes($('#dw-c').getContext('2d'), preview ? [...d.shapes.map((s) => ({ ...s })), preview] : d.shapes, d.base || 192);
+  paintShapes($('#dw-c').getContext('2d'), preview ? [...d.shapes.map((s) => ({ ...s })), preview] : d.shapes, d.base || 192, bgOf(d));
+  $('#draw .dw-rmimg').hidden = !d.bg;
   dwPaintSel();
 }
 function dwPickColor(c) {
@@ -1444,8 +1473,8 @@ function dwPickShape(t) {
 let dwHist = [];
 function dwEdit(fn) {
   if (!dwSnapped) { snap(); dwSnapped = true; }
-  const d = dwNow(); dwHist.push(JSON.stringify(d.shapes)); if (dwHist.length > 80) dwHist.shift();
-  fn(); if (d.center !== false) dwCenter(d); d.v = (d.v || 0) + 1; save(); dwPaint();
+  const d = dwNow(); dwHist.push(JSON.stringify([d.shapes, d.bg || null])); if (dwHist.length > 80) dwHist.shift();
+  fn(); if (d.center !== false && !d.bg) dwCenter(d); d.v = (d.v || 0) + 1; save(); dwPaint();
 }
 // «Centrado» (on unless unticked): the whole drawing sits in the middle of the sheet, both ways
 function dwCenter(d) {
@@ -1456,7 +1485,7 @@ function dwCenter(d) {
   if (dx || dy) d.shapes.forEach((s) => moveShape(s, dx, dy));
 }
 $('#draw').addEventListener('change', (e) => { if (!e.target.closest('.dw-center')) return; const d = dwNow(); if (!d) return; d.center = e.target.checked; if (d.center) dwEdit(() => {}); else save(); });
-function dwUndo() { const d = dwNow(); if (!d || !dwHist.length) return; d.shapes = JSON.parse(dwHist.pop()); dwSel.clear(); d.v = (d.v || 0) + 1; save(); dwPaint(); }
+function dwUndo() { const d = dwNow(); if (!d || !dwHist.length) return; const h = JSON.parse(dwHist.pop()); if (Array.isArray(h[0]) || !h.length) { d.shapes = h[0] || []; d.bg = h[1] || undefined; } else d.shapes = h; dwSel.clear(); d.v = (d.v || 0) + 1; save(); dwPaint(); }
 // colours, figures, filled/outline and the tools are taken with a click
 $('#draw').addEventListener('click', (e) => {
   const sw = e.target.closest('[data-col]'), sh = e.target.closest('[data-shape]'), fl = e.target.closest('[data-fill]');
@@ -1575,6 +1604,10 @@ $('#dw-c').addEventListener('pointerdown', (e) => {
   const end = () => { c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', end); up(); };
   c.addEventListener('pointermove', mv); c.addEventListener('pointerup', end);
 });
+$('#draw').addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.items || [])].some((i) => i.kind === 'file')) { e.preventDefault(); $('#draw .dw-sheet').classList.add('img-over'); } });
+$('#draw').addEventListener('dragleave', (e) => { if (!e.relatedTarget || !$('#draw').contains(e.relatedTarget)) $('#draw .dw-sheet').classList.remove('img-over'); });
+$('#draw').addEventListener('drop', (e) => { const f = [...(e.dataTransfer?.files || [])].find((x) => x.type.startsWith('image/')); $('#draw .dw-sheet').classList.remove('img-over'); if (!f) return; e.preventDefault(); dwImport(f); });
+addEventListener('paste', (e) => { if (!dwNow() || $('#draw').hidden) return; const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith('image/')); if (!f) return; e.preventDefault(); dwImport(f); });
 let drawDownOut = false;
 $('#draw').addEventListener('pointerdown', (e) => { drawDownOut = e.target === $('#draw'); });
 $('#draw').addEventListener('click', (e) => {
@@ -1582,6 +1615,8 @@ $('#draw').addEventListener('click', (e) => {
   if ((t === $('#draw') && drawDownOut) || t.closest('.dw-close')) return closeDrawing();
   if (t === $('#draw')) return;
   if (t.closest('.dw-undo')) return dwUndo();
+  if (t.closest('.dw-img')) { const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*'; f.onchange = () => dwImport(f.files[0]); return f.click(); }
+  if (t.closest('.dw-rmimg')) return dwEdit(() => { delete d.bg; });
   if (t.closest('.dw-clear')) return d.shapes.length && dwEdit(() => { d.shapes = []; dwSel.clear(); });
   if (t.closest('.dw-rm')) { dwOpen = null; $('#draw').hidden = true; snap(); S.drawings.splice(S.drawings.indexOf(d), 1); save(); renderAll(); return toast('Dibujo quitado', [['Deshacer', doUndo]]); }
 });
