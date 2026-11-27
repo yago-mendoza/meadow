@@ -1574,3 +1574,6 @@ body.dragging #drawer #dr-list { clip-path: inset(0 0 0 0 round 14px); opacity: 
 .dr-it button:hover { background: #fff; color: var(--accent); }
 .dr-it .dr-kill:hover { color: #c0566a; }
 .ar-dis { margin-top: 2px !important; opacity: .7; } .ar-col:hover > .ar-dis { opacity: 1; }
+
+/* frames: the first level is only its title; frames inside keep their band */
+.fr.d0 > .fr-head { background: transparent !important; border-bottom-color: transparent !important; }

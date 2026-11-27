@@ -297,7 +297,7 @@ const circles = (id, max = 4, deep = true) => { const all = itemsAt(id), l = all
 function frameHTML(id, depth) {
   const f = nd(id), at = activeTab(f), t = nd(at), tabs = f.kids.map(nd);
   const kids = t.kids.map((k) => (nd(k).kind === 'frame' ? (depth < 2 ? frameHTML(k, depth + 1) : stubHTML(k)) : docHTML(k))).join('');
-  return `<section class="fr d${depth}${drawsAt(id).length ? ' has-pic' : ''}${f.square ? ' sq' : ''}${f.paper ? ' fb-' + f.paper : ''}${f.edge ? ' fe-' + f.edge : ''}${f.headStyle ? ' fh-' + f.headStyle : ''}" data-id="${id}" style="--bg:${f.color || PASTEL[4]}">${drawsAt(id).length ? `<div class="fr-pic">${thumbs(id)}</div>` : ''}
+  return `<section class="fr d${depth}${drawsAt(id).length ? ' has-pic' : ''}${f.square ? ' sq' : ''}${f.paper ? ' fb-' + f.paper : ''}" data-id="${id}" style="--bg:${f.color || PASTEL[4]}">${drawsAt(id).length ? `<div class="fr-pic">${thumbs(id)}</div>` : ''}
     <div class="fr-head">
       <span class="fr-title${tabs.length > 1 && at === tabs[0].id ? ' on' : ''}" data-drag="${id}" data-tab0="${tabs[0].id}" title="${tabs.length > 1 ? 'Clic: su primera pestaña · ' : ''}Arrastra para moverlo · doble clic: renombrar">${esc(f.title)}</span>${nb(id)}${tabs.length > 1 && at === tabs[0].id ? `<button class="fr-tx" data-tab0="${tabs[0].id}" title="Borrar esta pestaña (la siguiente pasa a ser la primera)">×</button>` : ''}
       <span class="fr-tabs" data-drop="tabs" data-id="${id}">${tabs.length > 1 ? tabs.slice(1).map((x) => `<span class="ft${x.id === at ? ' on' : ''}" data-tab="${x.id}" data-drag="${x.id}" data-id="${x.id}">${esc(x.title)}${nb(x.id)}${x.id === at ? '<button class="ft-x" title="Borrar esta pestaña">×</button>' : ''}</span>`).join('') : ''}<button class="ft-add" title="Nueva pestaña">＋</button></span>
@@ -926,7 +926,7 @@ addEventListener('click', (e) => {
   const fo = t.closest('[data-fold]'); if (fo) return toggleFold(fo.dataset.fold);
   const sq = t.closest('.ar-sq'); if (sq) return focusTo(sq.dataset.sq);
   const ari = t.closest('.ar-idea'); if (ari) return openTask(S.ideas.find((x) => x.id === ari.dataset.it));
-  const aop = t.closest('.ar-o'); if (aop) return areaOptions(aop, aop.closest('.ar').dataset.area);
+  const aop = t.closest('.ar-o'); if (aop) return moreMenu(aop, aop.closest('.ar').dataset.area, () => areaOptions(aop, aop.closest('.ar').dataset.area));
   const arx = t.closest('.ar-x'); if (arx) return askDelete(arx.closest('.ar').dataset.area, arx);
   const ar = t.closest('.ar'); if (ar) {
     const id = ar.dataset.area;   // the second click of a double click lands on the redrawn button: it renames
@@ -982,9 +982,9 @@ addEventListener('click', (e) => {
     return;
   }
   const fx = t.closest('.fr-x'); if (fx) return askDelete(fx.closest('.fr').dataset.id, fx);
-  const fo2 = t.closest('.fr-opt'); if (fo2) return frameOptions(fo2, fo2.closest('.fr').dataset.id);
+  const fo2 = t.closest('.fr-opt'); if (fo2) return moreMenu(fo2, fo2.closest('.fr').dataset.id, () => frameOptions(fo2, fo2.closest('.fr').dataset.id));
   const dx = t.closest('.dc-x'); if (dx) return askDelete(dx.closest('.dc').dataset.id, dx);
-  const dop = t.closest('.dc-opt'); if (dop) return docOptions(dop, dop.closest('.dc').dataset.id);
+  const dop = t.closest('.dc-opt'); if (dop) return moreMenu(dop, dop.closest('.dc').dataset.id, () => docOptions(dop, dop.closest('.dc').dataset.id));
   const lcr = t.closest('.lc-row'); if (lcr) return openTask([...S.ideas, ...S.tasks].find((x) => x.id === lcr.dataset.it));
   const itc = t.closest('.it'); if (itc) return itemClick(itc.dataset.it, itc);
   const pg = t.closest('.dc-tabs span[data-pg]'); if (pg) { const dc2 = pg.closest('.dc'); return openDoc(dc2.dataset.id, pg.dataset.pg, dc2); }   // a tab of a document opens it there
@@ -2283,6 +2283,7 @@ const ICO = {
   head: '<path d="M6 4v16M14 4v16M6 12h8M18 8l2-1v13"/>',
   image: '<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  pin: '<path d="M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6"/>',
   mapgrid: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M3.5 11h17M11 4.5v15"/>',
   note: '<path d="M5 4h14v10l-5 6H5z"/><path d="M14 20v-6h5"/>',
   bin: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M12 10.5a2.4 2.4 0 0 0-1.4 4.3c.3.2.4.5.4.9h2c0-.4.1-.7.4-.9a2.4 2.4 0 0 0-1.4-4.3zM11.2 17.6h1.6"/>',
@@ -2296,11 +2297,21 @@ const ICO_BY = [[/cajón/i, 'drawer'], [/^Borrar|^Quitarlas/, 'trash'], [/^Edita
 const icoFor = (label) => ICO_BY.find(([re]) => re.test(label))?.[1];
 // a frame's options: a small card with visual choices (its corners)
 // rows of tiles: [{ label, now, set(v), tiles: [[value, name, previewHTML]] , small }]; the card stays open while you try
+function moreMenu(anchor, id, edit) {
+  const pinned = (S.pins || []).includes(id);
+  askChoice(anchor, esc(nd(id)?.title || ''), '', [
+    { label: 'Editar', ico: 'edit', run: () => setTimeout(edit, 0) },
+    { label: pinned ? 'Quitar el acceso directo' : 'Acceso directo abajo', ico: 'pin', run: () => { snap(); togglePin(id, !pinned); save(); renderAll(); toast(pinned ? 'Acceso directo quitado' : 'Acceso directo abajo a la izquierda'); } },
+  ]);
+}
 function optsPop(anchor, rows, width = 300) {
-  const pop = $('#pick'), r = anchor.getBoundingClientRect();
+  const pop = $('#pick'), r = anchor.getBoundingClientRect(), host = anchor.closest('.fr, .dc, .ar');
   const paint = () => { pop.innerHTML = '<div class="fo">' + rows().map((row, ri) => `<div class="fo-lab">${row.label}</div><div class="fo-seg${row.small ? ' small' : ''}" style="--n:${row.small ? 8 : row.tiles.length}">${row.tiles.map(([v, name, vis], ti) => `<button data-r="${ri}" data-t="${ti}" class="${row.now === v ? 'on' : ''}" title="${name}">${vis}${row.small ? '' : `<span>${name}</span>`}</button>`).join('')}</div>`).join('') + '</div>'; };
   paint(); pop.classList.add('fo-pop'); pop.style.width = width + 'px';
-  Object.assign(pop.style, { left: Math.min(innerWidth - width - 10, Math.max(8, r.right - width)) + 'px', top: Math.min(innerHeight - 120, r.bottom + 8) + 'px' });
+  const hr = host ? host.getBoundingClientRect() : r, ph = pop.offsetHeight || 260;
+  let left = hr.right + 14 + width < innerWidth ? hr.right + 14 : hr.left - width - 14 >= 8 ? hr.left - width - 14 : Math.min(innerWidth - width - 10, Math.max(8, r.right - width));
+  let top = (left === hr.right + 14 || left === hr.left - width - 14) ? Math.max(66, Math.min(hr.top, innerHeight - ph - 12)) : Math.min(innerHeight - ph - 12, r.bottom + 8);
+  Object.assign(pop.style, { left: left + 'px', top: top + 'px' });
   pop.classList.add('on');
   pop.onclick = (e) => { const b = e.target.closest('[data-r]'); if (!b) return; const row = rows()[+b.dataset.r], v = row.tiles[+b.dataset.t][0]; if (row.now !== v) { snap(); row.set(v); save(); renderAll(); } paint(); };
 }
@@ -2311,17 +2322,13 @@ function frameOptions(anchor, id) {
   optsPop(anchor, () => [
     { label: 'Esquinas', now: f.square ? 'sq' : 'round', set: (v) => { f.square = v === 'sq' || undefined; }, tiles: [['round', 'Redondas', '<i class="fo-shape round"></i>'], ['sq', 'Rectas', '<i class="fo-shape square"></i>']] },
     { label: 'Fondo', now: f.paper || 'plain', set: (v) => { f.paper = v === 'plain' ? undefined : v; }, tiles: [['plain', 'Liso', tileBox('bg-plain')], ['paper', 'Papel', tileBox('bg-paper')], ['dots', 'Puntos', tileBox('bg-dots')], ['grid', 'Cuadrícula', tileBox('bg-grid')]] },
-    { label: 'Borde', now: f.edge || 'line', set: (v) => { f.edge = v === 'line' ? undefined : v; }, tiles: [['line', 'Línea', tileBox('bd-line')], ['dash', 'Discontinuo', tileBox('bd-dash')], ['none', 'Sin borde', tileBox('bd-none')]] },
-    { label: 'Acceso directo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] },
-    { label: 'Cabecera', now: f.headStyle || 'band', set: (v) => { f.headStyle = v === 'band' ? undefined : v; }, tiles: [['band', 'Franja', tileBox('hd-band')], ['plain', 'Solo título', tileBox('hd-plain')]] },
-  ], 330);
+  ], 300);
 }
 // a document: card size, paper (also in the editor)
 function docOptions(anchor, id) {
   const d = nd(id);
   optsPop(anchor, () => [
     { label: 'Tamaño', now: d.size || 'm', set: (v) => { d.size = v === 'm' ? undefined : v; }, tiles: [['s', 'Pequeña', tileBox('sz-s')], ['m', 'Mediana', tileBox('sz-m')], ['l', 'Grande', tileBox('sz-l')]] },
-    { label: 'Acceso directo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] },
     { label: 'Papel', now: d.paper || 'plain', set: (v) => { d.paper = v === 'plain' ? undefined : v; }, tiles: [['plain', 'Liso', tileBox('pp-plain')], ['ruled', 'Rayado', tileBox('pp-ruled')], ['grid', 'Cuadriculado', tileBox('pp-grid')]] },
   ], 300);
 }
@@ -2329,7 +2336,7 @@ function docOptions(anchor, id) {
 const AREA_ICONS = ['🌱', '📚', '💼', '🎯', '🧪', '🏠', '🎨', '💡', '🛠️', '📈', '🧭', '❤️', '🎵', '✈️', '🧩', '⭐'];
 function areaOptions(anchor, id) {
   const a = nd(id);
-  optsPop(anchor, () => [{ label: 'Acceso directo', now: (S.pins || []).includes(id) ? 'on' : 'off', set: (v) => togglePin(id, v === 'on'), tiles: [['off', 'No', '<i class="fo-vis pin-off"></i>'], ['on', 'Sí', '<i class="fo-vis pin-on"></i>']] }, { label: 'Icono', small: true, now: a.icon || '', set: (v) => { a.icon = v || undefined; }, tiles: [['', 'Ninguno', '<i class="fo-none"></i>'], ...AREA_ICONS.map((e) => [e, e, `<i class="fo-emo">${e}</i>`])] }], 300);
+  optsPop(anchor, () => [{ label: 'Icono', small: true, now: a.icon || '', set: (v) => { a.icon = v || undefined; }, tiles: [['', 'Ninguno', '<i class="fo-none"></i>'], ...AREA_ICONS.map((e) => [e, e, `<i class="fo-emo">${e}</i>`])] }], 300);
 }
 function askChoice(anchor, title, note, options) {
   $('#pick').classList.remove('fo-pop'); $('#pick').style.width = '';
