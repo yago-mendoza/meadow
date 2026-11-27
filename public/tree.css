@@ -1577,3 +1577,10 @@ body.dragging #drawer #dr-list { clip-path: inset(0 0 0 0 round 14px); opacity: 
 
 /* frames: the first level is only its title; frames inside keep their band */
 .fr.d0 > .fr-head { background: transparent !important; border-bottom-color: transparent !important; }
+/* while dragging a place: the shortcuts show a dashed slot, the corner button takes it to the drawer */
+body.dragging:not(.drag-hang):not(.drag-make) #pins { display: flex !important; }
+body.dragging:not(.drag-hang):not(.drag-make) #pins::after { content: "Acceso directo"; display: inline-flex; align-items: center; padding: 7px 12px; border-radius: 12px; border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, transparent); color: color-mix(in srgb, var(--accent) 70%, #fff); font: 600 12.5px "Segoe UI", sans-serif; background: rgba(255, 255, 255, .7); }
+#pins.drop-on::after { background: color-mix(in srgb, var(--accent) 10%, #fff) !important; border-style: solid !important; }
+body.dragging:not(.drag-hang):not(.drag-make) #corner-btn { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent), 0 1px 3px rgba(60, 40, 70, .12); }
+#corner-btn.drop-on { background: color-mix(in srgb, var(--accent) 12%, #fff); color: var(--accent); }
+body.dragging #drawer:not(.open) #dr-list { clip-path: inset(0 0 100% 0 round 14px) !important; opacity: 0 !important; pointer-events: none !important; }

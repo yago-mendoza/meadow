@@ -708,7 +708,8 @@ addEventListener('pointerup', () => {
 function targetAt(x, y) {
   const el = hitThrough(x, y); if (!el) return null;
   const src = drag.src;
-  if (src.make === 'postit') return y > 64 ? { kind: 'postit', x, y, ok: true } : null;   // a post-it goes anywhere below the top bar
+  if (src.make === 'postit') return y > 64 ? { kind: 'postit', x, y, ok: true } : null;
+  if (src.node && el.closest('#pins')) return { kind: 'pin', el: $('#pins'), ok: ['area', 'frame', 'doc'].includes(nd(src.node)?.kind) };   // a post-it goes anywhere below the top bar
   if ((src.item || src.make === 'idea' || src.make === 'tarea') && ed && cur && el.closest('#ed-body .cm-content, #ed-body .cm-scroller')) {
     const v = ed.view, pos = v.posAtCoords({ x, y }, false); if (pos == null) return null;
     const line = v.state.doc.lineAt(pos), top = v.coordsAtPos(line.from), bot = v.coordsAtPos(line.to, -1) || top; if (!top) return null;
@@ -837,6 +838,7 @@ function dropInText(it, t) {   // the idea or task becomes its own line there (m
 }
 function drop(src, t) {
   snap();
+  if (t.kind === 'pin') { togglePin(src.node, true); save(); renderAll(); return toast('Acceso directo abajo a la izquierda'); }
   if (t.kind === 'text') {
     if (src.item) return dropInText([...S.ideas, ...S.tasks].find((x) => x.id === src.item), t);
     const it = newItem(src.make, '', null); it.fresh = true; dropInText(it, t); return openTask(it);
