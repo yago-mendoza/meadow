@@ -17,7 +17,7 @@
 <script type="module">
 import { createDiagram, diagramThumbSVG } from './diagram.js';
 
-// ?d=chain (default): one real chain in the inherited language, close to the GGUF.OS sketch 110.
+// ?d=chain (default): one chain with operations, triggers, readings and a frontier.
 // ?d=classic: the original boxes, one without coordinates. ?d=agent: what an agent writes, no coordinates at all.
 // &theme=dark switches the sample's theme.
 const SAMPLES = {
@@ -82,6 +82,55 @@ const SAMPLES = {
     ],
   },
 };
+// ?d=empty: nothing yet. ?d=big: 300 pieces and 400 arrows (speed). &pan=1: drag on empty space moves the view, as in Meadow.
+SAMPLES.empty = { v: 1, nodes: [], edges: [] };
+// ?d=sys: an architecture an agent writes by hand with Spanish names and synonyms (no coordinates), plus a callout,
+// a card, a count, words on the right, a legend and a title.
+SAMPLES.sys = {
+  v: 1,
+  nodes: [
+    { id: 't', shape: 'title', text: 'Tienda en línea' },
+    { id: 'u', shape: 'persona', text: 'Cliente' },
+    { id: 'web', shape: 'browser', text: 'Web' },
+    { id: 'app', shape: 'móvil', text: 'App' },
+    { id: 'cdn', shape: 'cdn', text: 'Estáticos', sub: 'Cloudflare' },
+    { id: 'api', shape: 'api-gateway', text: 'Entrada' },
+    { id: 'pay', shape: 'servicio', text: 'Pagos', sub: 'Node', form: 'card' },
+    { id: 'ord', shape: 'service', text: 'Pedidos', count: 3 },
+    { id: 'db', shape: 'base de datos', text: 'Pedidos', sub: 'Postgres' },
+    { id: 'cache', shape: 'redis', text: 'Sesiones' },
+    { id: 'q', shape: 'cola', text: 'Correos' },
+    { id: 'w', shape: 'worker', text: 'Envío' },
+    { id: 'mail', shape: 'email', text: 'Proveedor', labelAt: 'right' },
+    { id: 'log', shape: 'logs', text: 'Registros' },
+    { id: 'al', shape: 'alerta', text: 'Aviso' },
+    { id: 'p', shape: 'vpc', text: 'Producción', kids: ['api', 'pay', 'ord', 'db', 'cache', 'q', 'w'] },
+    { id: 'c1', shape: 'callout', text: 'Cobra antes de guardar', to: 'pay' },
+    { id: 'leg', shape: 'legend', text: 'Leyenda' },
+    { id: 'old', shape: 'agent', text: 'Asistente' },
+    { id: 'raro', shape: 'cosa-rara', text: 'Forma desconocida' },
+  ],
+  edges: [
+    { from: 'u', to: 'web' }, { from: 'u', to: 'app' }, { from: 'web', to: 'cdn' }, { from: 'web', to: 'api' }, { from: 'app', to: 'api' },
+    { from: 'api', to: 'pay', verb: 'cobra' }, { from: 'api', to: 'ord' }, { from: 'ord', to: 'db', verb: 'escribe' }, { from: 'ord', to: 'cache', verb: 'lee', dash: 'dashed' },
+    { from: 'ord', to: 'q', verb: 'añade' }, { from: 'q', to: 'w' }, { from: 'w', to: 'mail', verb: 'envía' }, { from: 'ord', to: 'log', dash: 'dashdot' }, { from: 'log', to: 'al' },
+  ],
+};
+// ?d=flow: the chain with data in motion (one line slow, one both ways) and a failing interpretation.
+SAMPLES.flow = (() => {
+  const d = structuredClone(SAMPLES.chain);
+  for (const e of d.edges) if (e.id !== 'e6') e.flow = true;
+  d.edges.find((e) => e.id === 'e2').flow = 'slow';
+  d.nodes.find((n) => n.id === 'interp').status = 'bad';
+  return d;
+})();
+SAMPLES.big = (() => {
+  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const nodes = [], edges = [], kinds = ['box', 'box', 'ellipse', 'operation', 'store', 'event', 'user'];
+  for (let i = 0; i < 300; i++) nodes.push({ id: 'n' + i, text: 'Pieza ' + i, shape: kinds[i % kinds.length], color: '#e3edf9', x: (i % 20) * 260 + Math.round(rnd() * 40), y: Math.floor(i / 20) * 200 + Math.round(rnd() * 40) });
+  for (let i = 0; i < 400; i++) { const a = Math.floor(rnd() * 280), c = Math.min(299, a + [1, 2, 20, 21][Math.floor(rnd() * 4)]); edges.push({ id: 'e' + i, from: 'n' + a, to: 'n' + c }); }
+  return { v: 1, nodes, edges };
+})();
 const q = new URLSearchParams(location.search), data = structuredClone(SAMPLES[q.get('d')] || SAMPLES.chain);
 if (q.get('theme')) data.theme = q.get('theme');
 
@@ -90,7 +139,8 @@ thumb.innerHTML = diagramThumbSVG(data);
 window.dg = createDiagram(document.getElementById('d'), {
   data,
   title: 'Cómo llega un mensaje al libro',
-  onChange: (d) => { console.log('onChange ' + JSON.stringify(d)); thumb.innerHTML = diagramThumbSVG(d); },
+  panOnDrag: q.get('pan') === '1',
+  onChange: (d) => { window.saved = d; if (q.get('d') !== 'big') console.log('onChange ' + JSON.stringify(d).slice(0, 200)); thumb.innerHTML = diagramThumbSVG(d); },
 });
 </script>
 </body>
