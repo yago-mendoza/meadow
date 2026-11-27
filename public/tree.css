@@ -64,9 +64,9 @@ body { background: #f6f6fa; }
 .dc-tabs span { flex: none; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 7px; border-radius: 6px 6px 0 0;
   font: 600 9.5px "Segoe UI", sans-serif; color: #7a6f80; background: color-mix(in srgb, var(--tint) 45%, #fff); }
 .dc-tabs span.on { background: color-mix(in srgb, var(--tint) 90%, #fff); color: #3a2f3f; }
-.dc-title { margin: 0 0 8px; font: 700 15px/1.25 Georgia, serif; color: #2b2230; padding-bottom: 7px; border-bottom: 1px solid #eee8ef; outline: none; }
+.dc-title { margin: 0 0 8px; font: 700 15px/1.25 "Segoe UI", sans-serif; color: #2b2230; padding-bottom: 7px; border-bottom: 1px solid #eee8ef; outline: none; }
 .dc-title[contenteditable="true"] { cursor: text; background: #faf7fa; }
-.dc-prev { font: 10.5px/1.55 Consolas, monospace; color: #6a5e6c; white-space: pre-wrap; word-break: break-word; max-height: 150px; overflow: hidden;
+.dc-prev { font: 11px/1.55 "Segoe UI", sans-serif; color: #6a5e6c; white-space: pre-wrap; word-break: break-word; max-height: 150px; overflow: hidden;
   -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
 .dc-prev b { display: block; font-weight: 700; color: #3a2f3f; }
 .dc-prev b.h\#\# { background: color-mix(in srgb, var(--tint) 70%, #fff); border-radius: 3px; padding: 0 3px; }
@@ -164,7 +164,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
   clip-path: inset(0 0 100% 0 round 14px); opacity: 0; pointer-events: none; transition: clip-path .3s cubic-bezier(.22, 1, .36, 1), opacity .12s; }
 #pick.on { clip-path: inset(0 0 0 0 round 14px); opacity: 1; pointer-events: auto; }
 #ipeek { position: fixed; z-index: 58; width: 280px; padding: 9px 12px 10px; border-radius: 12px; background: #fff; box-shadow: var(--shadow-up); border: 1px solid #e4dce6;
-  font: 13.5px/1.45 Georgia, serif; color: #2f2735; white-space: pre-wrap; pointer-events: none; clip-path: inset(0 0 100% 0 round 12px); opacity: 0;
+  font: 13.5px/1.45 "Segoe UI", sans-serif; color: #2f2735; white-space: pre-wrap; pointer-events: none; clip-path: inset(0 0 100% 0 round 12px); opacity: 0;
   transition: clip-path .32s cubic-bezier(.22, 1, .36, 1), opacity .12s; }
 #ipeek.on { clip-path: inset(0 0 0 0 round 12px); opacity: 1; }
 
@@ -388,7 +388,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .ip-t:empty::before { content: attr(data-ph); color: #b3a7b8; }
 
 /* the idea / task card, worked */
-#ipeek { width: 290px; padding: 0; border-radius: 14px; white-space: normal; font: 14px/1.5 Georgia, serif; overflow: visible;
+#ipeek { width: 290px; padding: 0; border-radius: 14px; white-space: normal; font: 14px/1.5 "Segoe UI", sans-serif; overflow: visible;
   border: 1px solid #e6dde9; box-shadow: 0 10px 28px -8px rgba(60, 35, 70, .28), 0 2px 6px rgba(60, 35, 70, .08); clip-path: none;
   transform: translateY(-4px) scale(.98); transform-origin: var(--ax, 50%) 0; transition: opacity .14s, transform .22s cubic-bezier(.22, 1, .36, 1); }
 #ipeek.on { clip-path: none; transform: none; }
@@ -414,7 +414,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .lrow { gap: 10px; padding: 9px 10px; }
 .lrow > div { flex: 1; min-width: 0; }
 .lic { width: 18px; flex: none; text-align: center; line-height: 20px; }
-.ltx { font: 13.5px/1.4 Georgia, serif; color: #2f2735; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ltx { font: 13.5px/1.4 "Segoe UI", sans-serif; color: #2f2735; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .lsub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fr-out { height: 26px; padding: 0 10px; border-radius: 8px; font: 600 12px "Segoe UI", sans-serif; color: var(--accent); background: rgba(255, 255, 255, .7); }
 .fr-out:hover { background: #fff; box-shadow: 0 1px 3px rgba(60, 40, 70, .15); }
@@ -449,7 +449,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .tk-x { width: 30px; height: 30px; border-radius: 9px; font-size: 18px; color: #8a7d8e; }
 .tk-x:hover { background: rgba(255, 255, 255, .8); color: #2f2735; }
 .tk-body { flex: 1; overflow: auto; padding: 18px 22px 8px; }
-.tk-title { font: 600 21px/1.35 Georgia, serif; color: #2f2735; outline: none; padding: 2px 0; }
+.tk-title { font: 600 21px/1.35 "Segoe UI", sans-serif; color: #2f2735; outline: none; padding: 2px 0; }
 .tk-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 10px 0 6px; }
 .tk-lab { font: 600 11.5px "Segoe UI", sans-serif; color: #a397a5; margin-right: 2px; }
 .tk-who { padding: 3px 10px; border-radius: 20px; font: 600 12px "Segoe UI", sans-serif; color: #7a6f80; background: #f5f1f6; }
@@ -461,12 +461,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .tk-where button:hover { color: var(--accent); background: #efe7f2; }
 .tk-sec { margin: 18px 0 6px; font: 700 11px "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #a397a5; }
 .tk-area, .tk-log-in { min-height: 46px; padding: 9px 12px; border-radius: 10px; background: #faf8fb; border: 1px solid #eee7f0; outline: none;
-  font: 14.5px/1.55 Georgia, serif; color: #2f2735; white-space: pre-wrap; overflow-wrap: anywhere; }
+  font: 14.5px/1.55 "Segoe UI", sans-serif; color: #2f2735; white-space: pre-wrap; overflow-wrap: anywhere; }
 .tk-area:focus, .tk-log-in:focus { background: #fff; border-color: #d9c9e0; box-shadow: 0 0 0 3px #f3ecf6; }
 .tk-log-in { min-height: 0; font-size: 13.5px; }
 [data-ph]:empty::before { content: attr(data-ph); color: #b8adbb; pointer-events: none; }
 .tk-log { margin-top: 8px; display: flex; flex-direction: column; }
-.tk-e { display: flex; align-items: baseline; gap: 12px; padding: 6px 4px; border-bottom: 1px solid #f3eef4; font: 13.5px/1.5 Georgia, serif; color: #3a2f3f; }
+.tk-e { display: flex; align-items: baseline; gap: 12px; padding: 6px 4px; border-bottom: 1px solid #f3eef4; font: 13.5px/1.5 "Segoe UI", sans-serif; color: #3a2f3f; }
 .tk-e time { flex: none; width: 104px; font: 600 11.5px "Segoe UI", sans-serif; color: #a397a5; }
 .tk-e span { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
 .tk-e.auto span { font: 600 12px "Segoe UI", sans-serif; color: #8a7d8e; }
@@ -486,7 +486,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 .cm-chip.st-bloqueada .cm-chip-ico { border-color: #d2685f; background: #fbe4e1; }
 #ipeek.st-curso { --ip-h: #fdf1dc; } #ipeek.st-bloqueada { --ip-h: #fbe4e1; }
 .ip-open { cursor: pointer; } .ip-open:hover { background: #faf6fb; }
-.ip-open small { display: block; margin-top: 4px; font: 12.5px/1.45 Georgia, serif; color: #8a7d8e; }
+.ip-open small { display: block; margin-top: 4px; font: 12.5px/1.45 "Segoe UI", sans-serif; color: #8a7d8e; }
 .lfil { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 2px 8px; margin-bottom: 4px; border-bottom: 1px solid #f3eef4; }
 .lfil button { padding: 3px 10px; border-radius: 20px; font: 600 11.5px "Segoe UI", sans-serif; color: #7a6f80; background: #f6f2f7; }
 .lfil button.on { background: var(--accent); color: #fff; }
@@ -563,7 +563,7 @@ body.drag-hang #stage .ft { outline-offset: 1px; }
 .tk-newver:hover { background: #eadff0; }
 .tk-area.old { background: #f6f4f7; color: #6a5e6c; border-style: dashed; }
 .tk-log { margin: 0 0 8px; gap: 8px; }
-.tk-none { margin: 0; padding: 10px 2px; font: italic 13.5px Georgia, serif; color: #b3a7b8; }
+.tk-none { margin: 0; padding: 10px 2px; font: italic 13.5px "Segoe UI", sans-serif; color: #b3a7b8; }
 .tk-e { display: block; padding: 8px 12px 9px; border: 0; border-radius: 10px; border-left: 3px solid; background: #f7f9fd; }
 .tk-e.by-yo { border-left-color: #3d7bd9; background: #f3f7fd; } .tk-e.by-ag { border-left-color: #e08a2e; background: #fdf6ee; }
 .tk-e-h { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
@@ -846,7 +846,7 @@ body.drag-hang .drop-on, body.drag-draw .drop-on { outline: 2px solid color-mix(
 
 /* ideas that live in a column */
 .ar-idea { display: flex; align-items: flex-start; gap: 7px; padding: 7px 10px; border-radius: 10px; cursor: pointer;
-  background: radial-gradient(circle at 20% 30%, #fff8dc, #f8e7b0); box-shadow: 0 0 0 1px #ecd391; font: 12.5px/1.3 Georgia, serif; color: #5a4a2a; }
+  background: radial-gradient(circle at 20% 30%, #fff8dc, #f8e7b0); box-shadow: 0 0 0 1px #ecd391; font: 12.5px/1.3 "Segoe UI", sans-serif; color: #5a4a2a; }
 .ar-idea .ar-t { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .ar-idea:hover { box-shadow: 0 0 0 1.5px #d9b75a, 0 2px 6px rgba(150, 110, 20, .18); }
 .ar-idea.st-descartada { opacity: .45; filter: grayscale(1); }
@@ -937,7 +937,7 @@ body.no-pics .fr.has-pic { margin-top: 0; } body.no-pics .fr.has-pic::before { d
 /* the list's empty line, in the app's own letter */
 #list .none { font: 13px/1.5 "Segoe UI", sans-serif; color: var(--muted); text-align: center; padding: 22px 12px; margin: 0; }
 /* a task's plan and notes read like a document's text */
-.tk-area { font: 14px/1.6 Consolas, "Cascadia Mono", "Lucida Console", monospace; color: var(--ink); }
+.tk-area { font: 14.5px/1.6 "Segoe UI", sans-serif; color: var(--ink); }
 .tk-area * { font: inherit !important; color: inherit !important; background: none !important; }
 
 /* each project's plant, and the stickers to choose another */
@@ -963,10 +963,10 @@ body.no-pics .fr.has-pic { margin-top: 0; } body.no-pics .fr.has-pic::before { d
 .hd-card h3 { margin: 0 0 6px; font: 700 18px "Segoe UI", sans-serif; color: #2f2735; overflow-wrap: anywhere; }
 .hd-note { margin: 0 0 4px; font: 13px/1.5 "Segoe UI", sans-serif; color: #8a7f8d; }
 .hd-ask { margin: 12px 0 0; font: 13px "Segoe UI", sans-serif; color: #5a4f5d; }
-.hd-ask b { font-family: Consolas, monospace; color: #b0485a; letter-spacing: .03em; }
+.hd-ask b { font-family: "Segoe UI", sans-serif; color: #b0485a; letter-spacing: .03em; }
 .hd-card input { width: 100%; box-sizing: border-box; margin-top: 14px; padding: 11px 14px; border-radius: 12px; border: 1.5px solid #e6dee9; outline: none; font: 600 15px "Segoe UI", sans-serif; color: #2f2735; text-align: center; }
 .hd-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #f1e9f4; }
-.hd-card.danger input { font-family: Consolas, monospace; }
+.hd-card.danger input { letter-spacing: .04em; }
 .hd-acts { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
 .hd-acts button { padding: 9px 18px; border-radius: 11px; font: 600 13.5px "Segoe UI", sans-serif; }
 .hd-no { color: #7a6f7d; background: #f4f0f5; }

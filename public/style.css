@@ -47,7 +47,7 @@ body.dragging .acts, body.dragging .x, body.dragging .pal, body.dragging .f-add 
 #ed-foot button i { font: 600 10.5px Consolas, monospace; color: var(--accent); font-style: normal; }
 /* CodeMirror, Notepad-like */
 #ed-body .cm-editor { height: 100%; outline: none !important; }
-#ed-body .cm-scroller { position: relative; font: 15px/1.6 Consolas, "Cascadia Mono", "Lucida Console", monospace; }
+#ed-body .cm-scroller { position: relative; font: 15.5px/1.65 "Segoe UI", sans-serif; }
 #ed-body .cm-content { padding: 34px 24px 40vh; caret-color: #2b2230; cursor: text; user-select: text; }
 #ed-body.mw-rich .cm-content { padding-left: 50px; padding-right: 32px; }
 /* with a level on: the grips get their own margin on the left and the block buttons theirs on the right, never over the text */
@@ -178,7 +178,7 @@ body.dragging .sign:not(.preview) { pointer-events: none; }
   font: 600 11px/1.7 "Segoe UI", sans-serif; letter-spacing: .02em; text-transform: none; vertical-align: middle; cursor: pointer; transition: background .15s, color .15s; }
 .mw-fph:hover { background: var(--accent-soft); color: var(--accent); }
 /* the format switch: ¶ lit = formatted, dim = raw text */
-.ib.fmt { font: 700 17px Georgia, serif; color: #b2a5b0; }
+.ib.fmt { font: 700 17px "Segoe UI", sans-serif; color: #b2a5b0; }
 .ib.fmt.on { background: var(--accent-soft); color: var(--accent); }
 .ib.fmt:not(.on) { text-decoration: line-through; text-decoration-thickness: 1.5px; }
 /* fold chevrons: no browser padding (it pushed the arrow off-centre); folded reads soft, not a dark disc */
@@ -194,14 +194,14 @@ body.dragging .sign:not(.preview) { pointer-events: none; }
 #ed-crumbs.on { display: flex; }
 button.cr:hover { background: #fff; color: var(--accent); box-shadow: var(--shadow); }
 .pk-t { font-weight: 700; font-size: 13px; padding: 0 14px 6px; color: var(--accent); border-bottom: 1px solid var(--line); margin-bottom: 6px; }
-.pk-b { font: 12px/1.55 Consolas, monospace; color: #6a6270; }
+.pk-b { font: 12.5px/1.55 "Segoe UI", sans-serif; color: #6a6270; }
 .pk-b div { padding: 0 14px; white-space: pre-wrap; word-break: break-word; }
 .pk-b .here { background: #fdf3c8; color: #3b3341; box-shadow: inset 3px 0 0 #e7c34a; }
 #toasts { bottom: 122px; }
 @keyframes breathe { 50% { box-shadow: 0 0 0 6px rgba(113, 75, 103, .12); } }
 /* what an idea or a task says, unfolding under it like a drawer */
 #ipeek { position: fixed; z-index: 58; width: 280px; padding: 9px 12px 10px; border-radius: 12px; background: #fff; box-shadow: var(--shadow-up);
-  font: 13.5px/1.45 Georgia, serif; color: #2f2735; white-space: pre-wrap; word-break: break-word; pointer-events: none;
+  font: 13.5px/1.45 "Segoe UI", sans-serif; color: #2f2735; white-space: pre-wrap; word-break: break-word; pointer-events: none;
   clip-path: inset(0 0 100% 0 round 12px); opacity: 0;
   transition: clip-path .32s cubic-bezier(.22, 1, .36, 1), opacity .12s ease; }
 #ipeek.on { clip-path: inset(0 0 0 0 round 12px); opacity: 1; }
