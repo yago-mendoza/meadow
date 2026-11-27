@@ -1416,3 +1416,6 @@ body.has-aits #stage { right: 230px; }
 #list { right: auto !important; bottom: auto !important; left: 50% !important; top: 84px !important; width: min(680px, 92vw) !important; height: min(560px, calc(100vh - 140px)); transform: translateX(-50%); z-index: 150 !important; border-radius: 20px !important;
   box-shadow: 0 24px 70px rgba(60, 40, 70, .28), 0 0 0 100vmax rgba(60, 40, 70, .14) !important; transition: opacity .16s, transform .22s cubic-bezier(.22, 1, .36, 1); }
 #list.closed { transform: translateX(-50%) translateY(-8px) scale(.98) !important; opacity: 0; pointer-events: none; box-shadow: none !important; }
+/* picking a place: just a small grow and back, no ring wave */
+.pulse { animation: pick-bump .38s cubic-bezier(.22, 1, .36, 1); }
+@keyframes pick-bump { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.035); } }
